@@ -51,7 +51,6 @@ export function parseUserFromJWT(token: string): User | null {
 
 export function roleRedirectPath(u: User | null) {
   if (!u) return '/login'
-  if (u.role === 'client') return '/homepage'
   if (u.role === 'employee') return '/employee/dashboard'
   if (u.role === 'admin') return '/admin/dashboard'
   if (u.role === 'superadmin') return '/admin/dashboard'

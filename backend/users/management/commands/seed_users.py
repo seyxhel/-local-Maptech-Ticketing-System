@@ -4,16 +4,6 @@ from users.models import User
 
 SEED_USERS = [
     {
-        'username': 'ivo',
-        'first_name': 'Rivo',
-        'last_name': 'Vebayo',
-        'email': 'rivovebayo@gmail.com',
-        'password': 'RivoVebayo123!',
-        'phone': '+639666666666',
-        'role': User.ROLE_CLIENT,
-        'is_agreed_privacy_policy': True,
-    },
-    {
         'username': 'seyxhel',
         'first_name': 'Sealtiel Joseph',
         'last_name': 'Pelagio',
@@ -39,7 +29,7 @@ SEED_USERS = [
 
 
 class Command(BaseCommand):
-    help = 'Seed the users_user table with default client, admin, and employee accounts.'
+    help = 'Seed the users_user table with default admin and employee accounts.'
 
     def handle(self, *args, **options):
         for data in SEED_USERS:

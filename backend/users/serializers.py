@@ -53,7 +53,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         password = validated_data.pop('password')
         user = User.objects.create_user(
             password=password,
-            role=User.ROLE_CLIENT,
+            role=User.ROLE_EMPLOYEE,
             is_agreed_privacy_policy=True,
             **{k: v for k, v in validated_data.items() if v is not None}
         )

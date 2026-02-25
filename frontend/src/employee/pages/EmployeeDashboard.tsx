@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { fetchTickets, updateEmployeeFields, uploadAttachments, deleteAttachment, escalateTicket, passTicket, uploadResolutionProof, requestClosure, updateTaskStatus, fetchEmployees } from '../../services/ticketService'
+import { fetchTickets, updateEmployeeFields, deleteAttachment, uploadResolutionProof, updateTaskStatus } from '../../services/ticketService'
 import { getCurrentUser } from '../../services/authService'
 import TicketChat from '../../shared/components/TicketChat'
 
@@ -7,16 +7,13 @@ const inputStyle: React.CSSProperties = { width: '100%', padding: '8px 12px', bo
 const labelStyle: React.CSSProperties = { display: 'block', fontWeight: 600, fontSize: 13, marginBottom: 4, color: '#374151' }
 const btnPrimary: React.CSSProperties = { padding: '8px 18px', borderRadius: 6, border: 'none', background: '#2563eb', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: 13 }
 const btnSecondary: React.CSSProperties = { padding: '8px 18px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer', fontSize: 13 }
-const btnDanger: React.CSSProperties = { padding: '8px 18px', borderRadius: 6, border: 'none', background: '#dc2626', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: 13 }
-const btnWarning: React.CSSProperties = { padding: '8px 18px', borderRadius: 6, border: 'none', background: '#f59e0b', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: 13 }
 
 export default function EmployeeDashboard() {
   const [tickets, setTickets] = useState<any[]>([])
   const [viewTicket, setViewTicket] = useState<any | null>(null)
   const [currentUserId, setCurrentUserId] = useState<number>(0)
-  const [chatTab, setChatTab] = useState<'client' | 'admin'>('client')
 
-  // Employee-editable fields (removed preferred_support_type and description_of_problem — now client-set)
+  // Employee-editable fields
   const [hasWarranty, setHasWarranty] = useState(false)
   const [product, setProduct] = useState('')
   const [brand, setBrand] = useState('')
@@ -29,31 +26,18 @@ export default function EmployeeDashboard() {
   const [remarks, setRemarks] = useState('')
   const [jobStatus, setJobStatus] = useState('')
 
-  // Attachments
-  const [pendingFiles, setPendingFiles] = useState<File[]>([])
-  const [isDragging, setIsDragging] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-
   // Resolution proof
   const [proofFiles, setProofFiles] = useState<File[]>([])
+  const [isDraggingProof, setIsDraggingProof] = useState(false)
   const proofInputRef = useRef<HTMLInputElement>(null)
 
   // Media preview lightbox
   const [previewMedia, setPreviewMedia] = useState<{ url: string; isVideo: boolean } | null>(null)
 
-  // Escalation / Pass
-  const [showEscalateModal, setShowEscalateModal] = useState(false)
-  const [escalateNotes, setEscalateNotes] = useState('')
-  const [showPassModal, setShowPassModal] = useState(false)
-  const [passNotes, setPassNotes] = useState('')
-  const [passEmployeeId, setPassEmployeeId] = useState<string>('')
-  const [employees, setEmployees] = useState<any[]>([])
-
   useEffect(() => {
     loadTickets()
     ;(async () => {
       try { const u = await getCurrentUser(); setCurrentUserId(u.id) } catch { /* ignore */ }
-      try { setEmployees(await fetchEmployees()) } catch { /* ignore */ }
     })()
   }, [])
 
@@ -72,10 +56,9 @@ export default function EmployeeDashboard() {
     setActionTaken(t.action_taken || '')
     setRemarks(t.remarks || '')
     setJobStatus(t.job_status || '')
-    setPendingFiles([])
     setProofFiles([])
   }
-  const closeDetail = () => { setViewTicket(null); setPendingFiles([]); setProofFiles([]) }
+  const closeDetail = () => { setViewTicket(null); setProofFiles([]) }
 
   const handleSave = async () => {
     if (!viewTicket) return
@@ -93,11 +76,6 @@ export default function EmployeeDashboard() {
       job_status: jobStatus,
     }
     await updateEmployeeFields(viewTicket.id, payload)
-    // Upload pending files
-    if (pendingFiles.length > 0) {
-      await uploadAttachments(viewTicket.id, pendingFiles)
-      setPendingFiles([])
-    }
     // Upload resolution proof files
     if (proofFiles.length > 0) {
       await uploadResolutionProof(viewTicket.id, proofFiles)
@@ -118,37 +96,6 @@ export default function EmployeeDashboard() {
     setViewTicket(refreshed.find((t: any) => t.id === viewTicket.id) || viewTicket)
   }
 
-  const handleEscalate = async () => {
-    if (!viewTicket) return
-    await escalateTicket(viewTicket.id, escalateNotes)
-    setShowEscalateModal(false)
-    setEscalateNotes('')
-    closeDetail()
-    await loadTickets()
-  }
-
-  const handlePass = async () => {
-    if (!viewTicket || !passEmployeeId) return
-    await passTicket(viewTicket.id, { employee_id: Number(passEmployeeId), notes: passNotes })
-    setShowPassModal(false)
-    setPassNotes('')
-    setPassEmployeeId('')
-    closeDetail()
-    await loadTickets()
-  }
-
-  const handleRequestClosure = async () => {
-    if (!viewTicket) return
-    const result = await requestClosure(viewTicket.id)
-    if (result.ok) {
-      const refreshed = await fetchTickets()
-      setTickets(refreshed)
-      setViewTicket(refreshed.find((t: any) => t.id === viewTicket.id) || null)
-    } else {
-      alert(result.data?.detail || 'Failed to request closure')
-    }
-  }
-
   const handleTaskStatusChange = async (taskId: number, newStatus: string) => {
     if (!viewTicket) return
     await updateTaskStatus(viewTicket.id, taskId, newStatus)
@@ -157,25 +104,18 @@ export default function EmployeeDashboard() {
     setViewTicket(refreshed.find((t: any) => t.id === viewTicket.id) || viewTicket)
   }
 
-  // Drag & drop
-  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(true) }
-  const handleDragLeave = () => setIsDragging(false)
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault(); setIsDragging(false)
+  // Drag & drop for resolution proof
+  const handleProofDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDraggingProof(true) }
+  const handleProofDragLeave = () => setIsDraggingProof(false)
+  const handleProofDrop = (e: React.DragEvent) => {
+    e.preventDefault(); setIsDraggingProof(false)
     const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'))
-    setPendingFiles(prev => [...prev, ...files])
+    setProofFiles(prev => [...prev, ...files])
   }
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const files = Array.from(e.target.files).filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'))
-      setPendingFiles(prev => [...prev, ...files])
-    }
-  }
-  const removePending = (idx: number) => setPendingFiles(prev => prev.filter((_, i) => i !== idx))
-
   const handleProofSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      setProofFiles(prev => [...prev, ...Array.from(e.target.files!)])
+      const files = Array.from(e.target.files).filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'))
+      setProofFiles(prev => [...prev, ...files])
     }
   }
   const removeProof = (idx: number) => setProofFiles(prev => prev.filter((_, i) => i !== idx))
@@ -246,9 +186,8 @@ export default function EmployeeDashboard() {
       {viewTicket && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
           <div style={{ background: '#fff', borderRadius: 12, padding: 28, width: 750, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <div style={{ marginBottom: 16 }}>
               <h2 style={{ margin: 0, fontSize: 20 }}>Ticket Details — {viewTicket.stf_no}</h2>
-              <button onClick={closeDetail} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#6b7280' }}>&times;</button>
             </div>
 
             {/* Read-only ticket info */}
@@ -354,42 +293,43 @@ export default function EmployeeDashboard() {
               <textarea style={{ ...inputStyle, minHeight: 50, resize: 'vertical' }} value={remarks} onChange={(e) => setRemarks(e.target.value)} />
             </div>
 
-            {/* Attachments — drag & drop */}
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ ...labelStyle, marginBottom: 8 }}>Attachments</label>
-              <div onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop} onClick={() => fileInputRef.current?.click()}
-                style={{ border: `2px dashed ${isDragging ? '#2563eb' : '#d1d5db'}`, borderRadius: 8, padding: 24, textAlign: 'center', cursor: 'pointer', background: isDragging ? '#eff6ff' : '#f9fafb', transition: 'all 0.2s' }}>
-                <p style={{ margin: 0, color: '#6b7280', fontSize: 14 }}>Drag & drop images/videos here, or <span style={{ color: '#2563eb', fontWeight: 600 }}>click to browse</span></p>
-                <input ref={fileInputRef} type="file" multiple accept="image/*,video/*" onChange={handleFileSelect} style={{ display: 'none' }} />
+            {/* Resolution Proof — drag & drop */}
+            <div style={{ marginBottom: 16, padding: 16, background: '#fefce8', borderRadius: 8, border: '1px solid #fde68a' }}>
+              <label style={{ ...labelStyle, marginBottom: 8, color: '#92400e' }}>Resolution Proof (Required for closure)</label>
+              <div onDragOver={handleProofDragOver} onDragLeave={handleProofDragLeave} onDrop={handleProofDrop} onClick={() => proofInputRef.current?.click()}
+                style={{ border: `2px dashed ${isDraggingProof ? '#f59e0b' : '#fde68a'}`, borderRadius: 8, padding: 24, textAlign: 'center', cursor: 'pointer', background: isDraggingProof ? '#fef9c3' : '#fffbeb', transition: 'all 0.2s' }}>
+                <p style={{ margin: 0, color: '#92400e', fontSize: 14 }}>Drag & drop images/videos here, or <span style={{ color: '#f59e0b', fontWeight: 600 }}>click to browse</span></p>
+                <p style={{ margin: '4px 0 0', color: '#b45309', fontSize: 12 }}>Accepts images and videos</p>
+                <input ref={proofInputRef} type="file" multiple accept="image/*,video/*" onChange={handleProofSelect} style={{ display: 'none' }} />
               </div>
-              {viewTicket.attachments && viewTicket.attachments.filter((a: any) => !a.is_resolution_proof).length > 0 && (
+              {/* Uploaded proof thumbnails */}
+              {viewTicket.attachments && viewTicket.attachments.filter((a: any) => a.is_resolution_proof).length > 0 && (
                 <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {viewTicket.attachments.filter((a: any) => !a.is_resolution_proof).map((att: any) => {
+                  {viewTicket.attachments.filter((a: any) => a.is_resolution_proof).map((att: any) => {
                     const isImage = att.file && att.file.match(/\.(jpg|jpeg|png|gif|webp)$/i); const isVideo = att.file && att.file.match(/\.(mp4|webm|ogg|mov|avi)$/i)
                     return (
-                      <div key={att.id} style={{ position: 'relative', width: 80, height: 80, borderRadius: 6, overflow: 'hidden', border: '1px solid #e5e7eb', cursor: (isImage || isVideo) ? 'pointer' : 'default' }} onClick={() => { if (isImage || isVideo) setPreviewMedia({ url: att.file, isVideo: !!isVideo }) }}>
-                        {isImage ? <img src={att.file} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : isVideo ? <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#f3f4f6', fontSize: 11, color: '#6b7280' }}><span style={{ fontSize: 24, marginBottom: 2 }}>&#9654;</span>Video</div> : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f3f4f6', fontSize: 11, color: '#6b7280' }}>File</div>}
+                      <div key={att.id} style={{ position: 'relative', width: 80, height: 80, borderRadius: 6, overflow: 'hidden', border: '1px solid #fde68a', cursor: (isImage || isVideo) ? 'pointer' : 'default' }} onClick={() => { if (isImage || isVideo) setPreviewMedia({ url: att.file, isVideo: !!isVideo }) }}>
+                        {isImage ? <img src={att.file} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : isVideo ? <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#fef9c3', fontSize: 11, color: '#92400e' }}><span style={{ fontSize: 24, marginBottom: 2 }}>&#9654;</span>Video</div> : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fef9c3', fontSize: 11, color: '#92400e' }}>File</div>}
                         <button onClick={(e) => { e.stopPropagation(); handleDeleteAttachment(att.id) }} style={{ position: 'absolute', top: 2, right: 2, width: 18, height: 18, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>&times;</button>
                       </div>
                     )
                   })}
                 </div>
               )}
-              {pendingFiles.length > 0 && (
-                <div style={{ marginTop: 8, fontSize: 13 }}><strong>Pending upload:</strong>{pendingFiles.map((f, i) => (<span key={i} style={{ marginLeft: 8, background: '#eff6ff', padding: '2px 8px', borderRadius: 4 }}>{f.name} <button onClick={() => removePending(i)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#dc2626', fontWeight: 700 }}>&times;</button></span>))}</div>
-              )}
-            </div>
-
-            {/* Resolution Proof Upload */}
-            <div style={{ marginBottom: 16, padding: 16, background: '#fefce8', borderRadius: 8, border: '1px solid #fde68a' }}>
-              <label style={{ ...labelStyle, marginBottom: 8, color: '#92400e' }}>Resolution Proof (Required for closure)</label>
-              <button type="button" onClick={() => proofInputRef.current?.click()} style={{ ...btnWarning, padding: '6px 14px', fontSize: 12 }}>Upload Proof Files</button>
-              <input ref={proofInputRef} type="file" multiple onChange={handleProofSelect} style={{ display: 'none' }} />
-              {viewTicket.attachments && viewTicket.attachments.filter((a: any) => a.is_resolution_proof).length > 0 && (
-                <div style={{ marginTop: 8, fontSize: 13 }}><strong>Uploaded proofs:</strong>{viewTicket.attachments.filter((a: any) => a.is_resolution_proof).map((att: any) => (<span key={att.id} style={{ marginLeft: 8, background: '#dcfce7', padding: '2px 8px', borderRadius: 4 }}>{att.file?.split('/').pop()} <button onClick={() => handleDeleteAttachment(att.id)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#dc2626', fontWeight: 700 }}>&times;</button></span>))}</div>
-              )}
+              {/* Pending proof files to upload */}
               {proofFiles.length > 0 && (
-                <div style={{ marginTop: 8, fontSize: 13 }}><strong>Pending proof:</strong>{proofFiles.map((f, i) => (<span key={i} style={{ marginLeft: 8, background: '#fef3c7', padding: '2px 8px', borderRadius: 4 }}>{f.name} <button onClick={() => removeProof(i)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#dc2626', fontWeight: 700 }}>&times;</button></span>))}</div>
+                <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {proofFiles.map((f, i) => {
+                    const isImage = f.type.startsWith('image/'); const isVideo = f.type.startsWith('video/')
+                    const thumbUrl = isImage ? URL.createObjectURL(f) : ''
+                    return (
+                      <div key={i} style={{ position: 'relative', width: 80, height: 80, borderRadius: 6, overflow: 'hidden', border: '2px solid #f59e0b' }}>
+                        {isImage ? <img src={thumbUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : isVideo ? <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#fef9c3', fontSize: 11, color: '#92400e' }}><span style={{ fontSize: 24, marginBottom: 2 }}>&#9654;</span>{f.name.length > 8 ? f.name.slice(0, 8) + '…' : f.name}</div> : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fef9c3', fontSize: 10, color: '#92400e', textAlign: 'center', padding: 4 }}>{f.name}</div>}
+                        <button onClick={() => removeProof(i)} style={{ position: 'absolute', top: 2, right: 2, width: 18, height: 18, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>&times;</button>
+                      </div>
+                    )
+                  })}
+                </div>
               )}
             </div>
 
@@ -414,16 +354,9 @@ export default function EmployeeDashboard() {
             </div>
 
             {/* Action buttons */}
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap' }}>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button style={{ ...btnDanger, fontSize: 12, padding: '6px 14px' }} onClick={() => { setEscalateNotes(''); setShowEscalateModal(true) }}>Escalate</button>
-                <button style={{ ...btnWarning, fontSize: 12, padding: '6px 14px' }} onClick={() => { setPassNotes(''); setPassEmployeeId(''); setShowPassModal(true) }}>Pass to Employee</button>
-                <button style={{ padding: '6px 14px', borderRadius: 6, border: 'none', background: '#7c3aed', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: 12 }} onClick={handleRequestClosure}>Request Closure</button>
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button style={btnSecondary} onClick={closeDetail}>Close</button>
-                <button style={btnPrimary} onClick={handleSave}>Save Changes</button>
-              </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginBottom: 20, flexWrap: 'wrap' }}>
+              <button style={btnSecondary} onClick={closeDetail}>Close</button>
+              <button style={btnPrimary} onClick={handleSave}>Save Changes</button>
             </div>
             </>)}
 
@@ -434,36 +367,12 @@ export default function EmployeeDashboard() {
               </div>
             )}
 
-            {/* ── Chat Section (two channels) ── */}
+            {/* ── Chat Section (admin channel only) ── */}
             {currentUserId > 0 && (
               <div style={{ marginBottom: 20 }}>
-                <label style={{ ...labelStyle, marginBottom: 8 }}>Messages</label>
-                <div style={{ display: 'flex', gap: 0, marginBottom: 8, borderBottom: '1px solid #e5e7eb' }}>
-                  <button
-                    onClick={() => setChatTab('client')}
-                    style={{
-                      padding: '8px 16px', cursor: 'pointer', border: 'none',
-                      borderBottom: chatTab === 'client' ? '3px solid #2563eb' : '3px solid transparent',
-                      background: 'none', fontWeight: chatTab === 'client' ? 700 : 400,
-                      color: chatTab === 'client' ? '#2563eb' : '#6b7280', fontSize: 13,
-                    }}
-                  >Client Chat</button>
-                  <button
-                    onClick={() => setChatTab('admin')}
-                    style={{
-                      padding: '8px 16px', cursor: 'pointer', border: 'none',
-                      borderBottom: chatTab === 'admin' ? '3px solid #2563eb' : '3px solid transparent',
-                      background: 'none', fontWeight: chatTab === 'admin' ? 700 : 400,
-                      color: chatTab === 'admin' ? '#2563eb' : '#6b7280', fontSize: 13,
-                    }}
-                  >Admin Chat</button>
-                </div>
+                <label style={{ ...labelStyle, marginBottom: 8 }}>Admin Chat</label>
                 <div style={{ height: 320 }}>
-                  {chatTab === 'client' ? (
-                    <TicketChat ticketId={viewTicket.id} channelType="client_employee" currentUserId={currentUserId} currentUserRole="employee" />
-                  ) : (
-                    <TicketChat ticketId={viewTicket.id} channelType="admin_employee" currentUserId={currentUserId} currentUserRole="employee" />
-                  )}
+                  <TicketChat ticketId={viewTicket.id} channelType="admin_employee" currentUserId={currentUserId} currentUserRole="employee" />
                 </div>
               </div>
             )}
@@ -471,44 +380,6 @@ export default function EmployeeDashboard() {
           </div>
         </div>
       )}
-      {/* ── Escalate Modal ── */}
-      {showEscalateModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100 }}>
-          <div style={{ background: '#fff', borderRadius: 12, padding: 24, width: 420, boxShadow: '0 4px 24px rgba(0,0,0,0.15)' }}>
-            <h3 style={{ marginTop: 0 }}>Escalate Ticket</h3>
-            <p style={{ fontSize: 13, color: '#6b7280' }}>This will escalate the ticket internally to the supervisor for reassignment.</p>
-            <label style={labelStyle}>Notes <span style={{ fontWeight: 400, color: '#9ca3af' }}>(optional)</span></label>
-            <textarea style={{ ...inputStyle, minHeight: 70, resize: 'vertical' }} value={escalateNotes} onChange={(e) => setEscalateNotes(e.target.value)} placeholder="Reason for escalation..." />
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
-              <button style={btnSecondary} onClick={() => setShowEscalateModal(false)}>Cancel</button>
-              <button style={btnDanger} onClick={handleEscalate}>Escalate</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Pass Ticket Modal ── */}
-      {showPassModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100 }}>
-          <div style={{ background: '#fff', borderRadius: 12, padding: 24, width: 420, boxShadow: '0 4px 24px rgba(0,0,0,0.15)' }}>
-            <h3 style={{ marginTop: 0 }}>Pass Ticket to Employee</h3>
-            <label style={labelStyle}>Select Employee *</label>
-            <select style={inputStyle} value={passEmployeeId} onChange={(e) => setPassEmployeeId(e.target.value)} required>
-              <option value="">-- Select Employee --</option>
-              {employees.filter(e => e.id !== currentUserId).map((emp: any) => (
-                <option key={emp.id} value={emp.id}>{emp.first_name} {emp.last_name} ({emp.username})</option>
-              ))}
-            </select>
-            <label style={{ ...labelStyle, marginTop: 12 }}>Notes <span style={{ fontWeight: 400, color: '#9ca3af' }}>(optional)</span></label>
-            <textarea style={{ ...inputStyle, minHeight: 60, resize: 'vertical' }} value={passNotes} onChange={(e) => setPassNotes(e.target.value)} placeholder="Reason for passing..." />
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
-              <button style={btnSecondary} onClick={() => setShowPassModal(false)}>Cancel</button>
-              <button style={btnPrimary} disabled={!passEmployeeId} onClick={handlePass}>Pass Ticket</button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ───── MEDIA PREVIEW LIGHTBOX ───── */}
       {previewMedia && (
         <div

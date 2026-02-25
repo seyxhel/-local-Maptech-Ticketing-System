@@ -16,39 +16,6 @@ export async function checkUnique(field: 'email' | 'username' | 'phone', value: 
   }
 }
 
-export async function checkPwnedPassword(password: string): Promise<boolean> {
-  try {
-    const encoder = new TextEncoder()
-    const data = encoder.encode(password)
-    const hashBuffer = await crypto.subtle.digest('SHA-1', data)
-    const hashArray = Array.from(new Uint8Array(hashBuffer))
-    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase()
-    const prefix = hashHex.slice(0, 5)
-    const suffix = hashHex.slice(5)
-    const res = await fetch(`https://api.pwnedpasswords.com/range/${prefix}`)
-    const text = await res.text()
-    const lines = text.split('\n')
-    for (const line of lines) {
-      const [hashSuffix, count] = line.split(':')
-      if (hashSuffix.trim() === suffix) {
-        return parseInt(count.trim(), 10) > 0
-      }
-    }
-    return false
-  } catch {
-    return false
-  }
-}
-
-export async function register(payload: any) {
-  const res = await fetch(`${API_BASE}/auth/register/`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  })
-  return res.json()
-}
-
 export async function login(payload: { username: string; password: string }) {
   const res = await fetch(`${API_BASE}/auth/login/`, {
     method: 'POST',
@@ -90,25 +57,6 @@ export async function sendPasswordReset(email: string) {
   return res.json()
 }
 
-/** Send Google ID token to backend; returns tokens for both new and existing users */
-export async function googleAuth(token: string) {
-  const res = await fetch(`${API_BASE}/auth/google/`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token }),
-  })
-  return res.json()
-}
-
-/** Mark the current user as having accepted the privacy policy */
-export async function acceptPrivacy() {
-  const res = await fetch(`${API_BASE}/auth/accept_privacy/`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
-  })
-  return res.json()
-}
-
 /** Refresh the access token using a refresh token */
 export async function refreshToken(refresh: string) {
   const res = await fetch(`${API_BASE}/auth/token/refresh/`, {
@@ -128,14 +76,3 @@ export async function resetPasswordConfirm(uid: string, token: string, new_passw
   })
   return { ok: res.ok, data: await res.json() }
 }
-
-/** Send Microsoft ID token to backend */
-export async function microsoftAuth(token: string) {
-  const res = await fetch(`${API_BASE}/auth/microsoft/`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token }),
-  })
-  return res.json()
-}
-

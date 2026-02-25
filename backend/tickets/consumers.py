@@ -9,10 +9,9 @@ class TicketChatConsumer(AsyncJsonWebsocketConsumer):
     """WebSocket consumer for ticket chat.
 
     URL: ws/chat/<ticket_id>/<channel_type>/
-    channel_type: client_employee | admin_employee
+    channel_type: admin_employee
 
     Permissions:
-      - client_employee: only the ticket creator (client) and the currently assigned employee
       - admin_employee: only admins and the currently assigned employee
       - Old employees (not currently assigned) are rejected.
     """
@@ -129,14 +128,7 @@ class TicketChatConsumer(AsyncJsonWebsocketConsumer):
             return False
 
         user = self.user
-        if self.channel_type == 'client_employee':
-            # Only ticket creator (client) or the currently assigned employee
-            if user.id == ticket.created_by_id:
-                return True
-            if ticket.assigned_to_id and user.id == ticket.assigned_to_id:
-                return True
-            return False
-        elif self.channel_type == 'admin_employee':
+        if self.channel_type == 'admin_employee':
             # Only admin/superadmin or the currently assigned employee
             if user.is_admin_level:
                 return True

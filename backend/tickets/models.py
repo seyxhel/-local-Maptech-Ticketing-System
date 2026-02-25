@@ -213,10 +213,8 @@ class AssignmentSession(models.Model):
 
 
 class Message(models.Model):
-    CHANNEL_CLIENT_EMPLOYEE = 'client_employee'
     CHANNEL_ADMIN_EMPLOYEE = 'admin_employee'
     CHANNEL_CHOICES = [
-        (CHANNEL_CLIENT_EMPLOYEE, 'Client ↔ Employee'),
         (CHANNEL_ADMIN_EMPLOYEE, 'Admin ↔ Employee'),
     ]
 

@@ -1,34 +1,12 @@
 """
 Role-based DRF permission classes for the ticketing system.
 
-Roles: client, employee, admin, superadmin
+Roles: employee, admin, superadmin
 """
 from rest_framework.permissions import BasePermission
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
-
-
-class IsClient(BasePermission):
-    """Allow only users with `client` role."""
-    message = 'Only clients can perform this action.'
-
-    def has_permission(self, request, view):
-        return (
-            request.user.is_authenticated
-            and request.user.role == User.ROLE_CLIENT
-        )
-
-
-class IsClientOrAdmin(BasePermission):
-    """Allow clients and admin-level users."""
-    message = 'Only clients or admins can perform this action.'
-
-    def has_permission(self, request, view):
-        return (
-            request.user.is_authenticated
-            and (request.user.role == User.ROLE_CLIENT or request.user.is_admin_level)
-        )
 
 
 class IsEmployee(BasePermission):
@@ -87,7 +65,7 @@ class IsAdminOrAssignedEmployee(BasePermission):
 
 
 class IsTicketParticipant(BasePermission):
-    """Allow the client who created the ticket, the assigned employee, or any admin."""
+    """Allow the assigned employee, or any admin."""
     message = 'You are not a participant of this ticket.'
 
     def has_permission(self, request, view):
@@ -98,7 +76,5 @@ class IsTicketParticipant(BasePermission):
         if user.is_admin_level:
             return True
         if user.role == User.ROLE_EMPLOYEE and obj.assigned_to == user:
-            return True
-        if user.role == User.ROLE_CLIENT and obj.created_by == user:
             return True
         return False

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { fetchTickets, assignTicket, reviewTicket, confirmTicket, closeTicket, escalateExternal, fetchEmployees, fetchCSAT } from '../../../services/ticketService'
+import { fetchTickets, assignTicket, reviewTicket, confirmTicket, closeTicket, escalateExternal, fetchEmployees } from '../../../services/ticketService'
 import { fetchTypesOfService, createTypeOfService, updateTypeOfService, deleteTypeOfService, TypeOfService } from '../../../services/typeOfServiceService'
 import { getCurrentUser } from '../../../services/authService'
 import TicketChat from '../../../shared/components/TicketChat'
@@ -35,7 +35,6 @@ export default function AdminDashboard() {
 
   // Ticket detail modal
   const [viewTicket, setViewTicket] = useState<any | null>(null)
-  const [priority, setPriority] = useState('')
   const [currentUserId, setCurrentUserId] = useState<number>(0)
 
   // Employees list for assign
@@ -50,9 +49,6 @@ export default function AdminDashboard() {
   const [showExtEscModal, setShowExtEscModal] = useState(false)
   const [extEscTo, setExtEscTo] = useState('')
   const [extEscNotes, setExtEscNotes] = useState('')
-
-  // CSAT survey for detail
-  const [csatData, setCsatData] = useState<any | null>(null)
 
   // Media preview lightbox
   const [previewMedia, setPreviewMedia] = useState<{ url: string; isVideo: boolean } | null>(null)
@@ -101,7 +97,7 @@ export default function AdminDashboard() {
       setTickets(refreshed)
       setViewTicket(refreshed.find((t: any) => t.id === viewTicket.id) || null)
     } else {
-      alert(result.data?.detail || 'Cannot close ticket — check that resolution proof and CSAT survey are present.')
+      alert(result.data?.detail || 'Failed to close ticket.')
     }
   }
 
@@ -132,17 +128,14 @@ export default function AdminDashboard() {
   const handleDeleteSvc = async (s: TypeOfService) => { if (confirm(`Delete "${s.name}"?`)) { await deleteTypeOfService(s.id); setServices(await fetchTypesOfService()) } }
 
   // ---------- Ticket detail / review ----------
-  const openTicketDetail = async (t: any) => {
+  const openTicketDetail = (t: any) => {
     setViewTicket(t)
-    setPriority(t.priority || '')
-    setCsatData(null)
-    try { const c = await fetchCSAT(t.id); setCsatData(c) } catch { /* no survey yet */ }
   }
-  const closeTicketDetail = () => { setViewTicket(null); setPriority(''); setCsatData(null) }
+  const closeTicketDetail = () => { setViewTicket(null) }
 
   const handleReview = async () => {
     if (!viewTicket) return
-    const updated = await reviewTicket(viewTicket.id, { priority })
+    const updated = await reviewTicket(viewTicket.id, {})
     setViewTicket(updated)
     setTickets(await fetchTickets())
   }
@@ -188,10 +181,7 @@ export default function AdminDashboard() {
                     <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', fontSize: 13 }}>{t.priority || '—'}</td>
                     <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', fontSize: 13 }}>{t.assigned_to?.username || '—'}</td>
                     <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', fontSize: 13 }}>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <button style={{ ...btnPrimary, padding: '5px 12px', fontSize: 12 }} onClick={() => openTicketDetail(t)}>View</button>
-                        <button style={{ ...btnSecondary, padding: '5px 12px', fontSize: 12 }} onClick={() => handleAssign(t.id)}>Assign</button>
-                      </div>
+                      <button style={{ ...btnPrimary, padding: '5px 12px', fontSize: 12 }} onClick={() => openTicketDetail(t)}>View</button>
                     </td>
                   </tr>
                 ))}
@@ -254,9 +244,8 @@ export default function AdminDashboard() {
       {viewTicket && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
           <div style={{ background: '#fff', borderRadius: 12, padding: 28, width: 750, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <div style={{ marginBottom: 16 }}>
               <h2 style={{ margin: 0, fontSize: 20 }}>Ticket Details — {viewTicket.stf_no}</h2>
-              <button onClick={closeTicketDetail} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#6b7280' }}>&times;</button>
             </div>
 
             {/* Info grid */}
@@ -319,20 +308,10 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            {/* CSAT Survey */}
-            {csatData && (
-              <div style={{ padding: 16, background: '#f0fdf4', borderRadius: 8, marginBottom: 16, fontSize: 14 }}>
-                <h4 style={{ margin: '0 0 8px 0', fontSize: 14, color: '#15803d' }}>CSAT Survey Result</h4>
-                <div><strong>Rating:</strong> {'⭐'.repeat(csatData.rating)} ({csatData.rating}/5)</div>
-                {csatData.comments && <div style={{ marginTop: 4 }}><strong>Comments:</strong> {csatData.comments}</div>}
-                {csatData.has_other_concerns && <div style={{ marginTop: 4 }}><strong>Other Concerns:</strong> {csatData.other_concerns_text}</div>}
-              </div>
-            )}
-
-            {/* Attachments */}
+            {/* Resolution Proofs */}
             {viewTicket.attachments && viewTicket.attachments.length > 0 && (
               <div style={{ marginBottom: 16 }}>
-                <label style={{ fontWeight: 700, fontSize: 14, marginBottom: 8, display: 'block' }}>Attachments</label>
+                <label style={{ fontWeight: 700, fontSize: 14, marginBottom: 8, display: 'block' }}>Resolution Proofs</label>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   {viewTicket.attachments.map((att: any) => {
                     const isImage = att.file && att.file.match(/\.(jpg|jpeg|png|gif|webp)$/i)
@@ -348,31 +327,33 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            {/* Priority selector */}
-            <div style={{ padding: 16, background: '#f9fafb', borderRadius: 8, marginBottom: 16 }}>
-              <label style={{ fontWeight: 700, fontSize: 14, marginBottom: 8, display: 'block' }}>Priority Level</label>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {[
-                  { value: 'low', label: 'Low', color: '#15803d', bg: '#dcfce7' },
-                  { value: 'medium', label: 'Medium', color: '#ca8a04', bg: '#fef9c3' },
-                  { value: 'high', label: 'High', color: '#ea580c', bg: '#ffedd5' },
-                  { value: 'critical', label: 'Critical', color: '#dc2626', bg: '#fee2e2' },
-                ].map((p) => (
-                  <button key={p.value} type="button" onClick={() => setPriority(p.value)} style={{ padding: '6px 16px', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 13, border: priority === p.value ? `2px solid ${p.color}` : '2px solid transparent', background: p.bg, color: p.color }}>{p.label}</button>
-                ))}
+            {/* Priority (read-only) */}
+            {viewTicket.priority && (
+              <div style={{ padding: 16, background: '#f9fafb', borderRadius: 8, marginBottom: 16 }}>
+                <label style={{ fontWeight: 700, fontSize: 14, marginBottom: 8, display: 'block' }}>Priority Level</label>
+                {(() => {
+                  const pMap: Record<string, { color: string; bg: string }> = { low: { color: '#15803d', bg: '#dcfce7' }, medium: { color: '#ca8a04', bg: '#fef9c3' }, high: { color: '#ea580c', bg: '#ffedd5' }, critical: { color: '#dc2626', bg: '#fee2e2' } }
+                  const p = pMap[viewTicket.priority] || { color: '#374151', bg: '#f3f4f6' }
+                  return <span style={{ padding: '6px 18px', borderRadius: 6, fontWeight: 600, fontSize: 13, background: p.bg, color: p.color, border: `2px solid ${p.color}`, display: 'inline-block' }}>{viewTicket.priority.charAt(0).toUpperCase() + viewTicket.priority.slice(1)}</span>
+                })()}
               </div>
-            </div>
+            )}
 
             {/* Action buttons */}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
-              <button style={btnPrimary} onClick={handleReview}>{viewTicket.time_in ? 'Update Priority' : 'Review & Start Time In'}</button>
+              {!viewTicket.time_in && (
+                <button style={btnPrimary} onClick={handleReview}>Review & Start Time In</button>
+              )}
               {!viewTicket.confirmed_by_admin && viewTicket.status !== 'closed' && (
                 <button style={{ ...btnPrimary, background: '#059669' }} onClick={handleConfirm}>Confirm Issue</button>
               )}
               {viewTicket.status !== 'closed' && viewTicket.status !== 'escalated_external' && (
                 <button style={{ ...btnDanger, background: '#7c3aed' }} onClick={() => { setExtEscTo(''); setExtEscNotes(''); setShowExtEscModal(true) }}>Escalate External</button>
               )}
-              {['pending_closure'].includes(viewTicket.status) && (
+              {viewTicket.status !== 'closed' && (
+                <button style={{ ...btnSecondary, fontWeight: 600 }} onClick={() => handleAssign(viewTicket.id)}>Reassign Employee</button>
+              )}
+              {viewTicket.status !== 'closed' && (
                 <button style={{ ...btnPrimary, background: '#15803d' }} onClick={handleCloseTicket}>Close Ticket</button>
               )}
               <button style={btnSecondary} onClick={closeTicketDetail}>Close</button>

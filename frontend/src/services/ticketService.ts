@@ -88,17 +88,6 @@ export async function updateEmployeeFields(ticketId: number, payload: Record<str
   return res.json()
 }
 
-export async function uploadAttachments(ticketId: number, files: File[]) {
-  const formData = new FormData()
-  files.forEach((f) => formData.append('files', f))
-  const res = await fetch(`${API_BASE}/tickets/${ticketId}/upload_attachment/`, {
-    method: 'POST',
-    headers: { ...authHeaders() },
-    body: formData,
-  })
-  return res.json()
-}
-
 export async function uploadResolutionProof(ticketId: number, files: File[]) {
   const formData = new FormData()
   files.forEach((f) => formData.append('files', f))

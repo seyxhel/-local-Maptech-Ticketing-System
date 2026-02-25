@@ -48,7 +48,7 @@ export class TicketChatSocket {
   private shouldReconnect = true
   private reconnectDelay = 1000
 
-  constructor(ticketId: number, channelType: 'client_employee' | 'admin_employee', callbacks: ChatCallbacks) {
+  constructor(ticketId: number, channelType: 'admin_employee', callbacks: ChatCallbacks) {
     this.ticketId = ticketId
     this.channelType = channelType
     this.callbacks = callbacks

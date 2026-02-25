@@ -224,7 +224,7 @@ def google_auth_view(request):
         email=email,
         first_name=first_name,
         last_name=last_name,
-        role=User.ROLE_CLIENT,
+        role=User.ROLE_EMPLOYEE,
     )
     user.set_unusable_password()
     user.last_login = timezone.now()
@@ -333,7 +333,7 @@ def microsoft_auth_view(request):
         email=email,
         first_name=first_name,
         last_name=last_name,
-        role=User.ROLE_CLIENT,
+        role=User.ROLE_EMPLOYEE,
     )
     user.set_unusable_password()
     user.last_login = timezone.now()

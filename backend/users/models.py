@@ -4,19 +4,17 @@ from django.contrib.auth.models import AbstractUser
 
 
 class User(AbstractUser):
-    ROLE_CLIENT = 'client'
     ROLE_EMPLOYEE = 'employee'
     ROLE_ADMIN = 'admin'
     ROLE_SUPERADMIN = 'superadmin'
     ROLE_CHOICES = [
-        (ROLE_CLIENT, 'Client'),
         (ROLE_EMPLOYEE, 'Employee'),
         (ROLE_ADMIN, 'Admin'),
         (ROLE_SUPERADMIN, 'Superadmin'),
     ]
 
     email = models.EmailField(unique=True)
-    role = models.CharField(max_length=12, choices=ROLE_CHOICES, default=ROLE_CLIENT)
+    role = models.CharField(max_length=12, choices=ROLE_CHOICES, default=ROLE_EMPLOYEE)
     middle_name = models.CharField(max_length=150, blank=True)
     suffix = models.CharField(max_length=3, blank=True)
     phone = models.CharField(max_length=13, blank=True)

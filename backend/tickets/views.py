@@ -17,10 +17,10 @@ from .serializers import (
     TicketSerializer, TypeOfServiceSerializer,
     TicketAttachmentSerializer, CSATSurveySerializer, EscalationLogSerializer,
     MessageSerializer, AssignmentSessionSerializer,
-    ClientCreateTicketSerializer, AdminTicketActionSerializer,
+    AdminCreateTicketSerializer,
     EmployeeTicketActionSerializer,
 )
-from .permissions import IsClient, IsAdminLevel, IsAssignedEmployee, IsAdminOrAssignedEmployee, IsTicketParticipant
+from .permissions import IsAdminLevel, IsAssignedEmployee, IsAdminOrAssignedEmployee, IsTicketParticipant
 from users.serializers import RegisterSerializer, UserSerializer
 
 
@@ -35,8 +35,7 @@ class TicketViewSet(viewsets.ModelViewSet):
             return Ticket.objects.all().order_by('-created_at')
         if user.role == User.ROLE_EMPLOYEE:
             return Ticket.objects.filter(assigned_to=user).order_by('-created_at')
-        # client
-        return Ticket.objects.filter(created_by=user).order_by('-created_at')
+        return Ticket.objects.none()
 
     def get_serializer_class(self):
         """Return a role-specific serializer for the create action so the
@@ -44,73 +43,46 @@ class TicketViewSet(viewsets.ModelViewSet):
         if self.action == 'create':
             user = self.request.user
             if user.is_authenticated:
-                if user.role == User.ROLE_CLIENT:
-                    return ClientCreateTicketSerializer
+                if user.is_admin_level:
+                    return AdminCreateTicketSerializer
                 elif user.role == User.ROLE_EMPLOYEE:
                     return EmployeeTicketActionSerializer
-                elif user.is_admin_level:
-                    return AdminTicketActionSerializer
         return TicketSerializer
 
     def create(self, request, *args, **kwargs):
-        """Role-aware POST: client creates a ticket, admin/employee act on existing tickets."""
+        """Role-aware POST: admin creates a ticket, employee acts on existing tickets."""
         user = request.user
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        # ── Client: create a new ticket (status auto-set to open) ──
-        if user.role == User.ROLE_CLIENT:
+        # ── Admin: create a new ticket ──
+        if user.is_admin_level:
+            priority = serializer.validated_data.pop('priority', '') or request.data.get('priority', '')
+            assign_to_id = serializer.validated_data.pop('assign_to', None) or request.data.get('assign_to')
+
             ticket = serializer.save(created_by=user)
+
+            if priority and priority in dict(Ticket.PRIORITY_CHOICES):
+                ticket.priority = priority
+
+            if assign_to_id:
+                try:
+                    emp = User.objects.get(id=assign_to_id, role=User.ROLE_EMPLOYEE)
+                    new_session = AssignmentSession.objects.create(ticket=ticket, employee=emp)
+                    ticket.assigned_to = emp
+                    ticket.current_session = new_session
+                except User.DoesNotExist:
+                    pass
+
+            # Set time_in since admin is creating directly
+            ticket.time_in = timezone.now()
+            ticket.confirmed_by_admin = True
+            ticket.save()
+
             return Response(
                 TicketSerializer(ticket, context={'request': request}).data,
                 status=status.HTTP_201_CREATED,
             )
-
-        # ── Admin: set priority and/or assign agent on existing ticket ──
-        if user.is_admin_level:
-            try:
-                ticket = Ticket.objects.get(id=serializer.validated_data['ticket'])
-            except Ticket.DoesNotExist:
-                return Response({'detail': 'Ticket not found.'}, status=status.HTTP_404_NOT_FOUND)
-
-            priority = serializer.validated_data.get('priority')
-            if priority:
-                ticket.priority = priority
-
-            assign_agent = serializer.validated_data.get('assign_agent')
-            if assign_agent:
-                try:
-                    emp = User.objects.get(id=assign_agent, role=User.ROLE_EMPLOYEE)
-                except User.DoesNotExist:
-                    return Response({'detail': 'Employee not found.'}, status=status.HTTP_404_NOT_FOUND)
-
-                old_employee = ticket.assigned_to
-                if ticket.current_session:
-                    prev = ticket.current_session
-                    prev.is_active = False
-                    prev.ended_at = timezone.now()
-                    prev.save()
-                    if old_employee and old_employee.id != emp.id:
-                        self._send_force_disconnect(ticket.id, old_employee)
-
-                new_session = AssignmentSession.objects.create(ticket=ticket, employee=emp)
-                ticket.assigned_to = emp
-                ticket.current_session = new_session
-                if ticket.status == Ticket.STATUS_OPEN:
-                    ticket.status = Ticket.STATUS_OPEN  # keep open
-
-                if old_employee and old_employee.id != emp.id:
-                    sys_content = f"Employee changed from {old_employee.get_full_name() or old_employee.username} to {emp.get_full_name() or emp.username}"
-                    for ch in ['client_employee', 'admin_employee']:
-                        Message.objects.create(
-                            ticket=ticket, assignment_session=new_session,
-                            channel_type=ch, sender=user,
-                            content=sys_content, is_system_message=True,
-                        )
-                        self._broadcast_system_message(ticket.id, ch, sys_content, user)
-
-            ticket.save()
-            return Response(TicketSerializer(ticket, context={'request': request}).data)
 
         # ── Employee: update product/service fields on existing ticket ──
         if user.role == User.ROLE_EMPLOYEE:
@@ -161,8 +133,7 @@ class TicketViewSet(viewsets.ModelViewSet):
             'escalate_external':        [IsAuthenticated(), IsAdminOrAssignedEmployee()],
             'upload_resolution_proof':  [IsAuthenticated(), IsAdminOrAssignedEmployee()],
             'update_task':              [IsAuthenticated(), IsAdminOrAssignedEmployee()],
-            # Any ticket participant (creator, assignee, admin)
-            'upload_attachment':        [IsAuthenticated(), IsTicketParticipant()],
+            # Delete attachment (resolution proofs)
             'delete_attachment':        [IsAuthenticated(), IsTicketParticipant()],
         }
         return perm_map.get(self.action, [IsAuthenticated()])
@@ -202,7 +173,7 @@ class TicketViewSet(viewsets.ModelViewSet):
         # Create system message about reassignment (in both channels)
         if old_employee and old_employee.id != emp.id:
             sys_content = f"Employee changed from {old_employee.get_full_name() or old_employee.username} to {emp.get_full_name() or emp.username}"
-            for ch in ['client_employee', 'admin_employee']:
+            for ch in ['admin_employee']:
                 Message.objects.create(
                     ticket=ticket,
                     assignment_session=new_session,
@@ -223,7 +194,7 @@ class TicketViewSet(viewsets.ModelViewSet):
         from asgiref.sync import async_to_sync
         channel_layer = get_channel_layer()
         if channel_layer:
-            for ch in ['client_employee', 'admin_employee']:
+            for ch in ['admin_employee']:
                 group = f'chat_{ticket_id}_{ch}'
                 async_to_sync(channel_layer.group_send)(group, {
                     'type': 'force_disconnect',
@@ -285,7 +256,7 @@ class TicketViewSet(viewsets.ModelViewSet):
         sys_content = f"{user.get_full_name() or user.username} escalated this ticket internally."
         if notes:
             sys_content += f" Notes: {notes}"
-        for ch in ['client_employee', 'admin_employee']:
+        for ch in ['admin_employee']:
             Message.objects.create(
                 ticket=ticket,
                 channel_type=ch,
@@ -340,7 +311,7 @@ class TicketViewSet(viewsets.ModelViewSet):
         sys_content = f"Ticket passed from {user.get_full_name() or user.username} to {to_emp.get_full_name() or to_emp.username}"
         if notes:
             sys_content += f". Notes: {notes}"
-        for ch in ['client_employee', 'admin_employee']:
+        for ch in ['admin_employee']:
             Message.objects.create(
                 ticket=ticket,
                 assignment_session=new_session,
@@ -422,7 +393,7 @@ class TicketViewSet(viewsets.ModelViewSet):
         sys_content = f"Ticket escalated externally to {escalated_to} by {user.get_full_name() or user.username}."
         if notes:
             sys_content += f" Notes: {notes}"
-        for ch in ['client_employee', 'admin_employee']:
+        for ch in ['admin_employee']:
             Message.objects.create(
                 ticket=ticket,
                 channel_type=ch,
@@ -436,17 +407,8 @@ class TicketViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def close_ticket(self, request, pk=None):
-        """Admin/Superadmin confirms closure. Requires resolution proof and CSAT survey."""
+        """Admin/Superadmin closes the ticket immediately."""
         ticket = self.get_object()
-
-        # Check resolution proof exists
-        has_proof = ticket.attachments.filter(is_resolution_proof=True).exists()
-        if not has_proof:
-            return Response({'detail': 'Resolution proof attachment is required before closure.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Check CSAT survey completed
-        if not hasattr(ticket, 'csat_survey') or not CSATSurvey.objects.filter(ticket=ticket).exists():
-            return Response({'detail': 'Client must complete CSAT survey before closure.'}, status=status.HTTP_400_BAD_REQUEST)
 
         # End current session
         if ticket.current_session:
@@ -460,15 +422,17 @@ class TicketViewSet(viewsets.ModelViewSet):
 
         # System message
         sys_content = f"Ticket closed by {request.user.get_full_name() or request.user.username}."
-        for ch in ['client_employee', 'admin_employee']:
-            Message.objects.create(
-                ticket=ticket,
-                channel_type=ch,
-                sender=request.user,
-                content=sys_content,
-                is_system_message=True,
-            )
-            self._broadcast_system_message(ticket.id, ch, sys_content, request.user)
+        if ticket.current_session:
+            for ch in ['admin_employee']:
+                Message.objects.create(
+                    ticket=ticket,
+                    assignment_session=ticket.current_session,
+                    channel_type=ch,
+                    sender=request.user,
+                    content=sys_content,
+                    is_system_message=True,
+                )
+                self._broadcast_system_message(ticket.id, ch, sys_content, request.user)
 
         return Response(self.get_serializer(ticket).data)
 
@@ -487,7 +451,7 @@ class TicketViewSet(viewsets.ModelViewSet):
         ticket.save()
 
         sys_content = f"{user.get_full_name() or user.username} marked this ticket as resolved and requested client feedback."
-        for ch in ['client_employee', 'admin_employee']:
+        for ch in ['admin_employee']:
             Message.objects.create(
                 ticket=ticket,
                 channel_type=ch,
@@ -511,7 +475,7 @@ class TicketViewSet(viewsets.ModelViewSet):
         for f in files:
             att = TicketAttachment.objects.create(ticket=ticket, file=f, uploaded_by=user, is_resolution_proof=True)
             attachments.append(att)
-        return Response(TicketAttachmentSerializer(attachments, many=True).data, status=status.HTTP_201_CREATED)
+        return Response(TicketAttachmentSerializer(attachments, many=True, context={'request': request}).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['patch'], url_path='update_task/(?P<task_id>[0-9]+)')
     def update_task(self, request, pk=None, task_id=None):
@@ -526,19 +490,6 @@ class TicketViewSet(viewsets.ModelViewSet):
             task.status = new_status
             task.save()
         return Response({'id': task.id, 'description': task.description, 'status': task.status})
-
-    @action(detail=True, methods=['post'], url_path='upload_attachment')
-    def upload_attachment(self, request, pk=None):
-        """Upload file attachments to a ticket."""
-        ticket = self.get_object()
-        files = request.FILES.getlist('files')
-        if not files:
-            return Response({'detail': 'No files provided.'}, status=status.HTTP_400_BAD_REQUEST)
-        attachments = []
-        for f in files:
-            att = TicketAttachment.objects.create(ticket=ticket, file=f, uploaded_by=request.user)
-            attachments.append(att)
-        return Response(TicketAttachmentSerializer(attachments, many=True).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['delete'], url_path='delete_attachment/(?P<att_id>[0-9]+)')
     def delete_attachment(self, request, pk=None, att_id=None):
@@ -596,27 +547,28 @@ class TicketViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'])
     def messages(self, request, pk=None):
         """Return message history for the ticket (scoped by channel_type param).
-        Admins/employees see all messages; clients see only client_employee channel."""
+        Employees see only messages from their current assignment session.
+        Admins see all messages across all sessions."""
         ticket = self.get_object()
         user = request.user
 
         # Verify participant
-        if not (user.is_admin_level or ticket.assigned_to == user or ticket.created_by == user):
+        if not (user.is_admin_level or ticket.assigned_to == user):
             return Response({'detail': 'Not allowed'}, status=status.HTTP_403_FORBIDDEN)
 
         qs = Message.objects.filter(ticket=ticket).order_by('created_at')
 
-        # Clients can only see client_employee channel
+        # Filter by channel if specified
         channel = request.query_params.get('channel')
-        if user.role == User.ROLE_CLIENT:
-            qs = qs.filter(channel_type='client_employee')
-        elif channel in ('client_employee', 'admin_employee'):
+        if channel in ('admin_employee',):
             qs = qs.filter(channel_type=channel)
 
-        # Optional: scope to current session only
-        session_only = request.query_params.get('current_session', '').lower() in ('1', 'true')
-        if session_only and ticket.current_session:
-            qs = qs.filter(assignment_session=ticket.current_session)
+        # Employees only see messages from their current assignment session
+        if getattr(user, 'role', None) == User.ROLE_EMPLOYEE:
+            if ticket.current_session:
+                qs = qs.filter(assignment_session=ticket.current_session)
+            else:
+                qs = qs.none()
 
         return Response(MessageSerializer(qs, many=True).data)
 
@@ -652,12 +604,10 @@ class TypeOfServiceViewSet(viewsets.ModelViewSet):
 
 
 class CSATSurveyViewSet(viewsets.GenericViewSet):
-    """Client submits CSAT survey for a ticket."""
+    """Admin submits CSAT survey for a ticket."""
     serializer_class = CSATSurveySerializer
 
     def get_permissions(self):
-        if self.action == 'submit':
-            return [IsAuthenticated(), IsClient()]
         return [IsAuthenticated()]
 
     @action(detail=False, methods=['get'], url_path='list')
@@ -670,7 +620,7 @@ class CSATSurveyViewSet(viewsets.GenericViewSet):
 
     @action(detail=False, methods=['post'], url_path='submit')
     def submit(self, request):
-        """Client submits CSAT survey. Ticket must be in pending_feedback status."""
+        """Admin submits CSAT survey on behalf of the client. Ticket must be in pending_feedback status."""
         ticket_id = request.data.get('ticket')
         if not ticket_id:
             return Response({'detail': 'ticket id required'}, status=status.HTTP_400_BAD_REQUEST)
@@ -679,8 +629,8 @@ class CSATSurveyViewSet(viewsets.GenericViewSet):
         except Ticket.DoesNotExist:
             return Response({'detail': 'Ticket not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        # Only the client who created the ticket can submit
-        if ticket.created_by != request.user:
+        # Only admin-level users can submit CSAT
+        if not request.user.is_admin_level:
             return Response({'detail': 'Not allowed'}, status=status.HTTP_403_FORBIDDEN)
 
         if ticket.status != Ticket.STATUS_PENDING_FEEDBACK:

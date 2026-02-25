@@ -54,11 +54,12 @@ class TicketSerializer(serializers.ModelSerializer):
     csat_survey = CSATSurveySerializer(read_only=True)
 
     # Role-based writable fields
-    CLIENT_FIELDS = {
+    TICKET_FIELDS = {
         'client', 'contact_person', 'address', 'designation',
         'landline', 'department_organization', 'mobile_no', 'email_address',
         'type_of_service', 'type_of_service_others',
         'preferred_support_type', 'description_of_problem',
+        'priority',
     }
     EMPLOYEE_FIELDS = {
         'has_warranty', 'product', 'brand', 'model_name',
@@ -66,7 +67,6 @@ class TicketSerializer(serializers.ModelSerializer):
         'date_purchased', 'serial_no',
         'action_taken', 'remarks', 'job_status',
     }
-    ADMIN_FIELDS = {'priority'}
 
     class Meta:
         model = Ticket
@@ -101,11 +101,9 @@ class TicketSerializer(serializers.ModelSerializer):
         from django.contrib.auth import get_user_model
         User = get_user_model()
         if role == User.ROLE_ADMIN or role == User.ROLE_SUPERADMIN:
-            return self.ADMIN_FIELDS | self.CLIENT_FIELDS
+            return self.TICKET_FIELDS
         elif role == User.ROLE_EMPLOYEE:
             return self.EMPLOYEE_FIELDS
-        elif role == User.ROLE_CLIENT:
-            return self.CLIENT_FIELDS
         return set()
 
     def update(self, instance, validated_data):
@@ -126,8 +124,11 @@ class TicketSerializer(serializers.ModelSerializer):
 # Role-specific form serializers (DRF browsable API)
 # ────────────────────────────────────────────
 
-class ClientCreateTicketSerializer(serializers.ModelSerializer):
-    """Form shown to clients when creating a new ticket."""
+class AdminCreateTicketSerializer(serializers.ModelSerializer):
+    """Form shown to admins when creating a new ticket.
+    Includes priority and assign_to so the admin can set them during the call flow."""
+    assign_to = serializers.IntegerField(required=False, write_only=True, help_text='Employee ID to assign')
+
     class Meta:
         model = Ticket
         fields = [
@@ -135,20 +136,8 @@ class ClientCreateTicketSerializer(serializers.ModelSerializer):
             'landline', 'department_organization', 'mobile_no', 'email_address',
             'type_of_service', 'type_of_service_others',
             'description_of_problem', 'preferred_support_type',
+            'priority', 'assign_to',
         ]
-
-
-class AdminTicketActionSerializer(serializers.Serializer):
-    """Form shown to admins: pick a ticket, set priority & assign agent."""
-    ticket = serializers.IntegerField(help_text='Ticket ID')
-    priority = serializers.ChoiceField(
-        choices=[('', '---')] + list(Ticket.PRIORITY_CHOICES),
-        required=False,
-    )
-    assign_agent = serializers.IntegerField(
-        required=False,
-        help_text='Employee user ID to assign',
-    )
 
 
 class EmployeeTicketActionSerializer(serializers.Serializer):

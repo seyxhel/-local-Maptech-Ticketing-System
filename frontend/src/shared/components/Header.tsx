@@ -23,10 +23,7 @@ export default function Header() {
   // Hide nav links on auth/protected pages
   const hideNavLinks =
     location.pathname === '/login' ||
-    location.pathname === '/homepage' ||
-    location.pathname === '/register' ||
     location.pathname === '/forgot-password' ||
-    location.pathname.startsWith('/register/') ||
     location.pathname.startsWith('/employee/') ||
     location.pathname.startsWith('/admin') ||
     location.pathname === '/settings'
@@ -39,13 +36,15 @@ export default function Header() {
             <Link to="/">Home</Link>
             {' | '}
             <Link to="/login">Login</Link>
-            {' | '}
-            <Link to="/register">Register</Link>
           </>
         )}
         {user && location.pathname !== '/login' && (user.role === 'admin' || user.role === 'superadmin') && (
           <>
             {' '}
+            <Link to="/admin/dashboard">Dashboard</Link>
+            {' | '}
+            <Link to="/admin/create-ticket">Create Ticket</Link>
+            {' | '}
             <Link to="/admin/user-management">User Management</Link>
           </>
         )}
