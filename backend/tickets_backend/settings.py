@@ -134,6 +134,9 @@ SWAGGER_SETTINGS = {
     'REFETCH_SCHEMA_WITH_AUTH': True,
     'USE_SESSION_AUTH': False,
     'DEFAULT_API_URL': 'http://127.0.0.1:8000',
+    'TAGS_SORTER': 'alpha',
+    'OPERATIONS_SORTER': 'alpha',
+    'DEFAULT_AUTO_SCHEMA_CLASS': 'tickets.swagger.TaggedAutoSchema',
 }
 
 

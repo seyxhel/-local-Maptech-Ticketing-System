@@ -22,6 +22,7 @@ class TicketViewSet(viewsets.ModelViewSet):
     queryset = Ticket.objects.all().order_by('-created_at')
     serializer_class = TicketSerializer
     permission_classes = [IsAuthenticated]
+    swagger_tags = ['Tickets']
 
     def get_queryset(self):
         if getattr(self, 'swagger_fake_view', False):
@@ -589,6 +590,7 @@ class TypeOfServiceViewSet(viewsets.ModelViewSet):
     """CRUD for Type of Service (admin manages, all authenticated can list active)."""
     queryset = TypeOfService.objects.all().order_by('name')
     serializer_class = TypeOfServiceSerializer
+    swagger_tags = ['Type of Service']
 
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
@@ -607,6 +609,7 @@ class EscalationLogViewSet(viewsets.ReadOnlyModelViewSet):
     """Read-only viewset for escalation logs (admin sees all, employee sees own)."""
     serializer_class = EscalationLogSerializer
     permission_classes = [IsAuthenticated]
+    swagger_tags = ['Escalation Logs']
 
     def get_queryset(self):
         if getattr(self, 'swagger_fake_view', False):
@@ -621,6 +624,10 @@ class EscalationLogViewSet(viewsets.ReadOnlyModelViewSet):
         return EscalationLog.objects.none()
 
 
+from drf_yasg.utils import swagger_auto_schema
+
+
+@swagger_auto_schema(method='get', tags=['Employees'])
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def list_employees(request):

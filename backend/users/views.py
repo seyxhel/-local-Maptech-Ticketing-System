@@ -17,6 +17,7 @@ User = get_user_model()
 class AuthViewSet(viewsets.GenericViewSet):
     """Auth-related actions (me, update_profile, change_password, password reset)."""
     serializer_class = UserSerializer
+    swagger_tags = ['Auth']
 
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def me(self, request):
@@ -160,6 +161,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 class UserViewSet(viewsets.GenericViewSet):
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
+    swagger_tags = ['Users']
 
     def get_queryset(self):
         return User.objects.all().order_by('-date_joined')
