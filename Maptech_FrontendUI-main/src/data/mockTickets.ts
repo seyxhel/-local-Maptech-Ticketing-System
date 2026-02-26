@@ -28,8 +28,8 @@ export type Ticket = {
 };
 
 function makeSTF(n: number) {
-  const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  return `STF-MT-${date}${String(100000 + n).slice(1)}`;
+  // Fixed date for stable demo IDs — replace with real backend IDs when connected
+  return `STF-MT-20260226${String(100000 + n).slice(1)}`;
 }
 
 const ISSUES: { issue: string; description: string }[] = [

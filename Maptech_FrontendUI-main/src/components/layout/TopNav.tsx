@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Bell, Search, Sun, Moon, Menu, Settings } from 'lucide-react';
-import { NotificationPanel } from '../NotificationPanel';
+import { NotificationPanel, INITIAL_NOTIFICATIONS } from '../NotificationPanel';
+import type { NotificationItem } from '../NotificationPanel';
 
 interface TopNavProps {
   role: 'SuperAdmin' | 'Admin' | 'Employee' | 'Client';
@@ -41,6 +42,9 @@ export function TopNav({
   onNavigate
 }: TopNavProps) {
   const [notificationOpen, setNotificationOpen] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
+  const unreadCount = notifications.filter((n) => !n.read).length;
+  const badgeLabel = unreadCount > 99 ? '99+' : unreadCount > 0 ? String(unreadCount) : null;
 
   return (
     <>
@@ -82,19 +86,27 @@ export function TopNav({
         </button>
 
         {/* Notifications */}
-        <button
-          onClick={() => setNotificationOpen(true)}
-          className="relative p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-          aria-label="Open notifications"
-        >
-          <Bell className="w-5 h-5" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-gray-900" />
-        </button>
-        <NotificationPanel
-          isOpen={notificationOpen}
-          onClose={() => setNotificationOpen(false)}
-          role={role}
-        />
+        <div className="relative">
+          <button
+            onClick={() => setNotificationOpen((o) => !o)}
+            className="relative p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            aria-label="Open notifications"
+          >
+            <Bell className="w-5 h-5" />
+            {badgeLabel && (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full border-2 border-white dark:border-gray-900 leading-none">
+                {badgeLabel}
+              </span>
+            )}
+          </button>
+          <NotificationPanel
+            isOpen={notificationOpen}
+            onClose={() => setNotificationOpen(false)}
+            role={role}
+            notifications={notifications}
+            onNotificationsChange={setNotifications}
+          />
+        </div>
 
         {/* User info */}
         <div className="flex items-center gap-3 pl-3 border-l border-gray-200 dark:border-gray-700 ml-1">

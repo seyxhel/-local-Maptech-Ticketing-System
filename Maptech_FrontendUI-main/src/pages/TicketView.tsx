@@ -72,14 +72,9 @@ export function TicketView() {
 
   const navigate = useNavigate();
   const [showChat, setShowChat] = useState(false);
-  // Chat tab: 'client' = client↔employee chat, 'admin' = admin↔employee chat
-  const [chatTab, setChatTab] = useState<'client' | 'admin'>(isAdmin ? 'admin' : 'client');
-  const [clientMessages, setClientMessages] = useState<Array<{from: 'client' | 'engineer' | 'system'; text: string; time?: string}>>([
-    { from: 'client', text: 'Can you provide the latest logs?', time: '10:36 AM' },
-    { from: 'engineer', text: "You're welcome, Mr. Doe. I'll update the ticket with today's actions.", time: '10:36 AM' }
-  ]);
+  // Admin↔Employee chat channel
   const [adminMessages, setAdminMessages] = useState<Array<{from: 'admin' | 'engineer' | 'system'; text: string; time?: string}>>([
-    { from: 'admin', text: 'Please prioritize this ticket. The client is escalating.', time: '9:15 AM' },
+    { from: 'admin', text: 'Please prioritize this ticket.', time: '9:15 AM' },
     { from: 'engineer', text: 'Understood, I\'m working on it now.', time: '9:20 AM' }
   ]);
   const [newMsg, setNewMsg] = useState('');
@@ -90,29 +85,18 @@ export function TicketView() {
   const sendMessage = () => {
     if (!newMsg.trim()) return;
     const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    if (chatTab === 'admin') {
-      const from = isAdmin ? 'admin' : 'engineer';
-      setAdminMessages((m) => [...m, { from, text: newMsg.trim(), time }]);
-    } else {
-      const from = isEmployee ? 'engineer' : 'client';
-      setClientMessages((m) => [...m, { from, text: newMsg.trim(), time }]);
-    }
+    const from = isAdmin ? 'admin' : 'engineer';
+    setAdminMessages((m) => [...m, { from, text: newMsg.trim(), time }]);
     setNewMsg('');
   };
 
   const isMine = (from: string) => {
-    if (chatTab === 'admin') {
-      if (isAdmin) return from === 'admin';
-      if (isEmployee) return from === 'engineer';
-    }
-    if (isEmployee) return from === 'engineer';
     if (isAdmin) return from === 'admin';
-    return from === 'client';
+    if (isEmployee) return from === 'engineer';
+    return false;
   };
   
-  const currentMessages = chatTab === 'admin' ? adminMessages : clientMessages;
-  // Show tabs: employee sees both tabs, admin sees only admin tab, client sees only client tab
-  const showTabs = isEmployee;
+  const currentMessages = adminMessages;
 
   return (
     <div className="space-y-6">
@@ -364,38 +348,10 @@ export function TicketView() {
           {/* Chat Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700">
             <div className="text-sm font-semibold">
-              {isAdmin ? 'Admin ↔ Employee' : chatTab === 'admin' ? 'Employee ↔ Admin' : isEmployee ? 'Employee ↔ Client' : 'Client ↔ Employee'}
+              {isAdmin ? 'Admin ↔ Employee' : 'Employee ↔ Admin'}
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-green-500">• Connected</span>
-              <button className="text-sm text-gray-500 hover:text-gray-700" onClick={() => setShowChat(false)}>Close</button>
-            </div>
+            <span className="text-xs text-green-500">• Connected</span>
           </div>
-          {/* Tabs - only for employee */}
-          {showTabs && (
-            <div className="flex border-b border-gray-100 dark:border-gray-700">
-              <button
-                onClick={() => setChatTab('client')}
-                className={`flex-1 px-4 py-2 text-xs font-semibold transition-colors ${
-                  chatTab === 'client'
-                    ? 'text-[#0E8F79] border-b-2 border-[#0E8F79] bg-green-50/50 dark:bg-green-900/10'
-                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                }`}
-              >
-                Client Chat
-              </button>
-              <button
-                onClick={() => setChatTab('admin')}
-                className={`flex-1 px-4 py-2 text-xs font-semibold transition-colors ${
-                  chatTab === 'admin'
-                    ? 'text-[#0E8F79] border-b-2 border-[#0E8F79] bg-green-50/50 dark:bg-green-900/10'
-                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                }`}
-              >
-                Admin Chat
-              </button>
-            </div>
-          )}
           {/* Messages */}
           <div className="p-4 flex-1 overflow-auto space-y-3">
             {currentMessages.map((m, i) => {

@@ -43,7 +43,11 @@ export function StatCard({
 }: StatCardProps) {
   const c = colorMap[color];
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 p-6">
+    <div
+      role="region"
+      aria-label={`${title}: ${value}`}
+      className="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 p-6"
+    >
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">

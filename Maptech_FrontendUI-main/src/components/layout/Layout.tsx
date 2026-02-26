@@ -22,6 +22,7 @@ export function Layout({
   navItems,
 }: LayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
   return (
     <div className="min-h-screen bg-[#f8f9fa] dark:bg-gray-950 transition-colors duration-200">
       {/* Mobile overlay */}
@@ -41,12 +42,13 @@ export function Layout({
           onNavigate={onNavigate}
           currentPage={currentPage}
           navItems={navItems}
+          onExpandChange={setIsSidebarExpanded}
         />
 
       </div>
 
       {/* Main Content */}
-      <div className="lg:pl-64 flex flex-col min-h-screen">
+      <div className={`flex flex-col min-h-screen transition-all duration-300 ${isSidebarExpanded ? 'lg:pl-64' : 'lg:pl-20'}`}>
         <TopNav
           role={role}
           isDark={isDark}

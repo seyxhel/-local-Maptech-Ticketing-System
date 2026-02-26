@@ -1,10 +1,12 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card } from '../components/ui/Card';
 import { StatCard } from '../components/ui/StatCard';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { PriorityBadge } from '../components/ui/PriorityBadge';
 import { SLATimer } from '../components/ui/SLATimer';
 import { MOCK_TICKETS } from '../data/mockTickets';
+import { useAuth } from '../context/AuthContext';
 import {
   CheckCircle,
   Clock,
@@ -17,6 +19,9 @@ interface EmployeeDashboardProps {
   onNavigate?: (page: string) => void;
 }
 export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const firstName = user?.name?.split(' ')[0] || 'there';
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -25,7 +30,7 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
             My Workspace
           </h1>
           <p className="text-gray-500 dark:text-gray-400">
-            Welcome back, Sarah. You have 4 tickets needing attention.
+            Welcome back, {firstName}. You have 4 tickets needing attention.
           </p>
         </div>
         <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-800 px-4 py-2 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
@@ -62,7 +67,7 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
           <Card
             key={ticket.id}
             className="hover:border-[#3BC25B] dark:hover:border-[#3BC25B] hover:shadow-md transition-all group"
-            onClick={() => onNavigate?.('ticket-view')}
+            onClick={() => navigate(`/employee/ticket-details?stf=${encodeURIComponent(ticket.id)}`)}
           >
 
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -118,7 +123,7 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
                 color: 'bg-[#3BC25B]'
               },
               {
-                label: 'CSAT Score',
+                label: 'Quality Score',
                 value: '4.8/5.0',
                 pct: '96%',
                 color: 'bg-[#0E8F79]'

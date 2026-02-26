@@ -15,11 +15,11 @@ import {
 import { toast } from 'sonner';
 
 function makeSTF(n: number) {
-  const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  return `STF-MT-${date}${String(100000 + n).slice(1)}`;
+  // Fixed date for stable demo IDs — replace with real backend IDs when connected
+  return `STF-MT-20260226${String(100000 + n).slice(1)}`;
 }
 
-const MOCK_ESCALATIONS = [
+const INITIAL_ESCALATIONS = [
   { id: 1, ticketId: makeSTF(4), type: 'Escalated' as const, to: 'Senior Network Engineer', reason: 'Complex network configuration requiring advanced Cisco CCNP-level diagnostics', time: '2h ago', status: 'pending' as const },
   { id: 2, ticketId: makeSTF(2), type: 'Cascaded' as const, to: 'Cisco Support (Principal)', reason: 'Hardware failure confirmed, warranty claim needed for switch replacement', time: '5h ago', status: 'in-progress' as const },
   { id: 3, ticketId: makeSTF(8), type: 'Cascaded' as const, to: 'Local Distributor (CompuTrader)', reason: 'VPN appliance part replacement via warranty', time: '1d ago', status: 'resolved' as const },
@@ -29,19 +29,45 @@ const MOCK_ESCALATIONS = [
   { id: 7, ticketId: makeSTF(6), type: 'Cascaded' as const, to: 'Dell Support (Principal)', reason: 'Server hardware failure under ProSupport warranty', time: '1d ago', status: 'pending' as const },
 ];
 
+const AVAILABLE_TICKETS = [
+  { value: makeSTF(1), label: 'System outage in North Wing' },
+  { value: makeSTF(4), label: 'Network latency issues' },
+  { value: makeSTF(7), label: 'Email gateway down' },
+  { value: makeSTF(10), label: 'Database migration request' },
+];
+
 const ITEMS_PER_PAGE = 4;
 
 export function Escalation() {
   const [escalationType, setEscalationType] = useState<'Higher' | 'Distributor' | 'Principal'>('Higher');
   const [escalationReason, setEscalationReason] = useState('');
+  const [selectedTicket, setSelectedTicket] = useState(AVAILABLE_TICKETS[0].value);
   const [currentPage, setCurrentPage] = useState(1);
+  const [escalations, setEscalations] = useState(() => INITIAL_ESCALATIONS);
 
-  const totalPages = Math.max(1, Math.ceil(MOCK_ESCALATIONS.length / ITEMS_PER_PAGE));
-  const paged = MOCK_ESCALATIONS.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  const totalPages = Math.max(1, Math.ceil(escalations.length / ITEMS_PER_PAGE));
+  const paged = escalations.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
+  const toLabel: Record<string, string> = {
+    Higher: 'IT Director / Senior Engineer',
+    Distributor: 'Local Distributor',
+    Principal: 'Principal Vendor',
+  };
 
   const handleEscalate = () => {
-    if (!escalationReason) { toast.error('Please provide a reason for escalation'); return; }
-    toast.success('Ticket escalated successfully');
+    if (!escalationReason.trim()) { toast.error('Please provide a reason for escalation'); return; }
+    const newEntry = {
+      id: Date.now(),
+      ticketId: selectedTicket,
+      type: (escalationType === 'Higher' ? 'Escalated' : 'Cascaded') as 'Escalated' | 'Cascaded',
+      to: toLabel[escalationType],
+      reason: escalationReason.trim(),
+      time: 'just now',
+      status: 'pending' as const,
+    };
+    setEscalations((prev) => [newEntry, ...prev]);
+    setCurrentPage(1);
+    toast.success(`Ticket ${selectedTicket} escalated successfully`);
     setEscalationReason('');
   };
 
@@ -70,11 +96,10 @@ export function Escalation() {
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Select Ticket</label>
-              <select className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#3BC25B] outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm">
-                <option>{makeSTF(1)} - System outage...</option>
-                <option>{makeSTF(4)} - Network latency...</option>
-                <option>{makeSTF(7)} - Email gateway...</option>
-                <option>{makeSTF(10)} - Database migration...</option>
+              <select value={selectedTicket} onChange={(e) => setSelectedTicket(e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#3BC25B] outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm">
+                {AVAILABLE_TICKETS.map((t) => (
+                  <option key={t.value} value={t.value}>{t.value} — {t.label}</option>
+                ))}
               </select>
             </div>
             <div>
@@ -129,7 +154,7 @@ export function Escalation() {
 
           {/* Pagination */}
           <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-100 dark:border-gray-700">
-            <span className="text-sm text-gray-500 dark:text-gray-400">Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1}-{Math.min(currentPage * ITEMS_PER_PAGE, MOCK_ESCALATIONS.length)} of {MOCK_ESCALATIONS.length}</span>
+            <span className="text-sm text-gray-500 dark:text-gray-400">Showing {escalations.length === 0 ? 0 : (currentPage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, escalations.length)} of {escalations.length}</span>
             <div className="flex items-center gap-1">
               <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-[#3BC25B] hover:text-white dark:hover:bg-[#3BC25B] text-gray-600 dark:text-gray-400 disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-600 transition-colors"><ChevronLeft className="w-4 h-4" /></button>
               {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
