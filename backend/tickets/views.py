@@ -1,27 +1,21 @@
 from rest_framework import viewsets, status
-from django.db import IntegrityError
 from django.db.models import Count, Avg, Q, F
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.response import Response
-from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework_simplejwt.views import TokenObtainPairView
 from django.contrib.auth import get_user_model
 User = get_user_model()
-from django.conf import settings as django_settings
 from django.utils import timezone
-from google.oauth2 import id_token as google_id_token
-from google.auth.transport import requests as google_requests
-from .models import Ticket, TicketTask, TypeOfService, TicketAttachment, AssignmentSession, Message, EscalationLog, CSATSurvey
+from .models import Ticket, TicketTask, TypeOfService, TicketAttachment, AssignmentSession, Message, EscalationLog
 from .serializers import (
     TicketSerializer, TypeOfServiceSerializer,
-    TicketAttachmentSerializer, CSATSurveySerializer, EscalationLogSerializer,
+    TicketAttachmentSerializer, EscalationLogSerializer,
     MessageSerializer, AssignmentSessionSerializer,
     AdminCreateTicketSerializer,
     EmployeeTicketActionSerializer,
 )
 from .permissions import IsAdminLevel, IsAssignedEmployee, IsAdminOrAssignedEmployee, IsTicketParticipant
-from users.serializers import RegisterSerializer, UserSerializer
+from users.serializers import UserSerializer
 
 
 class TicketViewSet(viewsets.ModelViewSet):
@@ -30,6 +24,8 @@ class TicketViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return Ticket.objects.none()
         user = self.request.user
         if user.is_admin_level:
             return Ticket.objects.all().order_by('-created_at')
@@ -40,6 +36,8 @@ class TicketViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         """Return a role-specific serializer for the create action so the
         DRF browsable API shows different form fields per role."""
+        if getattr(self, 'swagger_fake_view', False):
+            return TicketSerializer
         if self.action == 'create':
             user = self.request.user
             if user.is_authenticated:
@@ -438,7 +436,7 @@ class TicketViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='request_closure')
     def request_closure(self, request, pk=None):
-        """Employee marks ticket as pending feedback — triggers client CSAT survey."""
+        """Employee marks ticket as pending closure."""
         ticket = self.get_object()
         user = request.user
 
@@ -447,10 +445,10 @@ class TicketViewSet(viewsets.ModelViewSet):
         if not has_proof:
             return Response({'detail': 'You must upload resolution proof before requesting closure.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        ticket.status = Ticket.STATUS_PENDING_FEEDBACK
+        ticket.status = Ticket.STATUS_PENDING_CLOSURE
         ticket.save()
 
-        sys_content = f"{user.get_full_name() or user.username} marked this ticket as resolved and requested client feedback."
+        sys_content = f"{user.get_full_name() or user.username} marked this ticket as resolved and requested closure."
         for ch in ['admin_employee']:
             Message.objects.create(
                 ticket=ticket,
@@ -518,7 +516,7 @@ class TicketViewSet(viewsets.ModelViewSet):
         in_progress = by_status.get(Ticket.STATUS_IN_PROGRESS, 0)
         closed = by_status.get(Ticket.STATUS_CLOSED, 0)
         escalated = by_status.get(Ticket.STATUS_ESCALATED, 0) + by_status.get(Ticket.STATUS_ESCALATED_EXTERNAL, 0)
-        pending = by_status.get(Ticket.STATUS_PENDING_CLOSURE, 0) + by_status.get(Ticket.STATUS_PENDING_FEEDBACK, 0)
+        pending = by_status.get(Ticket.STATUS_PENDING_CLOSURE, 0)
 
         # Average resolution time (closed tickets that have time_in and time_out)
         closed_with_times = qs.filter(status=Ticket.STATUS_CLOSED, time_in__isnull=False, time_out__isnull=False)
@@ -598,80 +596,11 @@ class TypeOfServiceViewSet(viewsets.ModelViewSet):
         return [IsAuthenticated(), IsAdminLevel()]
 
     def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return TypeOfService.objects.none()
         if self.request.user.is_admin_level:
             return TypeOfService.objects.all().order_by('name')
         return TypeOfService.objects.filter(is_active=True).order_by('name')
-
-
-class CSATSurveyViewSet(viewsets.GenericViewSet):
-    """Admin submits CSAT survey for a ticket."""
-    serializer_class = CSATSurveySerializer
-
-    def get_permissions(self):
-        return [IsAuthenticated()]
-
-    @action(detail=False, methods=['get'], url_path='list')
-    def list_surveys(self, request):
-        """Admin lists all CSAT surveys."""
-        if not request.user.is_admin_level:
-            return Response({'detail': 'Not allowed'}, status=status.HTTP_403_FORBIDDEN)
-        surveys = CSATSurvey.objects.select_related('ticket').all().order_by('-created_at')
-        return Response(CSATSurveySerializer(surveys, many=True).data)
-
-    @action(detail=False, methods=['post'], url_path='submit')
-    def submit(self, request):
-        """Admin submits CSAT survey on behalf of the client. Ticket must be in pending_feedback status."""
-        ticket_id = request.data.get('ticket')
-        if not ticket_id:
-            return Response({'detail': 'ticket id required'}, status=status.HTTP_400_BAD_REQUEST)
-        try:
-            ticket = Ticket.objects.get(id=ticket_id)
-        except Ticket.DoesNotExist:
-            return Response({'detail': 'Ticket not found'}, status=status.HTTP_404_NOT_FOUND)
-
-        # Only admin-level users can submit CSAT
-        if not request.user.is_admin_level:
-            return Response({'detail': 'Not allowed'}, status=status.HTTP_403_FORBIDDEN)
-
-        if ticket.status != Ticket.STATUS_PENDING_FEEDBACK:
-            return Response({'detail': 'Ticket is not pending feedback.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        if CSATSurvey.objects.filter(ticket=ticket).exists():
-            return Response({'detail': 'CSAT survey already submitted for this ticket.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        rating = request.data.get('rating')
-        if not rating or int(rating) not in range(1, 6):
-            return Response({'detail': 'Rating must be between 1 and 5.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        survey = CSATSurvey.objects.create(
-            ticket=ticket,
-            rating=int(rating),
-            comments=request.data.get('comments', ''),
-            has_other_concerns=bool(request.data.get('has_other_concerns', False)),
-            other_concerns_text=request.data.get('other_concerns_text', ''),
-        )
-
-        ticket.status = Ticket.STATUS_PENDING_CLOSURE
-        ticket.save()
-
-        return Response(CSATSurveySerializer(survey).data, status=status.HTTP_201_CREATED)
-
-    @action(detail=False, methods=['get'], url_path='for_ticket/(?P<ticket_id>[0-9]+)')
-    def for_ticket(self, request, ticket_id=None):
-        """Get CSAT survey for a specific ticket (only participants)."""
-        try:
-            ticket = Ticket.objects.get(id=ticket_id)
-        except Ticket.DoesNotExist:
-            return Response({'detail': 'Ticket not found.'}, status=status.HTTP_404_NOT_FOUND)
-        # Only admin, assigned employee, or ticket creator can view
-        user = request.user
-        if not (user.is_admin_level or ticket.assigned_to == user or ticket.created_by == user):
-            return Response({'detail': 'Not allowed'}, status=status.HTTP_403_FORBIDDEN)
-        try:
-            survey = CSATSurvey.objects.get(ticket=ticket)
-            return Response(CSATSurveySerializer(survey).data)
-        except CSATSurvey.DoesNotExist:
-            return Response({'detail': 'No survey found.'}, status=status.HTTP_404_NOT_FOUND)
 
 
 class EscalationLogViewSet(viewsets.ReadOnlyModelViewSet):
@@ -680,6 +609,8 @@ class EscalationLogViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return EscalationLog.objects.none()
         user = self.request.user
         if user.is_admin_level:
             return EscalationLog.objects.all().order_by('-created_at')

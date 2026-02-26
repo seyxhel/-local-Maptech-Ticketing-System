@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth import get_user_model
-from .models import Ticket, TicketTask, TypeOfService, TicketAttachment, EscalationLog, CSATSurvey
+from .models import Ticket, TicketTask, TypeOfService, TicketAttachment, EscalationLog
 
 User = get_user_model()
 
@@ -40,8 +40,3 @@ class TicketAttachmentAdmin(admin.ModelAdmin):
 class EscalationLogAdmin(admin.ModelAdmin):
     list_display = ('ticket', 'escalation_type', 'from_user', 'to_user', 'to_external', 'created_at')
     list_filter = ('escalation_type',)
-
-
-@admin.register(CSATSurvey)
-class CSATSurveyAdmin(admin.ModelAdmin):
-    list_display = ('ticket', 'rating', 'has_other_concerns', 'created_at')

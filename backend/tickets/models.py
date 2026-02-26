@@ -25,7 +25,6 @@ class Ticket(models.Model):
     STATUS_ESCALATED = 'escalated'
     STATUS_ESCALATED_EXTERNAL = 'escalated_external'
     STATUS_PENDING_CLOSURE = 'pending_closure'
-    STATUS_PENDING_FEEDBACK = 'pending_feedback'
     STATUS_CHOICES = [
         (STATUS_OPEN, 'Open'),
         (STATUS_IN_PROGRESS, 'In Progress'),
@@ -33,7 +32,6 @@ class Ticket(models.Model):
         (STATUS_ESCALATED, 'Escalated (Internal)'),
         (STATUS_ESCALATED_EXTERNAL, 'Escalated (External)'),
         (STATUS_PENDING_CLOSURE, 'Pending Closure'),
-        (STATUS_PENDING_FEEDBACK, 'Pending Feedback'),
     ]
 
     # --- Priority choices (admin sets) ---
@@ -285,16 +283,3 @@ class EscalationLog(models.Model):
 
     def __str__(self):
         return f"Escalation on {self.ticket.stf_no} ({self.escalation_type})"
-
-
-class CSATSurvey(models.Model):
-    """Customer satisfaction survey — mandatory before ticket closure."""
-    ticket = models.OneToOneField(Ticket, related_name='csat_survey', on_delete=models.CASCADE)
-    rating = models.PositiveSmallIntegerField()   # 1–5 stars
-    comments = models.TextField(blank=True, default='')
-    has_other_concerns = models.BooleanField(default=False)
-    other_concerns_text = models.TextField(blank=True, default='')
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"CSAT for {self.ticket.stf_no}: {self.rating}/5"

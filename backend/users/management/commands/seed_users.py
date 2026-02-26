@@ -13,7 +13,6 @@ SEED_USERS = [
         'role': User.ROLE_SUPERADMIN,
         'is_staff': True,       # superadmin: is_staff=True, is_superuser=True
         'is_superuser': True,
-        'is_agreed_privacy_policy': True,
     },
     {
         'username': 'gerardquadra',
@@ -23,7 +22,6 @@ SEED_USERS = [
         'password': 'GerardQuadra123!',
         'phone': '+639696969696',
         'role': User.ROLE_EMPLOYEE,
-        'is_agreed_privacy_policy': True,
     },
 ]
 

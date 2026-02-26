@@ -8,56 +8,10 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'role', 'first_name', 'middle_name', 'last_name', 'suffix', 'phone', 'last_login', 'is_active', 'is_agreed_privacy_policy', 'has_usable_password']
+        fields = ['id', 'username', 'email', 'role', 'first_name', 'middle_name', 'last_name', 'suffix', 'phone', 'last_login', 'is_active', 'has_usable_password']
 
     def get_has_usable_password(self, obj):
         return obj.has_usable_password()
-
-
-class RegisterSerializer(serializers.ModelSerializer):
-    accept_terms = serializers.BooleanField(write_only=True, required=True)
-
-    class Meta:
-        model = User
-        fields = ['username', 'email', 'password', 'first_name', 'middle_name', 'last_name', 'suffix', 'phone', 'accept_terms']
-        extra_kwargs = {'password': {'write_only': True}}
-
-    def validate(self, attrs):
-        if not attrs.get('accept_terms'):
-            raise serializers.ValidationError({'accept_terms': 'You must accept the terms.'})
-
-        # required fields enforced server-side
-        if not attrs.get('username'):
-            raise serializers.ValidationError({'username': 'Username is required.'})
-        if not attrs.get('password'):
-            raise serializers.ValidationError({'password': 'Password is required.'})
-        if not attrs.get('first_name'):
-            raise serializers.ValidationError({'first_name': 'First name is required.'})
-        if not attrs.get('last_name'):
-            raise serializers.ValidationError({'last_name': 'Last name is required.'})
-
-        return attrs
-
-    def validate_username(self, value):
-        if User.objects.filter(username=value).exists():
-            raise serializers.ValidationError('A user with that username already exists.')
-        return value
-
-    def validate_email(self, value):
-        if User.objects.filter(email=value).exists():
-            raise serializers.ValidationError('A user with that email already exists.')
-        return value
-
-    def create(self, validated_data):
-        validated_data.pop('accept_terms', None)
-        password = validated_data.pop('password')
-        user = User.objects.create_user(
-            password=password,
-            role=User.ROLE_EMPLOYEE,
-            is_agreed_privacy_policy=True,
-            **{k: v for k, v in validated_data.items() if v is not None}
-        )
-        return user
 
 class AdminUserCreateSerializer(serializers.Serializer):
     first_name = serializers.CharField(max_length=150)

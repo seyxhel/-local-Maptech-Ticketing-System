@@ -24,6 +24,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'corsheaders',
+    'drf_yasg',
     'tickets',
     'users',
 ]
@@ -113,7 +114,28 @@ REST_FRAMEWORK = {
         'rest_framework_simplejwt.authentication.JWTAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.AllowAny',
+    ),
 }
+
+# drf-yasg Swagger settings
+SWAGGER_SETTINGS = {
+    'SECURITY_DEFINITIONS': {
+        'Bearer': {
+            'type': 'apiKey',
+            'name': 'Authorization',
+            'in': 'header',
+            'description': 'JWT token. Enter: Bearer <your_access_token>',
+            'bearerFormat': 'JWT',
+        },
+    },
+    'PERSIST_AUTH': True,
+    'REFETCH_SCHEMA_WITH_AUTH': True,
+    'USE_SESSION_AUTH': False,
+    'DEFAULT_API_URL': 'http://127.0.0.1:8000',
+}
+
 
 from datetime import timedelta
 SIMPLE_JWT = {
@@ -122,12 +144,3 @@ SIMPLE_JWT = {
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': False,
 }
-
-# Google OAuth2
-GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
-GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '')
-
-# Microsoft OAuth2
-MICROSOFT_CLIENT_ID = os.environ.get('MICROSOFT_CLIENT_ID', '')
-MICROSOFT_CLIENT_SECRET = os.environ.get('MICROSOFT_CLIENT_SECRET', '')
-MICROSOFT_TENANT_ID = os.environ.get('MICROSOFT_TENANT_ID', 'common')

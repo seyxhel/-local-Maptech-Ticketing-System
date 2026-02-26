@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Ticket, TicketTask, TypeOfService, TicketAttachment, AssignmentSession, Message, MessageReaction, MessageReadReceipt, CSATSurvey, EscalationLog
+from .models import Ticket, TicketTask, TypeOfService, TicketAttachment, AssignmentSession, Message, MessageReaction, MessageReadReceipt, EscalationLog
 from users.serializers import UserSerializer
 
 
@@ -37,13 +37,6 @@ class EscalationLogSerializer(serializers.ModelSerializer):
         fields = ['id', 'escalation_type', 'from_user', 'to_user', 'to_external', 'notes', 'created_at']
 
 
-class CSATSurveySerializer(serializers.ModelSerializer):
-    class Meta:
-        model = CSATSurvey
-        fields = ['id', 'ticket', 'rating', 'comments', 'has_other_concerns', 'other_concerns_text', 'created_at']
-        read_only_fields = ['id', 'created_at']
-
-
 class TicketSerializer(serializers.ModelSerializer):
     created_by = UserSerializer(read_only=True)
     assigned_to = UserSerializer(read_only=True)
@@ -51,7 +44,6 @@ class TicketSerializer(serializers.ModelSerializer):
     attachments = TicketAttachmentSerializer(many=True, read_only=True)
     type_of_service_detail = TypeOfServiceSerializer(source='type_of_service', read_only=True)
     escalation_logs = EscalationLogSerializer(many=True, read_only=True)
-    csat_survey = CSATSurveySerializer(read_only=True)
 
     # Role-based writable fields
     TICKET_FIELDS = {
@@ -87,7 +79,6 @@ class TicketSerializer(serializers.ModelSerializer):
             'external_escalated_to', 'external_escalation_notes', 'external_escalated_at',
             'attachments',
             'escalation_logs',
-            'csat_survey',
         ]
         read_only_fields = ['stf_no', 'date', 'time_in', 'time_out', 'confirmed_by_admin',
                             'external_escalated_to', 'external_escalation_notes', 'external_escalated_at']

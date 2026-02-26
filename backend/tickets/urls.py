@@ -1,15 +1,14 @@
 from rest_framework import routers
 from django.urls import path, include
-from .views import TicketViewSet, TypeOfServiceViewSet, CSATSurveyViewSet, EscalationLogViewSet, list_employees
-from users.views import RegisterViewSet, CustomTokenObtainPairView, UserViewSet
+from .views import TicketViewSet, TypeOfServiceViewSet, EscalationLogViewSet, list_employees
+from users.views import AuthViewSet, CustomTokenObtainPairView, UserViewSet
 from rest_framework_simplejwt.views import TokenRefreshView
 
 router = routers.DefaultRouter()
 router.register(r'tickets', TicketViewSet, basename='ticket')
-router.register(r'auth', RegisterViewSet, basename='auth')
+router.register(r'auth', AuthViewSet, basename='auth')
 router.register(r'users', UserViewSet, basename='user')
 router.register(r'type-of-service', TypeOfServiceViewSet, basename='typeofservice')
-router.register(r'csat', CSATSurveyViewSet, basename='csat')
 router.register(r'escalation-logs', EscalationLogViewSet, basename='escalationlog')
 
 urlpatterns = [
