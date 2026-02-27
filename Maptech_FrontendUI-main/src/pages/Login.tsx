@@ -6,7 +6,7 @@ import { Mail, Lock, Eye, EyeOff, Loader2, ArrowRight } from 'lucide-react';
 const LOGO_SRC = '/Maptech%20Official%20Logo%20version2%20(1).png';
 
 export function Login() {
-  const { user, loginWithCredentials, getRedirectPath } = useAuth();
+  const { user, loading: authLoading, loginWithCredentials, getRedirectPath } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -14,6 +14,14 @@ export function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-[#3BC25B] animate-spin" />
+      </div>
+    );
+  }
 
   if (user) {
     return <Navigate to={getRedirectPath(user.role)} replace />;
@@ -133,15 +141,6 @@ export function Login() {
             )}
           </button>
         </form>
-
-        <div className="mt-6 p-3 rounded-lg bg-gray-800/50 border border-gray-700">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Test credentials (no backend)</p>
-          <ul className="text-xs text-gray-500 space-y-1">
-            <li><span className="text-gray-400">SuperAdmin:</span> superadmin@test.com / superadmin</li>
-            <li><span className="text-gray-400">Admin:</span> admin@test.com / admin</li>
-            <li><span className="text-gray-400">Employee:</span> employee@test.com / employee</li>
-          </ul>
-        </div>
       </div>
     </div>
   );

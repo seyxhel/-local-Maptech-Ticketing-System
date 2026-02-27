@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_URL || '';
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 export interface LoginCredentials {
   email: string;
@@ -15,7 +15,11 @@ export interface LoginResponse {
     email: string;
     role: string;
     first_name?: string;
+    middle_name?: string;
     last_name?: string;
+    suffix?: string;
+    phone?: string;
+    is_active?: boolean;
     [key: string]: unknown;
   };
   redirect_path?: string;
@@ -35,9 +39,8 @@ export async function loginWithCredentials(creds: LoginCredentials): Promise<Log
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      email: creds.email,
-      password: creds.password,
       username: creds.email,
+      password: creds.password,
     }),
   });
   const data = await res.json().catch(() => ({}));
@@ -45,6 +48,33 @@ export async function loginWithCredentials(creds: LoginCredentials): Promise<Log
     throw new Error(data.detail || data.message || 'Login failed');
   }
   return data as LoginResponse;
+}
+
+export async function fetchCurrentUser(accessToken: string): Promise<LoginResponse['user']> {
+  const res = await fetch(`${API_BASE}/auth/me/`, {
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.detail || 'Failed to fetch user profile');
+  }
+  return data as LoginResponse['user'];
+}
+
+export async function refreshAccessToken(refreshToken: string): Promise<{ access: string }> {
+  const res = await fetch(`${API_BASE}/auth/token/refresh/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refresh: refreshToken }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.detail || 'Token refresh failed');
+  }
+  return data as { access: string };
 }
 
 export async function registerClient(data: SignupData): Promise<LoginResponse> {

@@ -9,8 +9,11 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children, allowedRole }: ProtectedRouteProps) {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const location = useLocation();
+
+  // Still verifying stored tokens – show nothing until resolved
+  if (loading) return null;
 
   if (!user) {
     return <Navigate to="/login" state={{ from: location.pathname }} replace />;
