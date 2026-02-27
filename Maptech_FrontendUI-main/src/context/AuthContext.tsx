@@ -5,7 +5,7 @@ import {
   refreshAccessToken,
 } from '../services/authService';
 
-export type Role = 'superadmin' | 'admin' | 'employee';
+export type Role = 'superadmin' | 'admin' | 'employee' | null;
 
 export interface AuthUser {
   role: Role;
@@ -42,8 +42,9 @@ const REFRESH_KEY = 'maptech_refresh';
 function normalizeRole(role: string): Role {
   const r = (role || '').toLowerCase();
   if (r === 'superadmin' || r === 'super_admin') return 'superadmin';
-  if (r === 'admin' || r === 'employee') return r as Role;
-  return 'employee';
+  if (r === 'admin') return 'admin';
+  if (r === 'employee') return 'employee';
+  return null;
 }
 
 function roleToPath(role: Role): string {
@@ -51,6 +52,7 @@ function roleToPath(role: Role): string {
     case 'superadmin': return '/superadmin/dashboard';
     case 'admin': return '/admin/dashboard';
     case 'employee': return '/employee/dashboard';
+    case null:
     default: return '/login';
   }
 }
@@ -76,8 +78,9 @@ function clearStorage(key: string) {
   sessionStorage.removeItem(key);
 }
 
-function buildAuthUser(apiUser: Record<string, unknown>): AuthUser {
+function buildAuthUser(apiUser: Record<string, unknown>): AuthUser | null {
   const role = normalizeRole(apiUser.role as string);
+  if (!role) return null; // Unknown role — deny access
   return {
     role,
     id: apiUser.id as number | undefined,
@@ -114,9 +117,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Try fetching current user with the stored access token
         const apiUser = await fetchCurrentUser(storedAccess);
         if (!cancelled) {
-          setAccessToken(storedAccess);
           const authUser = buildAuthUser(apiUser as unknown as Record<string, unknown>);
-          setUser(authUser);
+          if (authUser) {
+            setAccessToken(storedAccess);
+            setUser(authUser);
+          } else {
+            // Unknown role — clear tokens and deny access
+            clearStorage(TOKEN_KEY);
+            clearStorage(REFRESH_KEY);
+            clearStorage(STORAGE_KEY);
+          }
         }
       } catch {
         // Access token expired – try refreshing
@@ -125,11 +135,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const { access: newAccess } = await refreshAccessToken(storedRefresh);
             const apiUser = await fetchCurrentUser(newAccess);
             if (!cancelled) {
-              const persist = !!localStorage.getItem(TOKEN_KEY);
-              writeStorage(TOKEN_KEY, newAccess, persist);
-              setAccessToken(newAccess);
               const authUser = buildAuthUser(apiUser as unknown as Record<string, unknown>);
-              setUser(authUser);
+              if (authUser) {
+                const persist = !!localStorage.getItem(TOKEN_KEY);
+                writeStorage(TOKEN_KEY, newAccess, persist);
+                setAccessToken(newAccess);
+                setUser(authUser);
+              } else {
+                clearStorage(TOKEN_KEY);
+                clearStorage(REFRESH_KEY);
+                clearStorage(STORAGE_KEY);
+              }
             }
           } catch {
             // Refresh also failed – clear everything
@@ -165,6 +181,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Build user from response
       const authUser = buildAuthUser(data.user as unknown as Record<string, unknown>);
+      if (!authUser) {
+        // Unknown role — clear tokens and deny access
+        clearStorage(TOKEN_KEY);
+        clearStorage(REFRESH_KEY);
+        throw new Error('Your account role is not authorized to access this system.');
+      }
       writeStorage(STORAGE_KEY, JSON.stringify(authUser), persist);
 
       setAccessToken(token);

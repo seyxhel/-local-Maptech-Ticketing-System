@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { TopNav } from './TopNav';
+import { useAuth } from '../../context/AuthContext';
 import type { NavItem } from './Sidebar';
 
 interface LayoutProps {
@@ -23,6 +24,7 @@ export function Layout({
 }: LayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
+  const { user: authUser } = useAuth();
   return (
     <div className="min-h-screen bg-[#f8f9fa] dark:bg-gray-950 transition-colors duration-200">
       {/* Mobile overlay */}
@@ -54,7 +56,8 @@ export function Layout({
           isDark={isDark}
           onToggleDark={onToggleDark}
           onMenuClick={() => setIsSidebarOpen(true)}
-          onNavigate={onNavigate} />
+          onNavigate={onNavigate}
+          user={authUser} />
 
         <main className="flex-1 p-6 mt-16 overflow-x-hidden">
           <div className="max-w-7xl mx-auto space-y-6">{children}</div>

@@ -9,8 +9,8 @@ export function TermsOfService() {
         <p className="text-sm text-gray-400 mb-6">
           This page will display the full Terms of Service when provided. By signing up, you agree to these terms.
         </p>
-        <Link to="/signup" className="text-[#3BC25B] hover:text-[#63D44A] text-sm font-medium">
-          Back to Sign up
+        <Link to="/login" className="text-[#3BC25B] hover:text-[#63D44A] text-sm font-medium">
+          Back to Login
         </Link>
       </div>
     </div>

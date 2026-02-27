@@ -15,7 +15,7 @@ export function ProtectedRoute({ children, allowedRole }: ProtectedRouteProps) {
   // Still verifying stored tokens – show nothing until resolved
   if (loading) return null;
 
-  if (!user) {
+  if (!user || !user.role) {
     return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   }
 
