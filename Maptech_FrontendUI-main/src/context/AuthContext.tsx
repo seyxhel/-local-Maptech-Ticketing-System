@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 
-export type Role = 'superadmin' | 'admin' | 'employee' | 'client';
+export type Role = 'superadmin' | 'admin' | 'employee';
 
 export interface AuthUser {
   role: Role;
@@ -16,14 +16,6 @@ interface AuthContextValue {
   user: AuthUser | null;
   /** Login with backend credentials. Returns redirect path (from backend or derived from role). */
   loginWithCredentials: (email: string, password: string, rememberMe?: boolean) => Promise<string>;
-  /** Register client; returns redirect path on success. */
-  registerClient: (data: {
-    fullName: string;
-    email: string;
-    password: string;
-    companyName?: string;
-    acceptTerms: boolean;
-  }) => Promise<string>;
   logout: () => void;
   /** Used when backend does not return redirect_path; frontend derives from role. */
   getRedirectPath: (role: Role) => string;
@@ -39,14 +31,13 @@ export const TEST_CREDENTIALS: Record<Role, { email: string; password: string }>
   superadmin: { email: 'superadmin@test.com', password: 'superadmin' },
   admin: { email: 'admin@test.com', password: 'admin' },
   employee: { email: 'employee@test.com', password: 'employee' },
-  client: { email: 'client@test.com', password: 'client' },
 };
 
 function normalizeRole(role: string): Role {
   const r = (role || '').toLowerCase();
   if (r === 'superadmin' || r === 'super_admin') return 'superadmin';
-  if (r === 'admin' || r === 'employee' || r === 'client') return r as Role;
-  return 'client';
+  if (r === 'admin' || r === 'employee') return r as Role;
+  return 'employee';
 }
 
 function roleToPath(role: Role): string {
@@ -54,7 +45,6 @@ function roleToPath(role: Role): string {
     case 'superadmin': return '/superadmin/dashboard';
     case 'admin': return '/admin/dashboard';
     case 'employee': return '/employee/dashboard';
-    case 'client': return '/client/dashboard';
     default: return '/login';
   }
 }
@@ -92,43 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return roleToPath(role);
         }
       }
-      throw new Error('Invalid email or password. Use test credentials: superadmin@test.com / admin@test.com / employee@test.com / client@test.com (password = role name).');
-    },
-    []
-  );
-
-  const registerClient = useCallback(
-    async (data: {
-      fullName: string;
-      email: string;
-      password: string;
-      companyName?: string;
-      acceptTerms: boolean;
-    }): Promise<string> => {
-      const { registerClient: apiRegister } = await import('../services/authService');
-      const parts = (data.fullName || '').trim().split(/\s+/);
-      const first_name = parts[0] || '';
-      const last_name = parts.slice(1).join(' ') || '';
-      const res = await apiRegister({
-        first_name: first_name || 'Client',
-        last_name: last_name || 'User',
-        email: data.email,
-        password: data.password,
-        company_name: data.companyName,
-        accept_terms: data.acceptTerms,
-      });
-      const role = normalizeRole(res.user.role);
-      const authUser: AuthUser = {
-        role,
-        id: res.user.id,
-        username: res.user.username,
-        email: res.user.email,
-        name: [res.user.first_name, res.user.last_name].filter(Boolean).join(' ') || res.user.username,
-      };
-      setUser(authUser);
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(authUser));
-      if (res.access) sessionStorage.setItem(TOKEN_KEY, res.access);
-      return (res as { redirect_path?: string }).redirect_path ?? roleToPath(role);
+      throw new Error('Invalid email or password. Use test credentials: superadmin@test.com / admin@test.com / employee@test.com (password = role name).');
     },
     []
   );
@@ -148,7 +102,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         user,
         loginWithCredentials,
-        registerClient,
         logout,
         getRedirectPath,
       }}

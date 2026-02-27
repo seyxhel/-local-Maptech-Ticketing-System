@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   LayoutDashboard,
   Users,
@@ -23,9 +23,22 @@ interface SidebarProps {
   currentPage: string;
   /** When provided, use these items (path = route path). Otherwise derive from role (legacy). */
   navItems?: NavItem[];
+  onExpandChange?: (isExpanded: boolean) => void;
 }
 
-export function Sidebar({ role, onNavigate, currentPage, navItems: navItemsProp }: SidebarProps) {
+export function Sidebar({ role, onNavigate, currentPage, navItems: navItemsProp, onExpandChange }: SidebarProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const handleMouseEnter = () => {
+    setIsExpanded(true);
+    onExpandChange?.(true);
+  };
+
+  const handleMouseLeave = () => {
+    setIsExpanded(false);
+    onExpandChange?.(false);
+  };
+
   const getNavItems = (): NavItem[] => {
     const common: NavItem[] = [
       { id: 'logout', label: 'Logout', icon: LogOut, path: 'logout' },
@@ -70,7 +83,11 @@ export function Sidebar({ role, onNavigate, currentPage, navItems: navItemsProp 
     itemPath === 'logout' ? false : (currentPage === itemPath || currentPage.startsWith(itemPath + '/'));
 
   return (
-    <aside className="w-64 bg-white dark:bg-[#0a0a0a] text-gray-900 dark:text-white flex flex-col h-screen fixed left-0 top-0 z-50 border-r border-gray-200 dark:border-gray-800">
+    <aside 
+      className={`bg-white dark:bg-[#0a0a0a] text-gray-900 dark:text-white flex flex-col h-screen fixed left-0 top-0 z-50 border-r border-gray-200 dark:border-gray-800 transition-all duration-300 ${isExpanded ? 'w-64' : 'w-20'}`}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
       {/* Logo Area */}
       <div className="p-6 border-b border-gray-200 dark:border-gray-800 flex flex-col items-center">
         <img
@@ -78,9 +95,11 @@ export function Sidebar({ role, onNavigate, currentPage, navItems: navItemsProp 
           alt="Maptech Logo"
           className="h-16 w-auto mb-2 object-contain" />
 
-        <span className="text-xs text-gray-500 dark:text-gray-400 text-center tracking-wide font-medium leading-tight">
-          Maptech Information Solutions Inc.
-        </span>
+        {isExpanded && (
+          <span className="text-xs text-gray-500 dark:text-gray-400 text-center tracking-wide font-medium leading-tight">
+            Maptech Information Solutions Inc.
+          </span>
+        )}
       </div>
 
       {/* Navigation */}
@@ -93,13 +112,15 @@ export function Sidebar({ role, onNavigate, currentPage, navItems: navItemsProp 
             <button
               key={item.id}
               onClick={() => onNavigate(item.path)}
-              className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-all duration-200 group ${isActive ? 'bg-gradient-to-r from-[#63D44A] to-[#0E8F79] text-white shadow-lg shadow-[#3BC25B]/20' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white'}`}>
-
+              className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-all duration-200 group ${isExpanded ? '' : 'justify-center'} ${isActive ? 'bg-gradient-to-r from-[#63D44A] to-[#0E8F79] text-white shadow-lg shadow-[#3BC25B]/20' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white'}`}
+              title={!isExpanded ? item.label : undefined}
+            >
               <Icon
-                className={`w-5 h-5 mr-3 ${isActive ? 'text-white' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-900 dark:group-hover:text-white'}`} />
+                className={`w-5 h-5 flex-shrink-0 ${isExpanded ? 'mr-3' : ''} ${isActive ? 'text-white' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-900 dark:group-hover:text-white'}`} />
 
-              {item.label}
-            </button>);
+              {isExpanded && item.label}
+            </button>
+          );
 
         })}
       </nav>
@@ -108,12 +129,13 @@ export function Sidebar({ role, onNavigate, currentPage, navItems: navItemsProp 
       <div className="p-4 border-t border-gray-200 dark:border-gray-800">
         <button
           onClick={() => onNavigate('logout')}
-          className="w-full flex items-center px-4 py-3 text-sm font-medium text-gray-500 dark:text-gray-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-500 dark:hover:text-red-400 transition-colors">
-
-          <LogOut className="w-5 h-5 mr-3" />
-          Sign Out
+          className={`w-full flex items-center px-4 py-3 text-sm font-medium text-gray-500 dark:text-gray-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-500 dark:hover:text-red-400 transition-colors ${isExpanded ? '' : 'justify-center'}`}
+          title={!isExpanded ? 'Sign Out' : undefined}
+        >
+          <LogOut className={`w-5 h-5 flex-shrink-0 ${isExpanded ? 'mr-3' : ''}`} />
+          {isExpanded && 'Sign Out'}
         </button>
       </div>
-    </aside>);
-
+    </aside>
+  );
 }

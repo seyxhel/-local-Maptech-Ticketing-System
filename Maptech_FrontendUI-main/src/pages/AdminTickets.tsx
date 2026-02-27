@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '../components/ui/Card';
 import { StatusBadge } from '../components/ui/StatusBadge';
@@ -18,8 +18,8 @@ import {
 import { toast } from 'sonner';
 
 function makeSTF(n: number) {
-  const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  return `STF-MT-${date}${String(100000 + n).slice(1)}`;
+  // Fixed date for stable demo IDs — replace with real backend IDs when connected
+  return `STF-MT-20260226${String(100000 + n).slice(1)}`;
 }
 
 const ALL_TICKETS = [
@@ -49,17 +49,43 @@ export function AdminTickets() {
   const [filterPriority, setFilterPriority] = useState<string[]>([]);
   const [filterStatus, setFilterStatus] = useState<string[]>([]);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-  const menuRef = useRef<HTMLTableCellElement>(null);
+  const [tickets, setTickets] = useState(() => ALL_TICKETS);
+  const [editTicket, setEditTicket] = useState<typeof ALL_TICKETS[0] | null>(null);
+  const [editFields, setEditFields] = useState({ status: '', priority: '', assignee: '' });
 
+  // Close open menu when clicking anywhere outside
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setOpenMenuId(null);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    const handler = () => setOpenMenuId(null);
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
   }, []);
 
-  const filtered = ALL_TICKETS.filter((t) => {
+  const openEdit = (ticket: typeof ALL_TICKETS[0]) => {
+    setEditTicket(ticket);
+    setEditFields({ status: ticket.status, priority: ticket.priority, assignee: ticket.assignee || '' });
+    setOpenMenuId(null);
+  };
+
+  const saveEdit = () => {
+    if (!editTicket) return;
+    setTickets((prev) =>
+      prev.map((t) =>
+        t.id === editTicket.id
+          ? { ...t, status: editFields.status as typeof t.status, priority: editFields.priority as typeof t.priority, assignee: editFields.assignee || null }
+          : t
+      )
+    );
+    toast.success(`Ticket ${editTicket.id} updated.`);
+    setEditTicket(null);
+  };
+
+  const deleteTicket = (id: string) => {
+    setTickets((prev) => prev.filter((t) => t.id !== id));
+    toast.success(`Ticket ${id} deleted.`);
+    setOpenMenuId(null);
+  };
+
+  const filtered = tickets.filter((t) => {
     if (filterPriority.length > 0 && !filterPriority.includes(t.priority)) return false;
     if (filterStatus.length > 0 && !filterStatus.includes(t.status)) return false;
     if (search && !t.subject.toLowerCase().includes(search.toLowerCase()) && !t.id.toLowerCase().includes(search.toLowerCase()) && !t.client.toLowerCase().includes(search.toLowerCase())) return false;
@@ -129,13 +155,13 @@ export function AdminTickets() {
                     )}
                   </td>
                   <td className="px-6 py-4 text-gray-500 dark:text-gray-400 text-xs">{ticket.created}</td>
-                  <td className="px-6 py-4 text-right relative" ref={openMenuId === ticket.id ? menuRef : undefined}>
-                    <button onClick={() => setOpenMenuId(openMenuId === ticket.id ? null : ticket.id)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"><MoreHorizontal className="w-5 h-5" /></button>
+                  <td className="px-6 py-4 text-right relative">
+                    <button onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === ticket.id ? null : ticket.id); }} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"><MoreHorizontal className="w-5 h-5" /></button>
                     {openMenuId === ticket.id && (
-                      <div className="absolute right-6 top-12 z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl py-1 min-w-[140px]">
+                      <div onClick={(e) => e.stopPropagation()} className="absolute right-6 top-12 z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl py-1 min-w-[140px]">
                         <button onClick={() => { setOpenMenuId(null); navigate(`/admin/ticket-details?stf=${ticket.id}`); }} className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"><Eye className="w-4 h-4" /> View</button>
-                        <button onClick={() => { setOpenMenuId(null); toast.info(`Editing ${ticket.id}`); }} className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"><Pencil className="w-4 h-4" /> Edit</button>
-                        <button onClick={() => { setOpenMenuId(null); toast.success(`Deleted ${ticket.id}`); }} className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"><Trash2 className="w-4 h-4" /> Delete</button>
+                        <button onClick={() => openEdit(ticket)} className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"><Pencil className="w-4 h-4" /> Edit</button>
+                        <button onClick={() => deleteTicket(ticket.id)} className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"><Trash2 className="w-4 h-4" /> Delete</button>
                       </div>
                     )}
                   </td>
@@ -156,6 +182,42 @@ export function AdminTickets() {
           </div>
         </div>
       </Card>
+
+      {/* Edit Ticket Modal */}
+      {editTicket && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setEditTicket(null)}>
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">Edit Ticket</h3>
+              <button onClick={() => setEditTicket(null)} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"><X className="w-4 h-4 text-gray-500" /></button>
+            </div>
+            <p className="text-xs font-mono text-[#0E8F79] dark:text-green-400 bg-gray-50 dark:bg-gray-700/50 rounded px-2 py-1 mb-4">{editTicket.id}</p>
+            <p className="text-sm text-gray-700 dark:text-gray-300 font-medium mb-4 truncate">{editTicket.subject}</p>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Status</label>
+                <select value={editFields.status} onChange={(e) => setEditFields((p) => ({ ...p, status: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-[#3BC25B] outline-none">
+                  {STATUSES.map((s) => <option key={s}>{s}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Priority</label>
+                <select value={editFields.priority} onChange={(e) => setEditFields((p) => ({ ...p, priority: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-[#3BC25B] outline-none">
+                  {PRIORITIES.map((p) => <option key={p}>{p}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Assignee</label>
+                <input value={editFields.assignee} onChange={(e) => setEditFields((p) => ({ ...p, assignee: e.target.value }))} placeholder="e.g. John D." className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-[#3BC25B] outline-none" />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => setEditTicket(null)} className="flex-1 px-4 py-2 border border-gray-200 dark:border-gray-600 text-sm text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">Cancel</button>
+              <button onClick={saveEdit} className="flex-1 px-4 py-2 bg-[#3BC25B] hover:bg-[#2ea34a] text-white text-sm font-medium rounded-lg transition-colors">Save Changes</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filter Modal */}
       {showFilter && (

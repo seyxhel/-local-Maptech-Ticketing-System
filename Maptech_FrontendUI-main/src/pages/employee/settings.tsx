@@ -2,8 +2,15 @@ import React, { useState } from 'react';
 import { Card } from '../../components/ui/Card';
 import { GreenButton } from '../../components/ui/GreenButton';
 import { User, Lock, Mail, Phone, Building, MapPin } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 export default function EmployeeSettings() {
+  const { user } = useAuth();
+  const nameParts = (user?.name || 'Employee User').split(' ');
+  const firstName = nameParts[0] || 'Employee';
+  const lastName = nameParts.slice(1).join(' ') || '';
+  const email = user?.email || 'employee@test.com';
+
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -45,9 +52,9 @@ export default function EmployeeSettings() {
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Personal Details</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {[
-            { label: 'First Name', value: 'Sarah', icon: User },
-            { label: 'Last Name', value: 'Johnson', icon: User },
-            { label: 'Email', value: 'employee@test.com', icon: Mail },
+            { label: 'First Name', value: firstName, icon: User },
+            { label: 'Last Name', value: lastName || '—', icon: User },
+            { label: 'Email', value: email, icon: Mail },
             { label: 'Phone', value: '+63 917 123 4567', icon: Phone },
             { label: 'Department', value: 'Technical Support', icon: Building },
             { label: 'Location', value: 'Manila, Philippines', icon: MapPin },

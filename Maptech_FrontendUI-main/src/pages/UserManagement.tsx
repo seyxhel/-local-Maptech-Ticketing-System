@@ -8,8 +8,6 @@ import {
   Lock,
   Unlock,
   X,
-  Eye,
-  EyeOff,
   Users } from
 'lucide-react';
 import { toast } from 'sonner';
@@ -93,10 +91,12 @@ const INITIAL_USERS: UserAccount[] = [
 }];
 
 const EMPTY_FORM = {
-  name: '',
+  lastName: '',
+  firstName: '',
+  middleName: '',
   email: '',
+  contactNumber: '',
   role: 'Employee' as 'Admin' | 'Employee',
-  password: '',
   status: 'Active' as 'Active' | 'Blocked'
 };
 export function UserManagement() {
@@ -108,7 +108,7 @@ export function UserManagement() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserAccount | null>(null);
   const [formData, setFormData] = useState(EMPTY_FORM);
-  const [showPassword, setShowPassword] = useState(false);
+
   const filteredUsers = users.filter((u) => {
     const matchesRole = roleFilter === 'All' || u.role === roleFilter;
     const matchesSearch =
@@ -119,30 +119,36 @@ export function UserManagement() {
   const openAddModal = () => {
     setEditingUser(null);
     setFormData(EMPTY_FORM);
-    setShowPassword(false);
     setIsModalOpen(true);
   };
   const openEditModal = (user: UserAccount) => {
     setEditingUser(user);
+    const parts = user.name.trim().split(' ');
+    const lastName = parts.length > 1 ? parts[parts.length - 1] : '';
+    const firstName = parts[0] ?? '';
+    const middleName = parts.length > 2 ? parts.slice(1, -1).join(' ') : '';
     setFormData({
-      name: user.name,
+      lastName,
+      firstName,
+      middleName,
       email: user.email,
+      contactNumber: '',
       role: user.role === 'Client' ? 'Employee' : user.role,
-      password: '',
       status: user.status
     });
-    setShowPassword(false);
     setIsModalOpen(true);
   };
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
+    const fullName = [formData.firstName, formData.middleName, formData.lastName]
+      .map((s) => s.trim()).filter(Boolean).join(' ');
     if (editingUser) {
       setUsers((prev) =>
       prev.map((u) =>
       u.id === editingUser.id ?
       {
         ...u,
-        name: formData.name,
+        name: fullName,
         email: formData.email,
         role: formData.role,
         status: formData.status
@@ -150,12 +156,12 @@ export function UserManagement() {
       u
       )
       );
-      toast.success(`Account for ${formData.name} updated successfully.`);
+      toast.success(`Account for ${fullName} updated successfully.`);
     } else {
       setUsers((prev) => [
       {
         id: Date.now(),
-        name: formData.name,
+        name: fullName,
         email: formData.email,
         role: formData.role,
         status: formData.status
@@ -163,7 +169,7 @@ export function UserManagement() {
       ...prev]
       );
       toast.success(
-        `New ${formData.role} account created for ${formData.name}.`
+        `New ${formData.role} account created for ${fullName}.`
       );
     }
     setIsModalOpen(false);
@@ -337,15 +343,12 @@ export function UserManagement() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-1">
-                        {user.role !== 'Client' &&
-                    <button
+                        <button
                       onClick={() => openEditModal(user)}
                       title="Edit account"
                       className="p-2 text-gray-400 hover:text-[#0E8F79] dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors">
-
                             <Edit2 className="w-4 h-4" />
                           </button>
-                    }
                         <button
                       onClick={() => toggleStatus(user.id)}
                       title={
@@ -398,120 +401,85 @@ export function UserManagement() {
               </button>
             </div>
             <form onSubmit={handleSave} className="p-6 space-y-5">
-              {[
-            {
-              label: 'Full Name',
-              type: 'text',
-              key: 'name',
-              placeholder: 'e.g. Maria Santos',
-              required: true
-            },
-            {
-              label: 'Email Address',
-              type: 'email',
-              key: 'email',
-              placeholder: 'user@maptech.com',
-              required: true
-            }].
-            map((field) =>
-            <div key={field.key}>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
-                    {field.label}
-                  </label>
-                  <input
-                type={field.type}
-                required={field.required}
-                value={(formData as any)[field.key]}
-                onChange={(e) =>
-                setFormData((p) => ({
-                  ...p,
-                  [field.key]: e.target.value
-                }))
-                }
-                placeholder={field.placeholder}
-                className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-[#3BC25B] focus:border-transparent outline-none" />
-
-                </div>
-            )}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
-                    Role
+                    Last Name <span className="text-red-500">*</span>
                   </label>
-                  <select
-                  value={formData.role}
-                  onChange={(e) =>
-                  setFormData((p) => ({
-                    ...p,
-                    role: e.target.value as 'Admin' | 'Employee'
-                  }))
-                  }
-                  className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-[#3BC25B] outline-none">
-
-                    <option value="Admin">Admin</option>
-                    <option value="Employee">Employee</option>
-                  </select>
+                  <input
+                    type="text"
+                    required
+                    value={formData.lastName}
+                    onChange={(e) => setFormData((p) => ({ ...p, lastName: e.target.value }))}
+                    placeholder="e.g. Santos"
+                    className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-[#3BC25B] focus:border-transparent outline-none" />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
-                    Status
+                    First Name <span className="text-red-500">*</span>
                   </label>
-                  <div className="flex items-center gap-3 h-[42px]">
-                    <button
-                    type="button"
-                    onClick={() =>
-                    setFormData((p) => ({
-                      ...p,
-                      status: p.status === 'Active' ? 'Blocked' : 'Active'
-                    }))
-                    }
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#3BC25B] ${formData.status === 'Active' ? 'bg-[#3BC25B]' : 'bg-gray-300 dark:bg-gray-600'}`}>
-
-                      <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${formData.status === 'Active' ? 'translate-x-6' : 'translate-x-1'}`} />
-
-                    </button>
-                    <span
-                    className={`text-sm font-medium ${formData.status === 'Active' ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-
-                      {formData.status}
-                    </span>
-                  </div>
+                  <input
+                    type="text"
+                    required
+                    value={formData.firstName}
+                    onChange={(e) => setFormData((p) => ({ ...p, firstName: e.target.value }))}
+                    placeholder="e.g. Maria"
+                    className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-[#3BC25B] focus:border-transparent outline-none" />
                 </div>
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
-                  {editingUser ?
-                'New Password (leave blank to keep)' :
-                'Temporary Password'}
+                  Middle Name <span className="text-xs font-normal text-gray-400">(optional)</span>
                 </label>
-                <div className="relative">
-                  <input
-                  type={showPassword ? 'text' : 'password'}
-                  required={!editingUser}
-                  value={formData.password}
-                  onChange={(e) =>
-                  setFormData((p) => ({
-                    ...p,
-                    password: e.target.value
-                  }))
-                  }
-                  placeholder="••••••••"
-                  className="w-full px-4 py-2.5 pr-11 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-[#3BC25B] outline-none" />
-
-                  <button
-                  type="button"
-                  onClick={() => setShowPassword((s) => !s)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
-
-                    {showPassword ?
-                  <EyeOff className="w-4 h-4" /> :
-
-                  <Eye className="w-4 h-4" />
-                  }
-                  </button>
-                </div>
+                <input
+                  type="text"
+                  value={formData.middleName}
+                  onChange={(e) => setFormData((p) => ({ ...p, middleName: e.target.value }))}
+                  placeholder="e.g. Reyes"
+                  className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-[#3BC25B] focus:border-transparent outline-none" />
               </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+                  Email Address <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={formData.email}
+                  onChange={(e) => setFormData((p) => ({ ...p, email: e.target.value }))}
+                  placeholder="user@maptech.com"
+                  className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-[#3BC25B] focus:border-transparent outline-none" />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+                  Contact Number <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  required
+                  value={formData.contactNumber}
+                  onChange={(e) => setFormData((p) => ({ ...p, contactNumber: e.target.value }))}
+                  placeholder="e.g. +63 912 345 6789"
+                  className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-[#3BC25B] focus:border-transparent outline-none" />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+                  Role
+                </label>
+                <select
+                  value={formData.role}
+                  onChange={(e) =>
+                    setFormData((p) => ({
+                      ...p,
+                      role: e.target.value as 'Admin' | 'Employee'
+                    }))
+                  }
+                  className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-[#3BC25B] outline-none">
+                  <option value="Admin">Admin</option>
+                  <option value="Employee">Employee</option>
+                </select>
+              </div>
+
               <div className="flex gap-3 pt-2">
                 <button
                 type="button"

@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card } from '../components/ui/Card';
 import { StatCard } from '../components/ui/StatCard';
 import { GreenButton } from '../components/ui/GreenButton';
@@ -18,35 +19,27 @@ import {
   Cell,
   Legend } from
 'recharts';
-const TICKET_DATA = [
-{
-  name: 'Mon',
-  tickets: 45
-},
-{
-  name: 'Tue',
-  tickets: 52
-},
-{
-  name: 'Wed',
-  tickets: 38
-},
-{
-  name: 'Thu',
-  tickets: 65
-},
-{
-  name: 'Fri',
-  tickets: 48
-},
-{
-  name: 'Sat',
-  tickets: 25
-},
-{
-  name: 'Sun',
-  tickets: 15
-}];
+const WEEK_DATA = [
+  { name: 'Mon', tickets: 45 }, { name: 'Tue', tickets: 52 }, { name: 'Wed', tickets: 38 },
+  { name: 'Thu', tickets: 65 }, { name: 'Fri', tickets: 48 }, { name: 'Sat', tickets: 25 }, { name: 'Sun', tickets: 15 },
+];
+const MONTH_DATA = [
+  { name: 'Wk 1', tickets: 193 }, { name: 'Wk 2', tickets: 224 }, { name: 'Wk 3', tickets: 156 }, { name: 'Wk 4', tickets: 210 },
+];
+const YEAR_DATA = [
+  { name: 'Jan', tickets: 824 }, { name: 'Feb', tickets: 741 }, { name: 'Mar', tickets: 963 },
+  { name: 'Apr', tickets: 897 }, { name: 'May', tickets: 1050 }, { name: 'Jun', tickets: 978 },
+  { name: 'Jul', tickets: 1124 }, { name: 'Aug', tickets: 1066 }, { name: 'Sep', tickets: 932 },
+  { name: 'Oct', tickets: 1013 }, { name: 'Nov', tickets: 889 }, { name: 'Dec', tickets: 764 },
+];
+
+const RECENT_SUBJECTS = [
+  'Network outage in Building A',
+  'Database server unresponsive',
+  'Email gateway failure',
+  'SSL certificate expired on portal',
+  'VPN access down for remote staff',
+];
 
 const PRIORITY_DATA = [
 {
@@ -71,6 +64,11 @@ const PRIORITY_DATA = [
 }];
 
 export function SuperAdminDashboard() {
+  const navigate = useNavigate();
+  const [dateRange, setDateRange] = useState('Last 7 Days');
+
+  const chartData = dateRange === 'Last 30 Days' ? MONTH_DATA : dateRange === 'This Year' ? YEAR_DATA : WEEK_DATA;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -83,8 +81,8 @@ export function SuperAdminDashboard() {
           </p>
         </div>
         <div className="flex gap-3">
-          <GreenButton variant="outline">Download Report</GreenButton>
-          <GreenButton>System Settings</GreenButton>
+          <GreenButton variant="outline" onClick={() => navigate('/superadmin/reports')}>Download Report</GreenButton>
+          <GreenButton onClick={() => navigate('/superadmin/settings')}>System Settings</GreenButton>
         </div>
       </div>
 
@@ -135,7 +133,10 @@ export function SuperAdminDashboard() {
             <h3 className="text-lg font-bold text-gray-900 dark:text-white">
               Ticket Volume Trends
             </h3>
-            <select className="text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-2 py-1 focus:ring-2 focus:ring-[#3BC25B] outline-none">
+            <select
+              value={dateRange}
+              onChange={(e) => setDateRange(e.target.value)}
+              className="text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-2 py-1 focus:ring-2 focus:ring-[#3BC25B] outline-none">
               <option>Last 7 Days</option>
               <option>Last 30 Days</option>
               <option>This Year</option>
@@ -143,7 +144,7 @@ export function SuperAdminDashboard() {
           </div>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={TICKET_DATA}>
+              <BarChart data={chartData}>
                 <CartesianGrid
                   strokeDasharray="3 3"
                   vertical={false}
@@ -262,7 +263,7 @@ export function SuperAdminDashboard() {
           <h3 className="text-lg font-bold text-gray-900 dark:text-white">
             Recent Escalations
           </h3>
-          <GreenButton variant="ghost" className="text-sm">
+          <GreenButton variant="ghost" className="text-sm" onClick={() => navigate('/superadmin/reports')}>
             View All
           </GreenButton>
         </div>
@@ -284,11 +285,11 @@ export function SuperAdminDashboard() {
                 key={i}
                 className="hover:bg-gray-50 dark:hover:bg-gray-700/40">
 
-                  <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">
-                    #TK-2024-{100 + i}
+                  <td className="px-4 py-3 font-medium text-gray-900 dark:text-white font-mono text-xs">
+                    STF-MT-20260226{String(100000 + i).slice(1)}
                   </td>
                   <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
-                    Server downtime in region {i}
+                    {RECENT_SUBJECTS[i - 1]}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
