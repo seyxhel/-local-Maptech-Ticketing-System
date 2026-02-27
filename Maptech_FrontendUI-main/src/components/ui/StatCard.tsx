@@ -1,9 +1,10 @@
 import React from 'react';
-import { TrendingUp, TrendingDown, BoxIcon } from 'lucide-react';
+import { TrendingUp, TrendingDown } from 'lucide-react';
+
 interface StatCardProps {
   title: string;
   value: string;
-  icon: BoxIcon;
+  icon: React.ComponentType<{ className?: string }>;
   trend?: {
     value: number;
     isPositive: boolean;

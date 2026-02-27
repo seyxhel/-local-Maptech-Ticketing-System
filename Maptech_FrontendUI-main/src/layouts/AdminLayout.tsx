@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { Layout } from '../components/layout/Layout';
 import type { NavItem } from '../components/layout/Sidebar';
 import { LayoutDashboard, Ticket, ShieldAlert, BarChart3, PlusCircle } from 'lucide-react';
+import { NetworkErrorModal, useNetworkStatus } from '../shared';
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/admin/dashboard' },
@@ -32,6 +33,8 @@ export function AdminLayout() {
     navigate(path);
   };
 
+  const { isOffline, retry, dismiss, retrying } = useNetworkStatus();
+
   if (!user) return null;
 
   return (
@@ -43,6 +46,7 @@ export function AdminLayout() {
       onToggleDark={() => setIsDark((d) => !d)}
       navItems={NAV_ITEMS}
     >
+      <NetworkErrorModal isOpen={isOffline} onRetry={retry} onDismiss={dismiss} retrying={retrying} />
       <Outlet />
     </Layout>
   );

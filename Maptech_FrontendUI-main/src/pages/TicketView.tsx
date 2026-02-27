@@ -15,8 +15,9 @@ import { getTicketById } from '../data/mockTickets';
 import { useAuth } from '../context/AuthContext';
 import { TicketChatSocket } from '../services/chatService';
 import type { ChatMessage, ChatEvent, ChatAttachment } from '../services/chatService';
-import { fetchTicketByStf } from '../services/api';
+import { fetchTicketByStf, uploadResolutionProof, deleteAttachment } from '../services/api';
 import type { BackendTicket } from '../services/api';
+import { Loader2, Trash2 } from 'lucide-react';
 
 const JOB_STATUSES = ['Completed', 'Under Warranty', 'For Quotation', 'Pending', 'Chargeable', 'Under Contract'];
 
@@ -142,10 +143,20 @@ export function TicketView() {
   const [showScrollDown, setShowScrollDown] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  // Attachment state
+  // Chat attachment state
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<{ file: File; url: string; type: 'image' | 'video' | 'file' }[]>([]);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+
+  // Resolution proof attachment state
+  const screenshotInputRef = useRef<HTMLInputElement>(null);
+  const recordingInputRef = useRef<HTMLInputElement>(null);
+  const [screenshotFiles, setScreenshotFiles] = useState<File[]>([]);
+  const [recordingFiles, setRecordingFiles] = useState<File[]>([]);
+  const [uploadingAttachments, setUploadingAttachments] = useState(false);
+  const [uploadedAttachments, setUploadedAttachments] = useState<
+    { id: number; name: string; type: 'screenshot' | 'recording'; url?: string }[]
+  >([]);
 
   // Resolve the numeric ticket ID for the WebSocket
   const [backendTicketId, setBackendTicketId] = useState<number | null>(
@@ -409,6 +420,83 @@ export function TicketView() {
   const [actionTaken, setActionTaken] = useState(ticket.actionTaken || '');
   const [remarksText, setRemarksText] = useState(ticket.remarks || '');
 
+  // ── Attachment file handlers ──
+  const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10 MB
+  const MAX_VIDEO_SIZE = 50 * 1024 * 1024; // 50 MB
+  const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/jpg'];
+  const VIDEO_TYPES = ['video/mp4', 'video/webm'];
+
+  const handleScreenshotSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const valid = files.filter((f) => {
+      if (!IMAGE_TYPES.includes(f.type)) {
+        alert(`"${f.name}" is not a supported image format. Use PNG or JPG.`);
+        return false;
+      }
+      if (f.size > MAX_IMAGE_SIZE) {
+        alert(`"${f.name}" exceeds the 10 MB limit.`);
+        return false;
+      }
+      return true;
+    });
+    if (valid.length) setScreenshotFiles((prev) => [...prev, ...valid]);
+    e.target.value = '';
+  };
+
+  const handleRecordingSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const valid = files.filter((f) => {
+      if (!VIDEO_TYPES.includes(f.type)) {
+        alert(`"${f.name}" is not a supported video format. Use MP4 or WebM.`);
+        return false;
+      }
+      if (f.size > MAX_VIDEO_SIZE) {
+        alert(`"${f.name}" exceeds the 50 MB limit.`);
+        return false;
+      }
+      return true;
+    });
+    if (valid.length) setRecordingFiles((prev) => [...prev, ...valid]);
+    e.target.value = '';
+  };
+
+  const removeScreenshot = (idx: number) => setScreenshotFiles((prev) => prev.filter((_, i) => i !== idx));
+  const removeRecording = (idx: number) => setRecordingFiles((prev) => prev.filter((_, i) => i !== idx));
+
+  const handleUploadAttachments = async () => {
+    if (!backendTicketId) return;
+    const allFiles = [...screenshotFiles, ...recordingFiles];
+    if (!allFiles.length) return;
+    setUploadingAttachments(true);
+    try {
+      const result = await uploadResolutionProof(backendTicketId, allFiles);
+      const uploaded = (result as any[]).map((att: any) => ({
+        id: att.id,
+        name: att.file?.split('/').pop() || 'file',
+        type: (att.file?.match(/\.(mp4|webm)$/i) ? 'recording' : 'screenshot') as 'screenshot' | 'recording',
+        url: att.file,
+      }));
+      setUploadedAttachments((prev) => [...prev, ...uploaded]);
+      setScreenshotFiles([]);
+      setRecordingFiles([]);
+    } catch (err: any) {
+      alert(err?.message || 'Upload failed. Please try again.');
+    } finally {
+      setUploadingAttachments(false);
+    }
+  };
+
+  const handleRemoveUploaded = async (att: { id: number; name: string }) => {
+    if (!backendTicketId) return;
+    if (!confirm(`Remove "${att.name}"?`)) return;
+    try {
+      await deleteAttachment(backendTicketId, att.id);
+      setUploadedAttachments((prev) => prev.filter((a) => a.id !== att.id));
+    } catch (err: any) {
+      alert(err?.message || 'Failed to remove attachment.');
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Back + Messages */}
@@ -619,29 +707,142 @@ export function TicketView() {
             <h3 className="text-xs font-bold uppercase tracking-wider text-[#0E8F79] mb-3 flex items-center gap-2">
               <Paperclip className="w-4 h-4" /> Required Attachment
             </h3>
+
+            {/* Hidden file inputs */}
+            <input
+              ref={screenshotInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/jpg"
+              multiple
+              className="hidden"
+              onChange={handleScreenshotSelect}
+            />
+            <input
+              ref={recordingInputRef}
+              type="file"
+              accept="video/mp4,video/webm"
+              multiple
+              className="hidden"
+              onChange={handleRecordingSelect}
+            />
+
             <div className="space-y-3">
-              <div className="flex items-center gap-3 p-3 rounded-lg border border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 hover:border-[#0E8F79]/50 transition-colors cursor-pointer">
+              {/* Screenshot / Picture trigger */}
+              <button
+                type="button"
+                onClick={() => canEdit && screenshotInputRef.current?.click()}
+                disabled={!canEdit}
+                className={`w-full flex items-center gap-3 p-3 rounded-lg border border-dashed transition-colors text-left ${
+                  canEdit
+                    ? 'border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 hover:border-[#0E8F79] hover:bg-[#0E8F79]/5 cursor-pointer'
+                    : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 opacity-60 cursor-not-allowed'
+                }`}
+              >
                 <Camera className="w-5 h-5 text-[#0E8F79]" />
                 <div className="flex-1">
                   <div className="text-sm font-medium text-gray-700 dark:text-gray-300">Screenshot / Picture</div>
                   <div className="text-xs text-gray-400">PNG, JPG up to 10MB</div>
                 </div>
                 <Upload className="w-4 h-4 text-gray-400" />
-              </div>
-              <div className="flex items-center gap-3 p-3 rounded-lg border border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 hover:border-[#0E8F79]/50 transition-colors cursor-pointer">
+              </button>
+
+              {/* Selected screenshot files */}
+              {screenshotFiles.length > 0 && (
+                <div className="space-y-1.5 ml-8">
+                  {screenshotFiles.map((f, i) => (
+                    <div key={i} className="flex items-center gap-2 p-2 rounded-lg bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-800">
+                      <Camera className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                      <span className="text-xs text-blue-700 dark:text-blue-400 flex-1 truncate">{f.name}</span>
+                      <span className="text-[10px] text-blue-400 flex-shrink-0">{formatFileSize(f.size)}</span>
+                      <button type="button" onClick={() => removeScreenshot(i)} className="p-0.5 rounded hover:bg-blue-100 dark:hover:bg-blue-800 transition-colors">
+                        <X className="w-3.5 h-3.5 text-blue-400 hover:text-red-500" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Recording trigger */}
+              <button
+                type="button"
+                onClick={() => canEdit && recordingInputRef.current?.click()}
+                disabled={!canEdit}
+                className={`w-full flex items-center gap-3 p-3 rounded-lg border border-dashed transition-colors text-left ${
+                  canEdit
+                    ? 'border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 hover:border-[#0E8F79] hover:bg-[#0E8F79]/5 cursor-pointer'
+                    : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 opacity-60 cursor-not-allowed'
+                }`}
+              >
                 <Video className="w-5 h-5 text-[#0E8F79]" />
                 <div className="flex-1">
                   <div className="text-sm font-medium text-gray-700 dark:text-gray-300">Recording</div>
                   <div className="text-xs text-gray-400">MP4, WebM up to 50MB</div>
                 </div>
                 <Upload className="w-4 h-4 text-gray-400" />
-              </div>
+              </button>
+
+              {/* Selected recording files */}
+              {recordingFiles.length > 0 && (
+                <div className="space-y-1.5 ml-8">
+                  {recordingFiles.map((f, i) => (
+                    <div key={i} className="flex items-center gap-2 p-2 rounded-lg bg-purple-50 dark:bg-purple-900/10 border border-purple-100 dark:border-purple-800">
+                      <Video className="w-3.5 h-3.5 text-purple-500 flex-shrink-0" />
+                      <span className="text-xs text-purple-700 dark:text-purple-400 flex-1 truncate">{f.name}</span>
+                      <span className="text-[10px] text-purple-400 flex-shrink-0">{formatFileSize(f.size)}</span>
+                      <button type="button" onClick={() => removeRecording(i)} className="p-0.5 rounded hover:bg-purple-100 dark:hover:bg-purple-800 transition-colors">
+                        <X className="w-3.5 h-3.5 text-purple-400 hover:text-red-500" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-            {ticket.ticketAttachments && ticket.ticketAttachments.length > 0 && (
+
+            {/* Upload button (appears when files are selected) */}
+            {canEdit && (screenshotFiles.length > 0 || recordingFiles.length > 0) && (
+              <button
+                type="button"
+                disabled={uploadingAttachments}
+                onClick={handleUploadAttachments}
+                className="mt-3 w-full py-2.5 rounded-xl font-semibold text-white bg-gradient-to-r from-[#63D44A] to-[#0E8F79] hover:shadow-lg hover:shadow-[#3BC25B]/20 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all text-sm"
+              >
+                {uploadingAttachments ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4" />
+                    Upload {screenshotFiles.length + recordingFiles.length} file{screenshotFiles.length + recordingFiles.length > 1 ? 's' : ''}
+                  </>
+                )}
+              </button>
+            )}
+
+            {/* Already uploaded attachments (from backend or just uploaded) */}
+            {(uploadedAttachments.length > 0 || (ticket.ticketAttachments && ticket.ticketAttachments.length > 0)) && (
               <div className="mt-3 space-y-2">
                 <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Uploaded Files</div>
-                {ticket.ticketAttachments.map((att: { name: string; type: string }, i: number) => (
-                  <div key={i} className="flex items-center gap-3 p-2.5 rounded-lg bg-green-50 dark:bg-green-900/10 border border-green-100 dark:border-green-800">
+                {uploadedAttachments.map((att) => (
+                  <div key={att.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-green-50 dark:bg-green-900/10 border border-green-100 dark:border-green-800 group">
+                    {att.type === 'screenshot' ? <Camera className="w-4 h-4 text-green-600" /> : <Video className="w-4 h-4 text-green-600" />}
+                    <span className="text-sm text-green-700 dark:text-green-400 flex-1 truncate">{att.name}</span>
+                    {att.url && (
+                      <a href={att.url} target="_blank" rel="noopener noreferrer" className="p-1 rounded hover:bg-green-100 dark:hover:bg-green-800 transition-colors">
+                        <Download className="w-3.5 h-3.5 text-green-500" />
+                      </a>
+                    )}
+                    {canEdit && (
+                      <button type="button" onClick={() => handleRemoveUploaded(att)} className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/20 transition-colors opacity-0 group-hover:opacity-100">
+                        <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                      </button>
+                    )}
+                    <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                  </div>
+                ))}
+                {ticket.ticketAttachments?.map((att: { name: string; type: string }, i: number) => (
+                  <div key={`legacy-${i}`} className="flex items-center gap-3 p-2.5 rounded-lg bg-green-50 dark:bg-green-900/10 border border-green-100 dark:border-green-800">
                     {att.type === 'screenshot' ? <Camera className="w-4 h-4 text-green-600" /> : <Video className="w-4 h-4 text-green-600" />}
                     <span className="text-sm text-green-700 dark:text-green-400 flex-1">{att.name}</span>
                     <CheckCircle className="w-4 h-4 text-green-500" />
