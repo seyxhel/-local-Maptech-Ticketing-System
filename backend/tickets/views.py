@@ -380,9 +380,11 @@ class TicketViewSet(viewsets.ModelViewSet):
         for field in allowed:
             if field in request.data:
                 setattr(ticket, field, request.data[field])
-        # Set status to in_progress if still open
+        # Set status to in_progress if still open, or pending_closure (Resolved) when employee saves
         if ticket.status == Ticket.STATUS_OPEN:
             ticket.status = Ticket.STATUS_IN_PROGRESS
+        elif ticket.status == Ticket.STATUS_IN_PROGRESS:
+            ticket.status = Ticket.STATUS_PENDING_CLOSURE
         ticket.save()
         return Response(self.get_serializer(ticket).data)
 
