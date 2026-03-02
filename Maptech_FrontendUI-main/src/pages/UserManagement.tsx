@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card } from '../components/ui/Card';
 import { GreenButton } from '../components/ui/GreenButton';
 import {
@@ -8,106 +8,96 @@ import {
   Lock,
   Unlock,
   X,
-  Users } from
+  Users,
+  Loader2 } from
 'lucide-react';
 import { toast } from 'sonner';
+import {
+  fetchUsers,
+  createUser,
+  updateUser,
+  toggleUserActive,
+  type BackendUser,
+  type CreateUserPayload,
+} from '../services/api';
+
 interface UserAccount {
   id: number;
   name: string;
+  firstName: string;
+  middleName: string;
+  lastName: string;
+  suffix: string;
   email: string;
-  role: 'Admin' | 'Employee' | 'Client';
+  phone: string;
+  role: 'Admin' | 'Employee' | 'Superadmin';
   status: 'Active' | 'Blocked';
 }
-const INITIAL_USERS: UserAccount[] = [
-{
-  id: 1,
-  name: 'Alex Reyes',
-  email: 'alex.reyes@maptech.com',
-  role: 'Admin',
-  status: 'Active'
-},
-{
-  id: 2,
-  name: 'Sarah Engineer',
-  email: 'sarah.e@maptech.com',
-  role: 'Employee',
-  status: 'Active'
-},
-{
-  id: 3,
-  name: 'John Doe',
-  email: 'john@clientcorp.com',
-  role: 'Client',
-  status: 'Active'
-},
-{
-  id: 4,
-  name: 'Mike Ross',
-  email: 'mike.r@maptech.com',
-  role: 'Employee',
-  status: 'Blocked'
-},
-{
-  id: 5,
-  name: 'Jenny Lee',
-  email: 'jenny.l@maptech.com',
-  role: 'Employee',
-  status: 'Active'
-},
-{
-  id: 6,
-  name: 'David Kim',
-  email: 'david.k@maptech.com',
-  role: 'Admin',
-  status: 'Active'
-},
-{
-  id: 7,
-  name: 'Emily Chen',
-  email: 'emily@betasystems.com',
-  role: 'Client',
-  status: 'Active'
-},
-{
-  id: 8,
-  name: 'Robert Wilson',
-  email: 'robert.w@maptech.com',
-  role: 'Employee',
-  status: 'Active'
-},
-{
-  id: 9,
-  name: 'Maria Santos',
-  email: 'maria.s@maptech.com',
-  role: 'Admin',
-  status: 'Active'
-},
-{
-  id: 10,
-  name: 'Carlos Tan',
-  email: 'carlos@alphacorp.com',
-  role: 'Client',
-  status: 'Blocked'
-}];
+
+/** Map a BackendUser to the local UserAccount shape. */
+function toUserAccount(u: BackendUser): UserAccount {
+  const fullName = [u.first_name, u.middle_name, u.last_name, u.suffix]
+    .map((s) => (s || '').trim())
+    .filter(Boolean)
+    .join(' ');
+  const roleMap: Record<string, 'Admin' | 'Employee' | 'Superadmin'> = {
+    admin: 'Admin',
+    employee: 'Employee',
+    superadmin: 'Superadmin',
+  };
+  return {
+    id: u.id,
+    name: fullName || u.username,
+    firstName: u.first_name || '',
+    middleName: u.middle_name || '',
+    lastName: u.last_name || '',
+    suffix: u.suffix || '',
+    email: u.email,
+    phone: u.phone || '',
+    role: roleMap[u.role] || 'Employee',
+    status: u.is_active ? 'Active' : 'Blocked',
+  };
+}
 
 const EMPTY_FORM = {
   lastName: '',
   firstName: '',
   middleName: '',
+  suffix: '',
   email: '',
   contactNumber: '',
   role: 'Employee' as 'Admin' | 'Employee',
   status: 'Active' as 'Active' | 'Blocked'
 };
 export function UserManagement() {
-  const [users, setUsers] = useState<UserAccount[]>(INITIAL_USERS);
+  const [users, setUsers] = useState<UserAccount[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [roleFilter, setRoleFilter] = useState<
-    'All' | 'Admin' | 'Employee' | 'Client'>(
+    'All' | 'Admin' | 'Employee' | 'Superadmin'>(
     'All');
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserAccount | null>(null);
   const [formData, setFormData] = useState(EMPTY_FORM);
+
+  // ── Fetch users from backend ──
+  const loadUsers = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await fetchUsers();
+      setUsers(data.map(toUserAccount));
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to fetch users';
+      toast.error(msg);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadUsers();
+  }, [loadUsers]);
 
   const filteredUsers = users.filter((u) => {
     const matchesRole = roleFilter === 'All' || u.role === roleFilter;
@@ -123,86 +113,86 @@ export function UserManagement() {
   };
   const openEditModal = (user: UserAccount) => {
     setEditingUser(user);
-    const parts = user.name.trim().split(' ');
-    const lastName = parts.length > 1 ? parts[parts.length - 1] : '';
-    const firstName = parts[0] ?? '';
-    const middleName = parts.length > 2 ? parts.slice(1, -1).join(' ') : '';
     setFormData({
-      lastName,
-      firstName,
-      middleName,
+      lastName: user.lastName,
+      firstName: user.firstName,
+      middleName: user.middleName,
+      suffix: user.suffix,
       email: user.email,
-      contactNumber: '',
-      role: user.role === 'Client' ? 'Employee' : user.role,
+      contactNumber: user.phone,
+      role: user.role === 'Superadmin' ? 'Admin' : user.role,
       status: user.status
     });
     setIsModalOpen(true);
   };
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    const fullName = [formData.firstName, formData.middleName, formData.lastName]
-      .map((s) => s.trim()).filter(Boolean).join(' ');
-    if (editingUser) {
-      setUsers((prev) =>
-      prev.map((u) =>
-      u.id === editingUser.id ?
-      {
-        ...u,
-        name: fullName,
-        email: formData.email,
-        role: formData.role,
-        status: formData.status
-      } :
-      u
-      )
-      );
-      toast.success(`Account for ${fullName} updated successfully.`);
-    } else {
-      setUsers((prev) => [
-      {
-        id: Date.now(),
-        name: fullName,
-        email: formData.email,
-        role: formData.role,
-        status: formData.status
-      },
-      ...prev]
-      );
-      toast.success(
-        `New ${formData.role} account created for ${fullName}.`
-      );
-    }
-    setIsModalOpen(false);
-  };
-  const toggleStatus = (id: number) => {
-    setUsers((prev) =>
-    prev.map((u) => {
-      if (u.id === id) {
-        const next = u.status === 'Active' ? 'Blocked' : 'Active';
-        toast.info(
-          `${u.name} has been ${next === 'Blocked' ? 'blocked' : 'activated'}.`
-        );
-        return {
-          ...u,
-          status: next
+    setSubmitting(true);
+    try {
+      if (editingUser) {
+        // Update existing user via API
+        const payload: Record<string, string> = {
+          first_name: formData.firstName.trim(),
+          last_name: formData.lastName.trim(),
+          middle_name: formData.middleName.trim(),
+          email: formData.email.trim(),
+          phone: formData.contactNumber.trim(),
+          role: formData.role.toLowerCase(),
         };
+        await updateUser(editingUser.id, payload as never);
+        toast.success(`Account for ${formData.firstName} ${formData.lastName} updated successfully.`);
+      } else {
+        // Create new user via API
+        const payload: CreateUserPayload = {
+          first_name: formData.firstName.trim(),
+          last_name: formData.lastName.trim(),
+          middle_name: formData.middleName.trim(),
+          email: formData.email.trim(),
+          phone: formData.contactNumber.trim(),
+          role: formData.role.toLowerCase() as 'employee' | 'admin',
+        };
+        await createUser(payload);
+        toast.success(
+          `New ${formData.role} account created for ${formData.firstName} ${formData.lastName}.`
+        );
       }
-      return u;
-    })
-    );
+      setIsModalOpen(false);
+      await loadUsers(); // Refresh the list from the backend
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Operation failed';
+      toast.error(msg);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+  const toggleStatus = async (id: number) => {
+    try {
+      await toggleUserActive(id);
+      await loadUsers(); // Refresh
+      const user = users.find((u) => u.id === id);
+      if (user) {
+        const next = user.status === 'Active' ? 'blocked' : 'activated';
+        toast.info(`${user.name} has been ${next}.`);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Toggle failed';
+      toast.error(msg);
+    }
   };
   const roleBadge = (role: string) => {
     if (role === 'Admin')
     return 'bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-700';
     if (role === 'Employee')
     return 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-700';
+    if (role === 'Superadmin')
+    return 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-700';
     return 'bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-600';
   };
   const roleCounts = {
     All: users.length,
     Admin: users.filter((u) => u.role === 'Admin').length,
     Employee: users.filter((u) => u.role === 'Employee').length,
-    Client: users.filter((u) => u.role === 'Client').length
+    Superadmin: users.filter((u) => u.role === 'Superadmin').length
   };
   return (
     <div className="space-y-6">
@@ -242,9 +232,9 @@ export function UserManagement() {
           cls: 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700'
         },
         {
-          label: 'Clients',
-          count: roleCounts.Client,
-          cls: 'bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
+          label: 'Superadmins',
+          count: roleCounts.Superadmin,
+          cls: 'bg-amber-50 dark:bg-amber-800/30 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700'
         }].
         map((item) =>
         <div key={item.label} className={`rounded-xl p-4 ${item.cls}`}>
@@ -257,7 +247,7 @@ export function UserManagement() {
       <Card accent>
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <div className="flex bg-gray-100 dark:bg-gray-700 p-1 rounded-lg gap-1">
-            {(['All', 'Admin', 'Employee', 'Client'] as const).map((tab) =>
+            {(['All', 'Admin', 'Employee', 'Superadmin'] as const).map((tab) =>
             <button
               key={tab}
               onClick={() => setRoleFilter(tab)}
@@ -296,7 +286,16 @@ export function UserManagement() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-              {filteredUsers.length === 0 ?
+              {loading ?
+              <tr>
+                  <td colSpan={5} className="px-6 py-16 text-center">
+                    <div className="flex flex-col items-center gap-2 text-gray-400 dark:text-gray-500">
+                      <Loader2 className="w-8 h-8 animate-spin" />
+                      <p className="font-medium">Loading users...</p>
+                    </div>
+                  </td>
+                </tr> :
+              filteredUsers.length === 0 ?
               <tr>
                   <td colSpan={5} className="px-6 py-16 text-center">
                     <div className="flex flex-col items-center gap-2 text-gray-400 dark:text-gray-500">
@@ -484,12 +483,20 @@ export function UserManagement() {
                 <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="flex-1 px-4 py-2.5 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                disabled={submitting}
+                className="flex-1 px-4 py-2.5 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50">
 
                   Cancel
                 </button>
-                <GreenButton type="submit" className="flex-1">
-                  {editingUser ? 'Save Changes' : 'Create Account'}
+                <GreenButton type="submit" className="flex-1" disabled={submitting}>
+                  {submitting ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      {editingUser ? 'Saving...' : 'Creating...'}
+                    </span>
+                  ) : (
+                    editingUser ? 'Save Changes' : 'Create Account'
+                  )}
                 </GreenButton>
               </div>
             </form>
