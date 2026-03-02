@@ -5,7 +5,7 @@ import {
   refreshAccessToken,
 } from '../services/authService';
 
-export type Role = 'superadmin' | 'admin' | 'employee' | null;
+export type Role = 'superadmin' | 'admin' | 'employee' | 'client' | null;
 
 export interface AuthUser {
   role: Role;
@@ -44,6 +44,7 @@ function normalizeRole(role: string): Role {
   if (r === 'superadmin' || r === 'super_admin') return 'superadmin';
   if (r === 'admin') return 'admin';
   if (r === 'employee') return 'employee';
+  if (r === 'client') return 'client';
   return null;
 }
 
@@ -52,6 +53,7 @@ function roleToPath(role: Role): string {
     case 'superadmin': return '/superadmin/dashboard';
     case 'admin': return '/admin/dashboard';
     case 'employee': return '/employee/dashboard';
+    case 'client': return '/client/dashboard';
     case null:
     default: return '/login';
   }

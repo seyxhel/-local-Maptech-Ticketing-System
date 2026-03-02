@@ -5,6 +5,10 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Login } from './pages/Login';
 import { ForgotPassword } from './pages/ForgotPassword';
+import { Signup } from './pages/Signup';
+import { PrivacyPolicy } from './pages/PrivacyPolicy';
+import { TermsOfService } from './pages/TermsOfService';
+import { NotFound } from './pages/NotFound';
 import { SuperAdminLayout } from './layouts/SuperAdminLayout';
 import { AdminLayout } from './layouts/AdminLayout';
 import { EmployeeLayout } from './layouts/EmployeeLayout';
@@ -54,6 +58,9 @@ export function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/signup" element={<Signup />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/terms-of-service" element={<TermsOfService />} />
             <Route path="/" element={<RootRedirect />} />
 
             <Route
@@ -121,7 +128,7 @@ export function App() {
               <Route path="settings" element={<ClientSettings />} />
             </Route>
 
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
       </BrowserRouter>

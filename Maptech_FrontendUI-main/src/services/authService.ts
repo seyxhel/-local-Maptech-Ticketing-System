@@ -1,4 +1,16 @@
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
+const TOKEN_KEY = 'maptech_access';
+
+function getToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY) || null;
+}
+
+function authHeaders(): Record<string, string> {
+  const token = getToken();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return headers;
+}
 
 export interface LoginCredentials {
   email: string;
@@ -66,6 +78,62 @@ export async function refreshAccessToken(refreshToken: string): Promise<{ access
     throw new Error(data.detail || 'Token refresh failed');
   }
   return data as { access: string };
+}
+
+/** Send a password reset email. */
+export async function forgotPassword(email: string): Promise<{ detail: string }> {
+  const res = await fetch(`${API_BASE}/auth/password-reset/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.detail || 'Password reset request failed');
+  }
+  return data as { detail: string };
+}
+
+/** Confirm password reset with uid and token. */
+export async function resetPasswordConfirm(uid: string, token: string, newPassword: string): Promise<{ detail: string }> {
+  const res = await fetch(`${API_BASE}/auth/password-reset-confirm/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ uid, token, new_password: newPassword }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.detail || 'Password reset failed');
+  }
+  return data as { detail: string };
+}
+
+/** Change password (authenticated user). */
+export async function changePassword(oldPassword: string, newPassword: string): Promise<{ detail: string }> {
+  const res = await fetch(`${API_BASE}/auth/change_password/`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ old_password: oldPassword, new_password: newPassword }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.detail || 'Password change failed');
+  }
+  return data as { detail: string };
+}
+
+/** Update user profile (authenticated user). */
+export async function updateProfile(data: Record<string, unknown>): Promise<LoginResponse['user']> {
+  const res = await fetch(`${API_BASE}/auth/update_profile/`, {
+    method: 'PATCH',
+    headers: authHeaders(),
+    body: JSON.stringify(data),
+  });
+  const result = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(result.detail || 'Profile update failed');
+  }
+  return result as LoginResponse['user'];
 }
 
 

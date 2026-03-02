@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { Layout } from '../components/layout/Layout';
 import { Sidebar, type NavItem } from '../components/layout/Sidebar';
 import { LayoutDashboard, Users, BarChart3, Settings } from 'lucide-react';
+import { NetworkErrorModal, useNetworkStatus } from '../shared';
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/superadmin/dashboard' },
@@ -31,6 +32,8 @@ export function SuperAdminLayout() {
     navigate(path);
   };
 
+  const { isOffline, retry, dismiss, retrying } = useNetworkStatus();
+
   if (!user) return null;
   const layoutRole = 'SuperAdmin' as const;
 
@@ -43,6 +46,7 @@ export function SuperAdminLayout() {
       onToggleDark={() => setIsDark((d) => !d)}
       navItems={NAV_ITEMS}
     >
+      <NetworkErrorModal isOpen={isOffline} onRetry={retry} onDismiss={dismiss} retrying={retrying} />
       <Outlet />
     </Layout>
   );

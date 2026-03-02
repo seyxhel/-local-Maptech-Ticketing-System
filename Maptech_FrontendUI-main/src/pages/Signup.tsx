@@ -225,7 +225,7 @@ function PolicyModal({
 }
 
 export function Signup() {
-  const { user, registerClient, getRedirectPath } = useAuth();
+  const { user, getRedirectPath } = useAuth();
   const navigate = useNavigate();
   const [firstName, setFirstName] = useState('');
   const [middleName, setMiddleName] = useState('');
@@ -274,14 +274,11 @@ export function Signup() {
     }
     setLoading(true);
     try {
-      const fullName = [firstName, middleName, lastName].filter(Boolean).join(' ');
-      const redirectPath = await registerClient({
-        fullName: fullName.trim(),
-        email: email.trim(),
-        password,
-        acceptTerms,
-      });
-      navigate(redirectPath, { replace: true });
+      // Client registration — placeholder until backend supports client signup
+      const _fullName = [firstName, middleName, lastName].filter(Boolean).join(' ');
+      // TODO: Replace with actual API call when client registration endpoint is available
+      // For now, show a message that registration requires admin approval
+      throw new Error('Client registration is not yet available. Please contact your administrator to create an account.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed. Please try again.');
     } finally {
