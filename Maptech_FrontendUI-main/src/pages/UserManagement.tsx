@@ -9,9 +9,18 @@ import {
   Unlock,
   X,
   Users,
-  Loader2 } from
-'lucide-react';
+  Loader2,
+  RefreshCw,
+} from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  validateEmail,
+  validatePhone,
+  validateName,
+  MAX_NAME,
+  MAX_EMAIL,
+  MAX_PHONE,
+} from '../utils/validation';
 import {
   fetchUsers,
   createUser,
@@ -59,6 +68,14 @@ function toUserAccount(u: BackendUser): UserAccount {
   };
 }
 
+function displayName(u: UserAccount): string {
+  return u.name;
+}
+
+function cap(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+}
+
 const EMPTY_FORM = {
   lastName: '',
   firstName: '',
@@ -78,8 +95,9 @@ export function UserManagement() {
     'All');
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<BackendUser | null>(null);
+  const [editingUser, setEditingUser] = useState<UserAccount | null>(null);
   const [formData, setFormData] = useState(EMPTY_FORM);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   // ── Fetch users from backend ──
   const loadUsers = useCallback(async () => {
@@ -107,14 +125,6 @@ export function UserManagement() {
     return matchesRole && matchesSearch;
   });
 
-  /* ── role counts ──────────────────────────────────── */
-  const roleCounts: Record<RoleFilter, number> = {
-    All: users.length,
-    superadmin: users.filter((u) => u.role === 'superadmin').length,
-    admin: users.filter((u) => u.role === 'admin').length,
-    employee: users.filter((u) => u.role === 'employee').length,
-  };
-
   /* ── modal helpers ────────────────────────────────── */
   const openAddModal = () => {
     setEditingUser(null);
@@ -122,22 +132,42 @@ export function UserManagement() {
     setIsModalOpen(true);
   };
 
-  const openEditModal = (user: BackendUser) => {
+  const openEditModal = (user: UserAccount) => {
     setEditingUser(user);
     setFormData({
       lastName: user.lastName,
       firstName: user.firstName,
       middleName: user.middleName,
-      suffix: user.suffix,
+      suffix: user.suffix || '',
       email: user.email,
-      contactNumber: user.phone,
-      role: user.role === 'Superadmin' ? 'Admin' : user.role,
-      status: user.status
+      contactNumber: user.phone || '',
+      role: (user.role === 'Employee' ? 'employee' : 'admin') as 'admin' | 'employee',
     });
     setIsModalOpen(true);
   };
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // ── Validate fields ──
+    const errs: Record<string, string> = {};
+    const lastErr = validateName(formData.lastName, 'Last Name');
+    if (lastErr) errs.lastName = lastErr;
+    const firstErr = validateName(formData.firstName, 'First Name');
+    if (firstErr) errs.firstName = firstErr;
+    if (formData.middleName.trim()) {
+      const midErr = validateName(formData.middleName, 'Middle Name');
+      if (midErr) errs.middleName = midErr;
+    }
+    const emailErr = validateEmail(formData.email);
+    if (emailErr) errs.email = emailErr;
+    const phoneErr = validatePhone(formData.contactNumber, 'Contact Number');
+    if (phoneErr) errs.contactNumber = phoneErr;
+    setFieldErrors(errs);
+    if (Object.keys(errs).length > 0) {
+      toast.error('Please fix the highlighted errors.');
+      return;
+    }
+
     setSubmitting(true);
     try {
       if (editingUser) {
@@ -260,7 +290,7 @@ export function UserManagement() {
             <p className="text-2xl font-bold">{item.count}</p>
             <p className="text-sm mt-1 opacity-80">{item.label}</p>
           </div>
-        ))}
+        )}
       </div>
 
       {/* table card */}
@@ -284,7 +314,7 @@ export function UserManagement() {
                   {roleCounts[tab]}
                 </span>
               </button>
-            ))}
+            )}
           </div>
           <div className="relative w-full md:w-72">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 w-4 h-4" />
@@ -310,17 +340,17 @@ export function UserManagement() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-              {loading ?
-              <tr>
+              {loading ? (
+                <tr>
                   <td colSpan={5} className="px-6 py-16 text-center">
                     <div className="flex flex-col items-center gap-2 text-gray-400 dark:text-gray-500">
                       <Loader2 className="w-8 h-8 animate-spin" />
                       <p className="font-medium">Loading users...</p>
                     </div>
                   </td>
-                </tr> :
-              filteredUsers.length === 0 ?
-              <tr>
+                </tr>
+              ) : filteredUsers.length === 0 ? (
+                <tr>
                   <td colSpan={5} className="px-6 py-16 text-center">
                     <div className="flex flex-col items-center gap-2 text-gray-400 dark:text-gray-500">
                       <Users className="w-8 h-8" />
@@ -359,15 +389,15 @@ export function UserManagement() {
                       <td className="px-6 py-4">
                         <span
                           className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border ${
-                            user.is_active
+                            user.status === 'Active'
                               ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-700'
                               : 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-200 dark:border-red-700'
                           }`}
                         >
                           <span
-                            className={`w-1.5 h-1.5 rounded-full ${user.is_active ? 'bg-green-500' : 'bg-red-500'}`}
+                            className={`w-1.5 h-1.5 rounded-full ${user.status === 'Active' ? 'bg-green-500' : 'bg-red-500'}`}
                           />
-                          {user.is_active ? 'Active' : 'Blocked'}
+                          {user.status === 'Active' ? 'Active' : 'Blocked'}
                         </span>
                       </td>
                       <td className="px-6 py-4">
@@ -381,14 +411,14 @@ export function UserManagement() {
                           </button>
                           <button
                             onClick={() => toggleStatus(user.id)}
-                            title={user.is_active ? 'Block account' : 'Activate account'}
+                            title={user.status === 'Active' ? 'Block account' : 'Activate account'}
                             className={`p-2 rounded-lg transition-colors ${
-                              user.is_active
+                              user.status === 'Active'
                                 ? 'text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20'
                                 : 'text-red-400 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20'
                             }`}
                           >
-                            {user.is_active ? (
+                            {user.status === 'Active' ? (
                               <Lock className="w-4 h-4" />
                             ) : (
                               <Unlock className="w-4 h-4" />
@@ -441,11 +471,13 @@ export function UserManagement() {
                   <input
                     type="text"
                     required
+                    maxLength={MAX_NAME}
                     value={formData.lastName}
-                    onChange={(e) => setFormData((p) => ({ ...p, lastName: e.target.value }))}
+                    onChange={(e) => { setFormData((p) => ({ ...p, lastName: e.target.value })); setFieldErrors((p) => ({ ...p, lastName: '' })); }}
                     placeholder="e.g. Santos"
-                    className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-[#3BC25B] focus:border-transparent outline-none"
+                    className={`w-full px-4 py-2.5 border ${fieldErrors.lastName ? 'border-red-400 ring-2 ring-red-400' : 'border-gray-300 dark:border-gray-600'} rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-[#3BC25B] focus:border-transparent outline-none`}
                   />
+                  {fieldErrors.lastName && <p className="text-red-500 text-xs mt-1">{fieldErrors.lastName}</p>}
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
@@ -454,11 +486,13 @@ export function UserManagement() {
                   <input
                     type="text"
                     required
+                    maxLength={MAX_NAME}
                     value={formData.firstName}
-                    onChange={(e) => setFormData((p) => ({ ...p, firstName: e.target.value }))}
+                    onChange={(e) => { setFormData((p) => ({ ...p, firstName: e.target.value })); setFieldErrors((p) => ({ ...p, firstName: '' })); }}
                     placeholder="e.g. Maria"
-                    className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-[#3BC25B] focus:border-transparent outline-none"
+                    className={`w-full px-4 py-2.5 border ${fieldErrors.firstName ? 'border-red-400 ring-2 ring-red-400' : 'border-gray-300 dark:border-gray-600'} rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-[#3BC25B] focus:border-transparent outline-none`}
                   />
+                  {fieldErrors.firstName && <p className="text-red-500 text-xs mt-1">{fieldErrors.firstName}</p>}
                 </div>
               </div>
               <div>
@@ -468,11 +502,13 @@ export function UserManagement() {
                 </label>
                 <input
                   type="text"
+                  maxLength={MAX_NAME}
                   value={formData.middleName}
-                  onChange={(e) => setFormData((p) => ({ ...p, middleName: e.target.value }))}
+                  onChange={(e) => { setFormData((p) => ({ ...p, middleName: e.target.value })); setFieldErrors((p) => ({ ...p, middleName: '' })); }}
                   placeholder="e.g. Reyes"
-                  className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-[#3BC25B] focus:border-transparent outline-none"
+                  className={`w-full px-4 py-2.5 border ${fieldErrors.middleName ? 'border-red-400 ring-2 ring-red-400' : 'border-gray-300 dark:border-gray-600'} rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-[#3BC25B] focus:border-transparent outline-none`}
                 />
+                {fieldErrors.middleName && <p className="text-red-500 text-xs mt-1">{fieldErrors.middleName}</p>}
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
@@ -481,11 +517,13 @@ export function UserManagement() {
                 <input
                   type="email"
                   required
+                  maxLength={MAX_EMAIL}
                   value={formData.email}
-                  onChange={(e) => setFormData((p) => ({ ...p, email: e.target.value }))}
+                  onChange={(e) => { setFormData((p) => ({ ...p, email: e.target.value })); setFieldErrors((p) => ({ ...p, email: '' })); }}
                   placeholder="user@maptech.com"
-                  className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-[#3BC25B] focus:border-transparent outline-none"
+                  className={`w-full px-4 py-2.5 border ${fieldErrors.email ? 'border-red-400 ring-2 ring-red-400' : 'border-gray-300 dark:border-gray-600'} rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-[#3BC25B] focus:border-transparent outline-none`}
                 />
+                {fieldErrors.email && <p className="text-red-500 text-xs mt-1">{fieldErrors.email}</p>}
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
@@ -494,11 +532,13 @@ export function UserManagement() {
                 <input
                   type="tel"
                   required
+                  maxLength={MAX_PHONE}
                   value={formData.contactNumber}
-                  onChange={(e) => setFormData((p) => ({ ...p, contactNumber: e.target.value }))}
+                  onChange={(e) => { setFormData((p) => ({ ...p, contactNumber: e.target.value })); setFieldErrors((p) => ({ ...p, contactNumber: '' })); }}
                   placeholder="e.g. +63 912 345 6789"
-                  className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-[#3BC25B] focus:border-transparent outline-none"
+                  className={`w-full px-4 py-2.5 border ${fieldErrors.contactNumber ? 'border-red-400 ring-2 ring-red-400' : 'border-gray-300 dark:border-gray-600'} rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-[#3BC25B] focus:border-transparent outline-none`}
                 />
+                {fieldErrors.contactNumber && <p className="text-red-500 text-xs mt-1">{fieldErrors.contactNumber}</p>}
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">

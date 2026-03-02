@@ -499,11 +499,11 @@ export function TicketView() {
     const files = Array.from(e.target.files || []);
     const valid = files.filter((f) => {
       if (!IMAGE_TYPES.includes(f.type)) {
-        alert(`"${f.name}" is not a supported image format. Use PNG or JPG.`);
+        toast.error(`"${f.name}" is not a supported image format. Use PNG or JPG.`);
         return false;
       }
       if (f.size > MAX_IMAGE_SIZE) {
-        alert(`"${f.name}" exceeds the 10 MB limit.`);
+        toast.error(`"${f.name}" exceeds the 10 MB limit.`);
         return false;
       }
       return true;
@@ -516,11 +516,11 @@ export function TicketView() {
     const files = Array.from(e.target.files || []);
     const valid = files.filter((f) => {
       if (!VIDEO_TYPES.includes(f.type)) {
-        alert(`"${f.name}" is not a supported video format. Use MP4 or WebM.`);
+        toast.error(`"${f.name}" is not a supported video format. Use MP4 or WebM.`);
         return false;
       }
       if (f.size > MAX_VIDEO_SIZE) {
-        alert(`"${f.name}" exceeds the 50 MB limit.`);
+        toast.error(`"${f.name}" exceeds the 50 MB limit.`);
         return false;
       }
       return true;
@@ -549,7 +549,7 @@ export function TicketView() {
       setScreenshotFiles([]);
       setRecordingFiles([]);
     } catch (err: any) {
-      alert(err?.message || 'Upload failed. Please try again.');
+      toast.error(err?.message || 'Upload failed. Please try again.');
     } finally {
       setUploadingAttachments(false);
     }
@@ -562,7 +562,7 @@ export function TicketView() {
       await deleteAttachment(backendTicketId, att.id);
       setUploadedAttachments((prev) => prev.filter((a) => a.id !== att.id));
     } catch (err: any) {
-      alert(err?.message || 'Failed to remove attachment.');
+      toast.error(err?.message || 'Failed to remove attachment.');
     }
   };
 
@@ -1051,17 +1051,26 @@ export function TicketView() {
           )}
 
           {/* ── Messages Area ── */}
-          <div
-            ref={chatScrollRef}
-            onScroll={handleChatScroll}
-            className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-3 space-y-1 scroll-smooth"
-            style={{ scrollbarWidth: 'thin', scrollbarColor: '#d1d5db transparent' }}
-          >
+          <div className="flex-1 relative overflow-hidden">
+            {/* Persistent watermark logo */}
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-0">
+              <img
+                src="/Maptech Official Logo version2 (1).png"
+                alt=""
+                className="w-40 h-auto opacity-40 dark:opacity-40 dark:brightness-150 dark:contrast-125 select-none"
+                draggable={false}
+              />
+            </div>
+
+            <div
+              ref={chatScrollRef}
+              onScroll={handleChatScroll}
+              className="h-full overflow-y-auto overflow-x-hidden px-4 py-3 space-y-1 scroll-smooth relative z-[1]"
+              style={{ scrollbarWidth: 'thin', scrollbarColor: '#d1d5db transparent' }}
+            >
             {chatMessages.length === 0 && (
               <div className="flex flex-col items-center justify-center h-full text-center py-12">
-                <div className="w-16 h-16 rounded-full bg-[#0E8F79]/10 flex items-center justify-center mb-4">
-                  <MessageSquare className="w-7 h-7 text-[#0E8F79]" />
-                </div>
+                <img src="/Maptech Official Logo version2 (1).png" alt="Maptech" className="w-28 h-auto opacity-50 mb-4" />
                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">No messages yet</p>
                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 max-w-[200px]">Start the conversation between admin and employee here.</p>
               </div>
@@ -1332,6 +1341,7 @@ export function TicketView() {
               </button>
             </div>
           )}
+          </div>
 
           {/* ── Reply Preview Bar ── */}
           {replyTo && (
