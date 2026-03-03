@@ -23,6 +23,52 @@ SEED_USERS = [
         'phone': '+639696969696',
         'role': User.ROLE_EMPLOYEE,
     },
+    # ── 5 seeded employees ──
+    {
+        'username': 'jdcruz',
+        'first_name': 'Juan',
+        'last_name': 'Dela Cruz',
+        'email': 'juan.delacruz@maptech.com',
+        'password': 'Employee123!',
+        'phone': '+639171234567',
+        'role': User.ROLE_EMPLOYEE,
+    },
+    {
+        'username': 'mreyes',
+        'first_name': 'Maria',
+        'last_name': 'Reyes',
+        'email': 'maria.reyes@maptech.com',
+        'password': 'Employee123!',
+        'phone': '+639181234567',
+        'role': User.ROLE_EMPLOYEE,
+    },
+    {
+        'username': 'rsantos',
+        'first_name': 'Ricardo',
+        'last_name': 'Santos',
+        'email': 'ricardo.santos@maptech.com',
+        'password': 'Employee123!',
+        'phone': '+639191234567',
+        'role': User.ROLE_EMPLOYEE,
+    },
+    {
+        'username': 'agarcia',
+        'first_name': 'Angela',
+        'last_name': 'Garcia',
+        'email': 'angela.garcia@maptech.com',
+        'password': 'Employee123!',
+        'phone': '+639201234567',
+        'role': User.ROLE_EMPLOYEE,
+    },
+    {
+        'username': 'bnavarro',
+        'first_name': 'Bryan',
+        'last_name': 'Navarro',
+        'email': 'bryan.navarro@maptech.com',
+        'password': 'Employee123!',
+        'phone': '+639211234567',
+        'role': User.ROLE_EMPLOYEE,
+    },
 ]
 
 

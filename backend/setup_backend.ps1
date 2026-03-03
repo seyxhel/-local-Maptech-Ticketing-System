@@ -66,6 +66,7 @@ Write-Host "[5/6] Seeding default users (if available)..."
 try {
     & $pythonExe manage.py seed_users
     & $pythonExe manage.py seed_services
+    & $pythonExe manage.py seed_tickets
 } catch {
     Write-Warning "seed_users or seed_services command failed or is not present. Continuing..."
 }
