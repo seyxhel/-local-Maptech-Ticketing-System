@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { Layout } from '../components/layout/Layout';
 import type { NavItem } from '../components/layout/Sidebar';
-import { LayoutDashboard, Ticket, ShieldAlert, BarChart3, PlusCircle, ScrollText } from 'lucide-react';
+import { LayoutDashboard, Ticket, ShieldAlert, BarChart3, PlusCircle, ScrollText, BookOpen } from 'lucide-react';
 import { NetworkErrorModal, useNetworkStatus } from '../shared';
 
 const NAV_ITEMS: NavItem[] = [
@@ -12,18 +13,15 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'create-ticket', label: 'Create Ticket', icon: PlusCircle, path: '/admin/create-ticket' },
   { id: 'escalation', label: 'Escalation', icon: ShieldAlert, path: '/admin/escalation' },
   { id: 'audit-logs', label: 'Audit Logs', icon: ScrollText, path: '/admin/audit-logs' },
+  { id: 'knowledge-hub', label: 'Knowledge Hub', icon: BookOpen, path: '/admin/knowledge-hub' },
   { id: 'reports', label: 'Reports', icon: BarChart3, path: '/admin/reports' },
 ];
 
 export function AdminLayout() {
   const { user, logout } = useAuth();
+  const { isDark, toggleDark } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
-  const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', isDark);
-  }, [isDark]);
 
   const handleNavigate = (path: string) => {
     if (path === 'logout') {
@@ -44,7 +42,7 @@ export function AdminLayout() {
       currentPage={location.pathname}
       onNavigate={handleNavigate}
       isDark={isDark}
-      onToggleDark={() => setIsDark((d) => !d)}
+      onToggleDark={toggleDark}
       navItems={NAV_ITEMS}
     >
       <NetworkErrorModal isOpen={isOffline} onRetry={retry} onDismiss={dismiss} retrying={retrying} />

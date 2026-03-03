@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { Layout } from '../components/layout/Layout';
 import type { NavItem } from '../components/layout/Sidebar';
 import { LayoutDashboard, Ticket, BookOpen } from 'lucide-react';
@@ -9,18 +10,14 @@ import { NetworkErrorModal, useNetworkStatus } from '../shared';
 const NAV_ITEMS: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/employee/dashboard' },
   { id: 'assigned-tickets', label: 'Assigned Tickets', icon: Ticket, path: '/employee/my-tickets' },
-  { id: 'knowledge-base', label: 'Knowledge Base', icon: BookOpen, path: '/employee/knowledge-base' },
+  { id: 'knowledge-hub', label: 'Knowledge Hub', icon: BookOpen, path: '/employee/knowledge-hub' },
 ];
 
 export function EmployeeLayout() {
   const { user, logout } = useAuth();
+  const { isDark, toggleDark } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
-  const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', isDark);
-  }, [isDark]);
 
   const handleNavigate = (path: string) => {
     if (path === 'logout') {
@@ -41,7 +38,7 @@ export function EmployeeLayout() {
       currentPage={location.pathname}
       onNavigate={handleNavigate}
       isDark={isDark}
-      onToggleDark={() => setIsDark((d) => !d)}
+      onToggleDark={toggleDark}
       navItems={NAV_ITEMS}
     >
       <NetworkErrorModal isOpen={isOffline} onRetry={retry} onDismiss={dismiss} retrying={retrying} />

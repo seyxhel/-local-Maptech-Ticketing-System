@@ -2,6 +2,7 @@ import React from 'react';
 import { Toaster } from 'sonner';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Login } from './pages/Login';
 import { ForgotPassword } from './pages/ForgotPassword';
@@ -28,11 +29,12 @@ import AdminCreateTicket from './pages/admin/create-ticket';
 import AdminTicketDetails from './pages/admin/ticket-details';
 import AdminSettings from './pages/admin/settings';
 import AdminAuditLogs from './pages/admin/audit-logs';
+import AdminKnowledgeHub from './pages/admin/knowledge-hub';
 
 import EmployeeDashboard from './pages/employee/dashboard';
 import EmployeeMyTickets from './pages/employee/my-tickets';
 import EmployeeTicketDetails from './pages/employee/ticket-details';
-import EmployeeKnowledgeBase from './pages/employee/knowledge-base';
+import EmployeeKnowledgeHub from './pages/employee/knowledge-base';
 import EmployeeSettings from './pages/employee/settings';
 
 import ClientDashboard from './pages/client/dashboard';
@@ -56,6 +58,7 @@ export function App() {
     <>
       <Toaster position="top-right" richColors />
       <BrowserRouter>
+        <ThemeProvider>
         <AuthProvider>
           <Routes>
             <Route path="/login" element={<Login />} />
@@ -97,6 +100,7 @@ export function App() {
               <Route path="create-ticket" element={<AdminCreateTicket />} />
               <Route path="ticket-details" element={<AdminTicketDetails />} />
               <Route path="audit-logs" element={<AdminAuditLogs />} />
+              <Route path="knowledge-hub" element={<AdminKnowledgeHub />} />
               <Route path="settings" element={<AdminSettings />} />
             </Route>
 
@@ -112,7 +116,7 @@ export function App() {
               <Route path="dashboard" element={<EmployeeDashboard />} />
               <Route path="my-tickets" element={<EmployeeMyTickets />} />
               <Route path="ticket-details" element={<EmployeeTicketDetails />} />
-              <Route path="knowledge-base" element={<EmployeeKnowledgeBase />} />
+              <Route path="knowledge-hub" element={<EmployeeKnowledgeHub />} />
               <Route path="settings" element={<EmployeeSettings />} />
             </Route>
 
@@ -135,6 +139,7 @@ export function App() {
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
+        </ThemeProvider>
       </BrowserRouter>
     </>
   );
