@@ -3,6 +3,7 @@ import { Card } from '../components/ui/Card';
 import { GreenButton } from '../components/ui/GreenButton';
 import { User, Lock, Mail, Phone, Building, MapPin, Shield } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { changePassword } from '../services/authService';
 import {
   validatePassword,
   validateConfirmPassword,
@@ -24,7 +25,9 @@ export function AdminSettings() {
   const [pwSuccess, setPwSuccess] = useState('');
   const [pwRules, setPwRules] = useState<PasswordRules | null>(null);
 
-  const handleChangePassword = (e: React.FormEvent) => {
+  const [pwLoading, setPwLoading] = useState(false);
+
+  const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setPwError('');
     setPwSuccess('');
@@ -36,11 +39,19 @@ export function AdminSettings() {
     if (error) { setPwError(error); return; }
     const confirmErr = validateConfirmPassword(newPassword, confirmPassword);
     if (confirmErr) { setPwError(confirmErr); return; }
-    setPwSuccess('Password changed successfully.');
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
-    setPwRules(null);
+    setPwLoading(true);
+    try {
+      await changePassword(currentPassword, newPassword);
+      setPwSuccess('Password changed successfully.');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setPwRules(null);
+    } catch (err: any) {
+      setPwError(err?.message || 'Failed to change password.');
+    } finally {
+      setPwLoading(false);
+    }
   };
 
   return (

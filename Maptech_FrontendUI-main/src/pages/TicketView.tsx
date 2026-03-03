@@ -454,11 +454,10 @@ export function TicketView() {
   const [savingFields, setSavingFields] = useState(false);
   const [closingTicket, setClosingTicket] = useState(false);
 
-  // Fields are only editable if:
-  // - Employee: must be the assigned employee AND ticket is not Resolved/Closed
-  // - Admin: ticket is not Resolved/Closed
+  // Fields are only editable by the assigned employee AND ticket is not Resolved/Closed
+  // Admins can view but not edit these fields
   const isAssignedEmployee = isEmployee && btData?.assigned_to?.id === user?.id;
-  const canEdit = (isAssignedEmployee || isAdmin) && ticket.status !== 'Resolved' && ticket.status !== 'Closed';
+  const canEdit = isAssignedEmployee && ticket.status !== 'Resolved' && ticket.status !== 'Closed';
 
   /** Employee saves action taken, remarks, job status */
   const handleSaveFields = async () => {
