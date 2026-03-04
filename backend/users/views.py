@@ -1,3 +1,6 @@
+import hashlib
+import requests as http_requests
+
 from rest_framework import viewsets, status
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
@@ -10,6 +13,27 @@ from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
 from django.utils import timezone
 from .serializers import UserSerializer
+
+
+def _is_password_pwned(password: str) -> bool:
+    """Check the HIBP Passwords API (k-anonymity).  Returns True if breached."""
+    sha1 = hashlib.sha1(password.encode('utf-8')).hexdigest().upper()
+    prefix, suffix = sha1[:5], sha1[5:]
+    try:
+        resp = http_requests.get(
+            f'https://api.pwnedpasswords.com/range/{prefix}',
+            timeout=5,
+            headers={'Add-Padding': 'true'},
+        )
+        if resp.status_code == 200:
+            for line in resp.text.splitlines():
+                hash_suffix, _, _ = line.partition(':')
+                if hash_suffix.strip() == suffix:
+                    return True
+    except Exception:
+        # Network failure — allow the password rather than blocking the user
+        pass
+    return False
 
 User = get_user_model()
 
@@ -60,6 +84,12 @@ class AuthViewSet(viewsets.GenericViewSet):
         if not new_pw or len(new_pw) < 8:
             return Response({'detail': 'New password must be at least 8 characters.'}, status=status.HTTP_400_BAD_REQUEST)
 
+        if _is_password_pwned(new_pw):
+            return Response(
+                {'detail': 'This password has been found in a data breach (haveibeenpwned.com). Please choose a different password.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         user.set_password(new_pw)
         user.save()
         # Return new tokens since password change invalidates old ones
@@ -108,6 +138,11 @@ class AuthViewSet(viewsets.GenericViewSet):
             return Response({'detail': 'Token is invalid or has expired.'}, status=status.HTTP_400_BAD_REQUEST)
         if len(new_password) < 8:
             return Response({'detail': 'Password must be at least 8 characters.'}, status=status.HTTP_400_BAD_REQUEST)
+        if _is_password_pwned(new_password):
+            return Response(
+                {'detail': 'This password has been found in a data breach (haveibeenpwned.com). Please choose a different password.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         user.set_password(new_password)
         user.save()
         return Response({'detail': 'Password has been reset successfully.'})

@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { Mail, Lock, User, Phone, AtSign, ChevronDown, Loader2, Eye, EyeOff, X } from 'lucide-react';
 import {
   validateEmail, validatePhone, validateName, validateUsername,
-  validatePassword, validateConfirmPassword,
+  validatePassword, validateConfirmPassword, checkPasswordPwned,
   MAX_NAME, MAX_EMAIL, MAX_PHONE, MAX_USERNAME, MAX_PASSWORD,
   type PasswordRules,
 } from '../utils/validation';
@@ -302,6 +302,13 @@ export function Signup() {
     }
     setLoading(true);
     try {
+      // Check HIBP before proceeding
+      const breached = await checkPasswordPwned(password);
+      if (breached) {
+        setFieldErrors((p) => ({ ...p, password: 'This password has been found in a data breach. Please choose a different one.' }));
+        setError('This password has been found in a data breach (haveibeenpwned.com). Please choose a different password.');
+        return;
+      }
       // Client registration — placeholder until backend supports client signup
       const _fullName = [firstName, middleName, lastName].filter(Boolean).join(' ');
       // TODO: Replace with actual API call when client registration endpoint is available
@@ -439,9 +446,10 @@ export function Signup() {
                       { ok: rules.hasLowercase, label: 'Lowercase letter' },
                       { ok: rules.hasNumber, label: 'Number' },
                       { ok: rules.hasSpecial, label: 'Special character' },
+                      { ok: rules.notBreached, label: 'Not found in data breaches', pending: rules.notBreached === null },
                     ].map((r) => (
-                      <p key={r.label} className={`text-xs ${r.ok ? 'text-green-400' : 'text-gray-500'}`}>
-                        {r.ok ? '✓' : '○'} {r.label}
+                      <p key={r.label} className={`text-xs ${'pending' in r && r.pending ? 'text-gray-500' : r.ok ? 'text-green-400' : 'text-red-400'}`}>
+                        {'pending' in r && r.pending ? '○' : r.ok ? '✓' : '✗'} {r.label}{('pending' in r && r.pending) ? ' (checked on submit)' : ''}
                       </p>
                     ))}
                   </div>

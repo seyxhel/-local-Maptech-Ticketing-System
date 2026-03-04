@@ -12,6 +12,7 @@ import {
   validateRequired,
   validatePassword,
   validateConfirmPassword,
+  checkPasswordPwned,
   MAX_NAME,
   MAX_EMAIL,
   MAX_PHONE,
@@ -84,6 +85,12 @@ export default function ClientSettingsPage() {
     if (confirmErr) { setPwError(confirmErr); return; }
     setPwLoading(true);
     try {
+      const breached = await checkPasswordPwned(newPassword);
+      if (breached) {
+        setPwError('This password has been found in a data breach (haveibeenpwned.com). Please choose a different password.');
+        setPwRules((prev) => prev ? { ...prev, notBreached: false } : prev);
+        return;
+      }
       await changePassword(currentPassword, newPassword);
       toast.success('Password changed successfully.');
       setCurrentPassword('');
@@ -266,8 +273,11 @@ export default function ClientSettingsPage() {
                     { ok: pwRules.hasLowercase, text: 'A lowercase letter' },
                     { ok: pwRules.hasNumber, text: 'A number' },
                     { ok: pwRules.hasSpecial, text: 'A special character' },
+                    { ok: pwRules.notBreached, text: 'Not found in data breaches', pending: pwRules.notBreached === null },
                   ].map((r) => (
-                    <li key={r.text} className={r.ok ? 'text-green-600' : 'text-gray-400'}>{r.ok ? '\u2713' : '\u2022'} {r.text}</li>
+                    <li key={r.text} className={'pending' in r && r.pending ? 'text-gray-400' : r.ok ? 'text-green-600' : 'text-red-500'}>
+                      {'pending' in r && r.pending ? '○' : r.ok ? '\u2713' : '\u2717'} {r.text}{('pending' in r && r.pending) ? ' (checked on submit)' : ''}
+                    </li>
                   ))}
                 </ul>
               )}

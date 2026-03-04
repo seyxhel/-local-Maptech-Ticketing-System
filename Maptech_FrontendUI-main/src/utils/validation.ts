@@ -106,6 +106,7 @@ export function validatePassword(val: string): { error: string; rules: PasswordR
     hasLowercase: /[a-z]/.test(val),
     hasNumber: /\d/.test(val),
     hasSpecial: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?`~]/.test(val),
+    notBreached: null, // determined asynchronously
   };
   if (!val) return { error: 'Password is required.', rules };
   if (val.length > MAX_PASSWORD) return { error: `Password must be under ${MAX_PASSWORD} characters.`, rules };
@@ -125,6 +126,7 @@ export interface PasswordRules {
   hasLowercase: boolean;
   hasNumber: boolean;
   hasSpecial: boolean;
+  notBreached: boolean | null; // null = not yet checked / checking
 }
 
 export function validateConfirmPassword(password: string, confirm: string): string {
@@ -144,4 +146,34 @@ export function validateReason(val: string, label = 'Reason'): string {
 /** Sanitize text to prevent XSS — strips HTML tags */
 export function sanitize(val: string): string {
   return val.replace(/<[^>]*>/g, '');
+}
+
+/**
+ * Check the HIBP Passwords API using k-anonymity (only the first 5 chars
+ * of the SHA-1 hash are sent to the server).
+ * Returns true if the password has been found in a data breach.
+ */
+export async function checkPasswordPwned(password: string): Promise<boolean> {
+  try {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(password);
+    const hashBuffer = await crypto.subtle.digest('SHA-1', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const sha1 = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+    const prefix = sha1.slice(0, 5);
+    const suffix = sha1.slice(5);
+
+    const res = await fetch(`https://api.pwnedpasswords.com/range/${prefix}`, {
+      headers: { 'Add-Padding': 'true' },
+    });
+    if (!res.ok) return false; // fail open
+    const text = await res.text();
+    return text.split('\n').some((line) => {
+      const [hashSuffix] = line.split(':');
+      return hashSuffix.trim() === suffix;
+    });
+  } catch {
+    // Network error — don't block the user
+    return false;
+  }
 }
