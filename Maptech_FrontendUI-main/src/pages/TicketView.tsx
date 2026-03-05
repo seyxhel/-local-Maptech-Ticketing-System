@@ -1474,8 +1474,8 @@ export function TicketView() {
             </div>
           </Card>
 
-          {/* Employee Performance Rating (visible once ticket is closed) */}
-          <Card>
+          {/* Employee Performance Rating (visible to admin only) */}
+          {isAdmin && <Card>
             <h3 className="text-xs font-bold uppercase tracking-wider text-[#0E8F79] mb-3 flex items-center gap-2">
               <Star className="w-4 h-4" /> Technical Performance Rating
             </h3>
@@ -1529,7 +1529,7 @@ export function TicketView() {
                 </div>
               </div>
             )}
-          </Card>
+          </Card>}
 
           {/* ── Action Buttons ── */}
           {ticket.status !== 'Closed' && (
