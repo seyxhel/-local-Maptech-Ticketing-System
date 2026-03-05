@@ -720,7 +720,7 @@ export async function unpublishAttachment(id: number): Promise<KnowledgeHubAttac
 }
 
 /** Update published title/description on an attachment. */
-export async function updateKnowledgeHubAttachment(id: number, data: { published_title?: string; published_description?: string }): Promise<KnowledgeHubAttachment> {
+export async function updateKnowledgeHubAttachment(id: number, data: { published_title?: string; published_description?: string; published_tags?: string[] }): Promise<KnowledgeHubAttachment> {
   const res = await fetch(`${API_BASE}/knowledge-hub/${id}/`, {
     method: 'PATCH',
     headers: authHeaders(),

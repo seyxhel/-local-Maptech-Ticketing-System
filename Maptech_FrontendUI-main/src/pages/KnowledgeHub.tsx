@@ -1,11 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card } from '../components/ui/Card';
-import { StatCard } from '../components/ui/StatCard';
 import {
   Search,
   Paperclip,
-  FileCheck,
-  Clock,
   RefreshCw,
   Trash2,
   Eye,
@@ -21,16 +18,17 @@ import {
   Archive,
   ArchiveRestore,
   Send,
+  Pencil,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import type { KnowledgeHubAttachment, KnowledgeHubSummary } from '../services/api';
+import type { KnowledgeHubAttachment } from '../services/api';
 import {
   fetchKnowledgeHubAttachments,
-  fetchKnowledgeHubSummary,
   deleteKnowledgeHubAttachment,
   archiveAttachment,
   unarchiveAttachment,
   publishAttachment,
+  updateKnowledgeHubAttachment,
 } from '../services/api';
 
 const ITEMS_PER_PAGE = 12;
@@ -83,12 +81,9 @@ function FileTypeIcon({ url }: { url: string }) {
 
 export default function KnowledgeHub({ filter }: { filter?: 'uploaded' | 'published' | 'archived' }) {
   const [attachments, setAttachments] = useState<KnowledgeHubAttachment[]>([]);
-  const [summary, setSummary] = useState<KnowledgeHubSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [typeFilter, setTypeFilter] = useState<'' | 'images' | 'videos'>('');
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<KnowledgeHubAttachment | null>(null);
   const [deleting, setDeleting] = useState<number | null>(null);
@@ -98,12 +93,17 @@ export default function KnowledgeHub({ filter }: { filter?: 'uploaded' | 'publis
   const [publishTags, setPublishTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [publishing, setPublishing] = useState(false);
+  const [editTarget, setEditTarget] = useState<KnowledgeHubAttachment | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editSteps, setEditSteps] = useState<string[]>(['']);
+  const [editTags, setEditTags] = useState<string[]>([]);
+  const [editTagInput, setEditTagInput] = useState('');
+  const [saving, setSaving] = useState(false);
 
   // Build API filter params based on the active filter
   const getFilterParams = useCallback(() => {
     const params: Record<string, string | undefined> = {
       search: search || undefined,
-      ticket_status: statusFilter || undefined,
     };
     if (filter === 'uploaded') {
       params.published = 'false';
@@ -115,25 +115,20 @@ export default function KnowledgeHub({ filter }: { filter?: 'uploaded' | 'publis
       params.archived = 'true';
     }
     return params;
-  }, [filter, search, statusFilter]);
+  }, [filter, search]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [items, stats] = await Promise.all([
-        fetchKnowledgeHubAttachments(getFilterParams()),
-        fetchKnowledgeHubSummary(),
-      ]);
+      const items = await fetchKnowledgeHubAttachments(getFilterParams());
       setAttachments(items);
-      setSummary(stats);
     } catch {
       toast.error('Failed to load attachments.');
       setAttachments([]);
-      setSummary(null);
     } finally {
       setLoading(false);
     }
-  }, [getFilterParams, dateFrom, dateTo]);
+  }, [getFilterParams]);
 
   useEffect(() => {
     loadData();
@@ -172,6 +167,51 @@ export default function KnowledgeHub({ filter }: { filter?: 'uploaded' | 'publis
       if (selected?.id === id) setSelected(null);
     } catch {
       toast.error('Failed to unarchive attachment.');
+    }
+  };
+
+  const parseSteps = (desc: string): string[] => {
+    try {
+      const parsed = JSON.parse(desc);
+      if (Array.isArray(parsed)) return parsed;
+    } catch { /* plain text fallback */ }
+    return desc ? desc.split('\n').filter((s: string) => s.trim()) : [''];
+  };
+
+  const openEditModal = (att: KnowledgeHubAttachment) => {
+    setEditTarget(att);
+    setEditTitle(att.published_title || '');
+    setEditSteps(parseSteps(att.published_description).length ? parseSteps(att.published_description) : ['']);
+    setEditTags(att.published_tags || []);
+    setEditTagInput('');
+  };
+
+  const handleEdit = async () => {
+    if (!editTarget) return;
+    if (!editTitle.trim()) {
+      toast.error('Title is required.');
+      return;
+    }
+    const steps = editSteps.map((s) => s.trim()).filter(Boolean);
+    if (steps.length === 0) {
+      toast.error('At least one troubleshooting step is required.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const updated = await updateKnowledgeHubAttachment(editTarget.id, {
+        published_title: editTitle.trim(),
+        published_description: JSON.stringify(steps),
+        published_tags: editTags,
+      });
+      toast.success('Article updated.');
+      setAttachments((prev) => prev.map((a) => (a.id === editTarget.id ? updated : a)));
+      if (selected?.id === editTarget.id) setSelected(updated);
+      setEditTarget(null);
+    } catch {
+      toast.error('Failed to update article.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -219,9 +259,16 @@ export default function KnowledgeHub({ filter }: { filter?: 'uploaded' | 'publis
   };
   const heading = filter ? FILTER_HEADINGS[filter] : { title: 'Knowledge Hub', subtitle: 'Proof attachments submitted through STF Ticket forms' };
 
+  // Client-side type filtering
+  const filtered = attachments.filter((att) => {
+    if (typeFilter === 'images') return isImageFile(att.file);
+    if (typeFilter === 'videos') return isVideoFile(att.file);
+    return true;
+  });
+
   // Pagination
-  const totalPages = Math.ceil(attachments.length / ITEMS_PER_PAGE);
-  const paged = attachments.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+  const paged = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
 
   return (
     <div className="space-y-6">
@@ -243,35 +290,6 @@ export default function KnowledgeHub({ filter }: { filter?: 'uploaded' | 'publis
         </div>
       </div>
 
-      {summary && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard
-            title="Total Proofs"
-            value={String(summary.total_proofs)}
-            icon={Paperclip}
-            color="blue"
-          />
-          <StatCard
-            title="Published"
-            value={String(summary.published)}
-            icon={FileCheck}
-            color="green"
-          />
-          <StatCard
-            title="Unpublished"
-            value={String(summary.unpublished)}
-            icon={Clock}
-            color="orange"
-          />
-          <StatCard
-            title="Archived"
-            value={String(summary.archived)}
-            icon={Archive}
-            color="purple"
-          />
-        </div>
-      )}
-
       {/* Filters */}
       <Card className="p-4">
         <div className="flex flex-col lg:flex-row gap-3">
@@ -288,30 +306,15 @@ export default function KnowledgeHub({ filter }: { filter?: 'uploaded' | 'publis
             <div className="flex items-center gap-1.5">
               <Filter className="w-4 h-4 text-gray-400" />
               <select
-                value={statusFilter}
-                onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+                value={typeFilter}
+                onChange={(e) => { setTypeFilter(e.target.value as '' | 'images' | 'videos'); setPage(1); }}
                 className="px-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm outline-none focus:ring-2 focus:ring-[#3BC25B] dark:text-white"
               >
-                <option value="">All Statuses</option>
-                {Object.entries(STATUS_LABELS).map(([k, v]) => (
-                  <option key={k} value={k}>{v}</option>
-                ))}
+                <option value="">All Types</option>
+                <option value="images">Images</option>
+                <option value="videos">Videos</option>
               </select>
             </div>
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
-              className="px-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm outline-none focus:ring-2 focus:ring-[#3BC25B] dark:text-white"
-              title="From date"
-            />
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
-              className="px-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm outline-none focus:ring-2 focus:ring-[#3BC25B] dark:text-white"
-              title="To date"
-            />
           </div>
         </div>
       </Card>
@@ -371,20 +374,27 @@ export default function KnowledgeHub({ filter }: { filter?: 'uploaded' | 'publis
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
                   <Eye className="w-6 h-6 text-white" />
                 </div>
-                {/* Status badge */}
-                <span className={`absolute top-2 right-2 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${STATUS_COLORS[att.ticket_status] || 'bg-gray-100 text-gray-600'}`}>
-                  {STATUS_LABELS[att.ticket_status] || att.ticket_status}
-                </span>
               </div>
 
               {/* Info */}
               <div className="p-3 space-y-2">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-gray-900 dark:text-white truncate" title={getFileName(att.file)}>
-                      {getFileName(att.file)}
-                    </p>
-                    <p className="text-xs text-[#0E8F79] font-medium">{att.stf_no}</p>
+                    {filter === 'published' && att.published_title ? (
+                      <>
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white truncate" title={att.published_title}>
+                          {att.published_title}
+                        </p>
+                        <p className="text-xs text-[#0E8F79] font-medium">{att.stf_no}</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white truncate" title={getFileName(att.file)}>
+                          {getFileName(att.file)}
+                        </p>
+                        <p className="text-xs text-[#0E8F79] font-medium">{att.stf_no}</p>
+                      </>
+                    )}
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
                     <a
@@ -404,6 +414,15 @@ export default function KnowledgeHub({ filter }: { filter?: 'uploaded' | 'publis
                         title="Publish"
                       >
                         <Send className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    {filter === 'published' && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); openEditModal(att); }}
+                        className="p-1.5 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/20 text-gray-400 hover:text-amber-500 transition-colors"
+                        title="Edit"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
                       </button>
                     )}
                     {filter !== 'archived' && (
@@ -434,11 +453,40 @@ export default function KnowledgeHub({ filter }: { filter?: 'uploaded' | 'publis
                     </button>
                   </div>
                 </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 space-y-0.5">
-                  {att.client && <p><span className="font-medium">Client:</span> {att.client}</p>}
-                  {att.assigned_to_name && <p><span className="font-medium">Assigned:</span> {att.assigned_to_name}</p>}
-                  {att.type_of_service_name && <p><span className="font-medium">Service:</span> {att.type_of_service_name}</p>}
-                </div>
+                {filter === 'published' ? (
+                  <div className="space-y-2">
+                    {/* Tags */}
+                    {att.published_tags && att.published_tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {att.published_tags.map((tag, i) => (
+                          <span key={i} className="px-2 py-0.5 rounded-full bg-[#0E8F79]/10 text-[#0E8F79] text-[10px] font-medium">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {/* Steps preview */}
+                    {att.published_description && (() => {
+                      const steps = parseSteps(att.published_description);
+                      return steps.length > 0 ? (
+                        <ol className="list-decimal list-inside text-xs text-gray-500 dark:text-gray-400 space-y-0.5">
+                          {steps.slice(0, 3).map((step, i) => (
+                            <li key={i} className="truncate">{step}</li>
+                          ))}
+                          {steps.length > 3 && (
+                            <li className="text-gray-400 list-none pl-4">+{steps.length - 3} more steps...</li>
+                          )}
+                        </ol>
+                      ) : null;
+                    })()}
+                  </div>
+                ) : (
+                  <div className="text-xs text-gray-500 dark:text-gray-400 space-y-0.5">
+                    {att.client && <p><span className="font-medium">Client:</span> {att.client}</p>}
+                    {att.assigned_to_name && <p><span className="font-medium">Assigned:</span> {att.assigned_to_name}</p>}
+                    {att.type_of_service_name && <p><span className="font-medium">Service:</span> {att.type_of_service_name}</p>}
+                  </div>
+                )}
                 <div className="flex items-center justify-between pt-1 border-t border-gray-100 dark:border-gray-700">
                   <span className="text-[10px] text-gray-400">
                     {att.uploaded_by ? `${att.uploaded_by.first_name} ${att.uploaded_by.last_name}` : 'Unknown'}
@@ -457,7 +505,7 @@ export default function KnowledgeHub({ filter }: { filter?: 'uploaded' | 'publis
       {totalPages > 1 && (
         <div className="flex items-center justify-between px-1">
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Showing {(page - 1) * ITEMS_PER_PAGE + 1}–{Math.min(page * ITEMS_PER_PAGE, attachments.length)} of {attachments.length}
+            Showing {(page - 1) * ITEMS_PER_PAGE + 1}–{Math.min(page * ITEMS_PER_PAGE, filtered.length)} of {filtered.length}
           </p>
           <div className="flex items-center gap-1">
             <button
@@ -609,6 +657,14 @@ export default function KnowledgeHub({ filter }: { filter?: 'uploaded' | 'publis
                     className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-sm font-medium hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
                   >
                     <Send className="w-4 h-4" /> Publish
+                  </button>
+                )}
+                {filter === 'published' && (
+                  <button
+                    onClick={() => { setSelected(null); openEditModal(selected); }}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 text-sm font-medium hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
+                  >
+                    <Pencil className="w-4 h-4" /> Edit
                   </button>
                 )}
                 {filter !== 'archived' && (
@@ -784,6 +840,156 @@ export default function KnowledgeHub({ filter }: { filter?: 'uploaded' | 'publis
                 >
                   <Send className="w-4 h-4" />
                   {publishing ? 'Publishing...' : 'Publish'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {editTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          onClick={() => setEditTarget(null)}
+        >
+          <div
+            className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-gray-700">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white">Edit Published Article</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{getFileName(editTarget.file)}</p>
+              </div>
+              <button
+                onClick={() => setEditTarget(null)}
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title <span className="text-red-500">*</span></label>
+                <input
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  placeholder="Enter a title..."
+                  className="w-full px-4 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm outline-none focus:ring-2 focus:ring-[#3BC25B] dark:text-white"
+                  maxLength={300}
+                />
+              </div>
+
+              {/* Tags Input */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tags <span className="text-xs text-gray-400 font-normal">(max 3)</span></label>
+                <div className="flex flex-wrap items-center gap-1.5 p-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 min-h-[42px]">
+                  {editTags.map((tag, i) => (
+                    <span
+                      key={i}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#0E8F79]/10 text-[#0E8F79] text-xs font-medium"
+                    >
+                      {tag}
+                      <button
+                        type="button"
+                        onClick={() => setEditTags((prev) => prev.filter((_, idx) => idx !== i))}
+                        className="hover:text-red-500 transition-colors"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                  {editTags.length < 3 && (
+                    <input
+                      value={editTagInput}
+                      onChange={(e) => setEditTagInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const val = editTagInput.trim();
+                          if (val && !editTags.includes(val)) {
+                            setEditTags((prev) => [...prev, val]);
+                            setEditTagInput('');
+                          }
+                        }
+                      }}
+                      placeholder={editTags.length === 0 ? 'Type a tag and press Enter...' : 'Add another...'}
+                      className="flex-1 min-w-[120px] bg-transparent text-sm outline-none dark:text-white"
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* Troubleshooting Steps */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Troubleshooting Steps <span className="text-red-500">*</span></label>
+                <div className="space-y-2">
+                  {editSteps.map((step, i) => (
+                    <div key={i} className="flex items-start gap-2">
+                      <span className="flex-shrink-0 w-7 h-9 flex items-center justify-center text-xs font-bold text-[#0E8F79]">
+                        {i + 1}.
+                      </span>
+                      <input
+                        value={step}
+                        onChange={(e) => {
+                          const next = [...editSteps];
+                          next[i] = e.target.value;
+                          setEditSteps(next);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const next = [...editSteps];
+                            next.splice(i + 1, 0, '');
+                            setEditSteps(next);
+                            setTimeout(() => {
+                              const inputs = document.querySelectorAll<HTMLInputElement>('[data-edit-step]');
+                              inputs[i + 1]?.focus();
+                            }, 0);
+                          } else if (e.key === 'Backspace' && step === '' && editSteps.length > 1) {
+                            e.preventDefault();
+                            const next = editSteps.filter((_, idx) => idx !== i);
+                            setEditSteps(next);
+                            setTimeout(() => {
+                              const inputs = document.querySelectorAll<HTMLInputElement>('[data-edit-step]');
+                              inputs[Math.max(0, i - 1)]?.focus();
+                            }, 0);
+                          }
+                        }}
+                        data-edit-step
+                        placeholder={`Step ${i + 1}...`}
+                        className="flex-1 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm outline-none focus:ring-2 focus:ring-[#3BC25B] dark:text-white"
+                      />
+                      {editSteps.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => setEditSteps((prev) => prev.filter((_, idx) => idx !== i))}
+                          className="flex-shrink-0 p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-400 hover:text-red-500 transition-colors"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-400 mt-1.5">Press Enter to add a new step. Backspace on an empty step to remove it.</p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  onClick={() => setEditTarget(null)}
+                  className="px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleEdit}
+                  disabled={saving}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#0E8F79] text-white text-sm font-medium hover:bg-[#0b7a67] transition-colors disabled:opacity-50"
+                >
+                  <Pencil className="w-4 h-4" />
+                  {saving ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
             </div>
