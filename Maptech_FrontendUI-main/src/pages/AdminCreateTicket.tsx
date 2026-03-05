@@ -39,6 +39,7 @@ import {
   Shield,
   Package,
   Cog,
+  ExternalLink,
   type LucideIcon,
 } from 'lucide-react';
 import {
@@ -383,6 +384,67 @@ export function AdminCreateTicket() {
     }
   };
 
+  const handleAssignExternal = async () => {
+    if (isAssigning) return;
+    setIsAssigning(true);
+
+    const supportTypeMap: Record<string, string> = {
+      'Remote / Online': 'remote_online',
+      'Remote/Online': 'remote_online',
+      'Onsite': 'onsite',
+      'Chat': 'chat',
+      'Call': 'call',
+    };
+    const matchedService = serviceTypes.find((s) => s.name === serviceType);
+
+    try {
+      const ticketData: Record<string, unknown> = {
+        client: contactValues.client,
+        contact_person: contactValues.contactPerson,
+        landline: contactValues.landline,
+        mobile_no: contactValues.mobile,
+        designation: contactValues.designation,
+        department_organization: contactValues.department,
+        email_address: email.trim(),
+        address,
+        description_of_problem: description,
+        preferred_support_type: supportTypeMap[supportType?.trim()] || 'remote_online',
+        priority: priorityLevel.toLowerCase(),
+      };
+
+      if (matchedService) {
+        ticketData.type_of_service = matchedService.id;
+      } else if (serviceType === 'Others') {
+        ticketData.type_of_service_others = serviceOthersText;
+        if (estimatedDaysOverride && Number(estimatedDaysOverride) > 0) {
+          ticketData.estimated_resolution_days_override = Number(estimatedDaysOverride);
+        }
+      } else if (serviceType) {
+        ticketData.type_of_service_others = serviceType;
+      }
+
+      if (isExistingClient && selectedClientId) {
+        ticketData.client_record = selectedClientId;
+        ticketData.is_existing_client = true;
+      }
+      if (selectedProductId) {
+        ticketData.product_record = selectedProductId;
+      }
+
+      const created = await createTicket(ticketData as any);
+
+      setModalStep('none');
+      toast.success(`Ticket ${created.stf_no} created for external assignment`, {
+        description: `Priority: ${priorityLevel} | Service: ${serviceType}`,
+      });
+      navigate(`/admin/ticket-details?stf=${encodeURIComponent(created.stf_no)}`);
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to create ticket.');
+    } finally {
+      setIsAssigning(false);
+    }
+  };
+
   const errorRing = 'ring-2 ring-red-400 border-red-400';
   const inputCls = 'w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#3BC25B] outline-none text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 transition-all';
   const labelCls = 'block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1';
@@ -458,7 +520,7 @@ export function AdminCreateTicket() {
             {CONTACT_FIELDS.map((f) => (
               <div key={f.name}>
                 <label className={labelCls}>{f.label} {f.required && <span className="text-red-500 ml-1">*</span>}</label>
-                <input type="text" placeholder={f.placeholder} value={contactValues[f.name]} onChange={(e) => { const val = e.target.value; if ((f.name === 'mobile' || f.name === 'landline') && val !== '' && !/^\d*$/.test(val)) return; setContactField(f.name, val); }} maxLength={f.name === 'mobile' ? 11 : f.name === 'landline' ? MAX_PHONE : MAX_FIELD} className={`${inputCls} ${errors[f.name] ? errorRing : ''}`} />
+                <input type="text" placeholder={f.placeholder} value={contactValues[f.name]} onChange={(e) => { const val = e.target.value; if (f.name === 'mobile' && val !== '' && !/^\d*$/.test(val)) return; if (f.name === 'landline' && val !== '' && !/^[\d()\-\s]*$/.test(val)) return; setContactField(f.name, val); }} maxLength={f.name === 'mobile' ? 11 : f.name === 'landline' ? MAX_PHONE : MAX_FIELD} className={`${inputCls} ${errors[f.name] ? errorRing : ''}`} />
                 {errors[f.name] && <p className="text-red-500 text-xs mt-1">{errorMsgs[f.name] || 'This field is required'}</p>}
               </div>
             ))}
@@ -786,9 +848,17 @@ export function AdminCreateTicket() {
                   })}
                 </div>
 
-                <div className="mt-5">
+                <div className="mt-5 space-y-3">
                   <button onClick={handleAssign} disabled={!selectedEmployee || isAssigning} className="w-full px-4 py-2.5 rounded-lg bg-[#3BC25B] hover:bg-[#2ea34a] text-white text-sm font-bold transition-colors flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed">
                     {isAssigning ? <><Loader2 className="w-4 h-4 animate-spin" /> Assigning…</> : <><UserCheck className="w-4 h-4" /> Assign Ticket</>}
+                  </button>
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+                    <span className="text-xs text-gray-400 dark:text-gray-500 font-medium">or</span>
+                    <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+                  </div>
+                  <button onClick={handleAssignExternal} disabled={isAssigning} className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 text-sm font-bold transition-colors flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed">
+                    {isAssigning ? <><Loader2 className="w-4 h-4 animate-spin" /> Processing…</> : <><ExternalLink className="w-4 h-4" /> Assign to External</>}
                   </button>
                 </div>
               </div>

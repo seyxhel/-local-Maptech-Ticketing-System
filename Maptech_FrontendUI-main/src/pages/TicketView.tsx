@@ -951,14 +951,6 @@ export function TicketView() {
                 <div className="text-xs font-semibold uppercase tracking-wider text-[#0E8F79] mb-1">Preferred Type of Support</div>
                 <div className="text-gray-900 dark:text-gray-100">{ticket.preferredSupport}</div>
               </div>
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-wider text-[#0E8F79] mb-1">Assigned To</div>
-                <div className="text-gray-900 dark:text-gray-100">{ticket.assignedTo}</div>
-              </div>
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-wider text-[#0E8F79] mb-1">Issue</div>
-                <div className="text-gray-900 dark:text-gray-100">{ticket.issue}</div>
-              </div>
               {/* Description - Full Width */}
               <div className="col-span-2 mt-2">
                 <div className="text-xs font-semibold uppercase tracking-wider text-[#0E8F79] mb-1">Description</div>
