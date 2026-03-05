@@ -974,6 +974,11 @@ class KnowledgeHubViewSet(viewsets.ModelViewSet):
         if pub is not None and pub != '':
             qs = qs.filter(is_published=pub.lower() in ('true', '1'))
 
+        # Filter by archived status
+        archived = self.request.query_params.get('archived')
+        if archived is not None and archived != '':
+            qs = qs.filter(is_archived=archived.lower() in ('true', '1'))
+
         # Filter by ticket STF number
         stf = self.request.query_params.get('stf_no')
         if stf:
@@ -1016,16 +1021,21 @@ class KnowledgeHubViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         title = request.data.get('published_title', '').strip()
         description = request.data.get('published_description', '').strip()
+        tags = request.data.get('published_tags', [])
         if not title:
             return Response({'detail': 'published_title is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not isinstance(tags, list):
+            tags = []
+        tags = [str(t).strip() for t in tags[:3] if str(t).strip()]
         instance.is_published = True
         instance.published_title = title
         instance.published_description = description
+        instance.published_tags = tags
         instance.published_by = request.user
         instance.published_at = timezone.now()
         instance.save(update_fields=[
             'is_published', 'published_title', 'published_description',
-            'published_by', 'published_at',
+            'published_tags', 'published_by', 'published_at',
         ])
         return Response(self.get_serializer(instance).data)
 
@@ -1037,6 +1047,22 @@ class KnowledgeHubViewSet(viewsets.ModelViewSet):
         instance.save(update_fields=['is_published'])
         return Response(self.get_serializer(instance).data)
 
+    @action(detail=True, methods=['post'])
+    def archive(self, request, pk=None):
+        """Move an attachment to the archived section."""
+        instance = self.get_object()
+        instance.is_archived = True
+        instance.save(update_fields=['is_archived'])
+        return Response(self.get_serializer(instance).data)
+
+    @action(detail=True, methods=['post'])
+    def unarchive(self, request, pk=None):
+        """Restore an attachment from the archived section."""
+        instance = self.get_object()
+        instance.is_archived = False
+        instance.save(update_fields=['is_archived'])
+        return Response(self.get_serializer(instance).data)
+
     @action(detail=False, methods=['get'])
     def summary(self, request):
         """Summary stats for the Knowledge Hub dashboard."""
@@ -1044,6 +1070,7 @@ class KnowledgeHubViewSet(viewsets.ModelViewSet):
         total = qs.filter(is_resolution_proof=True).count()
         published_count = qs.filter(is_resolution_proof=True, is_published=True).count()
         unpublished_count = total - published_count
+        archived_count = qs.filter(is_resolution_proof=True, is_archived=True).count()
         by_status = dict(
             qs.filter(is_resolution_proof=True)
             .values_list('ticket__status')
@@ -1055,6 +1082,7 @@ class KnowledgeHubViewSet(viewsets.ModelViewSet):
             'total_proofs': total,
             'published': published_count,
             'unpublished': unpublished_count,
+            'archived': archived_count,
             'by_ticket_status': by_status,
         })
 

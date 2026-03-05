@@ -310,8 +310,12 @@ class TicketAttachment(models.Model):
     is_published = models.BooleanField(default=False)
     published_title = models.CharField(max_length=300, blank=True, default='')
     published_description = models.TextField(blank=True, default='')
+    published_tags = models.JSONField(default=list, blank=True)
     published_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='published_attachments')
     published_at = models.DateTimeField(null=True, blank=True)
+
+    # ── Archive field ──
+    is_archived = models.BooleanField(default=False)
 
     def __str__(self):
         return f"Attachment for {self.ticket.stf_no}: {self.file.name}"

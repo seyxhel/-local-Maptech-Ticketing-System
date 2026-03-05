@@ -363,7 +363,9 @@ class KnowledgeHubAttachmentSerializer(serializers.ModelSerializer):
             'description_of_problem', 'type_of_service_name', 'assigned_to_name',
             # Publish fields
             'is_published', 'published_title', 'published_description',
-            'published_by_detail', 'published_at',
+            'published_tags', 'published_by_detail', 'published_at',
+            # Archive field
+            'is_archived',
         ]
 
     def get_type_of_service_name(self, obj):
@@ -388,9 +390,9 @@ class PublishedArticleSerializer(serializers.ModelSerializer):
     class Meta:
         model = TicketAttachment
         fields = [
-            'id', 'published_title', 'published_description', 'file_url',
-            'stf_no', 'uploaded_by_name', 'published_by_name', 'published_at',
-            'uploaded_at',
+            'id', 'published_title', 'published_description', 'published_tags',
+            'file_url', 'stf_no', 'uploaded_by_name', 'published_by_name',
+            'published_at', 'uploaded_at',
         ]
 
     def get_file_url(self, obj):

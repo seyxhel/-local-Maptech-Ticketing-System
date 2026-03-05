@@ -651,14 +651,18 @@ export interface KnowledgeHubAttachment {
   is_published: boolean;
   published_title: string;
   published_description: string;
+  published_tags: string[];
   published_by_detail: { id: number; username: string; email: string; role: string; first_name: string; last_name: string } | null;
   published_at: string | null;
+  // archive field
+  is_archived: boolean;
 }
 
 export interface KnowledgeHubSummary {
   total_proofs: number;
   published: number;
   unpublished: number;
+  archived: number;
   by_ticket_status: Record<string, number>;
 }
 
@@ -666,6 +670,7 @@ export interface PublishedArticle {
   id: number;
   published_title: string;
   published_description: string;
+  published_tags: string[];
   file_url: string;
   stf_no: string;
   uploaded_by_name: string;
@@ -680,6 +685,7 @@ export async function fetchKnowledgeHubAttachments(params?: {
   stf_no?: string;
   ticket_status?: string;
   published?: string;
+  archived?: string;
   all?: boolean;
 }): Promise<KnowledgeHubAttachment[]> {
   const query = new URLSearchParams();
@@ -687,6 +693,7 @@ export async function fetchKnowledgeHubAttachments(params?: {
   if (params?.stf_no) query.set('stf_no', params.stf_no);
   if (params?.ticket_status) query.set('ticket_status', params.ticket_status);
   if (params?.published) query.set('published', params.published);
+  if (params?.archived) query.set('archived', params.archived);
   if (params?.all) query.set('all', 'true');
   const qs = query.toString() ? `?${query.toString()}` : '';
   const res = await fetch(`${API_BASE}/knowledge-hub/${qs}`, { headers: authHeaders() });
@@ -694,7 +701,7 @@ export async function fetchKnowledgeHubAttachments(params?: {
 }
 
 /** Publish an attachment to the employee Knowledge Hub. */
-export async function publishAttachment(id: number, data: { published_title: string; published_description: string }): Promise<KnowledgeHubAttachment> {
+export async function publishAttachment(id: number, data: { published_title: string; published_description: string; published_tags?: string[] }): Promise<KnowledgeHubAttachment> {
   const res = await fetch(`${API_BASE}/knowledge-hub/${id}/publish/`, {
     method: 'POST',
     headers: authHeaders(),
@@ -732,6 +739,24 @@ export async function deleteKnowledgeHubAttachment(id: number): Promise<void> {
     const data = await res.json().catch(() => ({}));
     throw new Error((data as Record<string, string>).detail || `Delete failed (${res.status}).`);
   }
+}
+
+/** Archive an attachment. */
+export async function archiveAttachment(id: number): Promise<KnowledgeHubAttachment> {
+  const res = await fetch(`${API_BASE}/knowledge-hub/${id}/archive/`, {
+    method: 'POST',
+    headers: authHeaders(),
+  });
+  return handleResponse<KnowledgeHubAttachment>(res);
+}
+
+/** Unarchive an attachment. */
+export async function unarchiveAttachment(id: number): Promise<KnowledgeHubAttachment> {
+  const res = await fetch(`${API_BASE}/knowledge-hub/${id}/unarchive/`, {
+    method: 'POST',
+    headers: authHeaders(),
+  });
+  return handleResponse<KnowledgeHubAttachment>(res);
 }
 
 /** Fetch Knowledge Hub summary stats. */
