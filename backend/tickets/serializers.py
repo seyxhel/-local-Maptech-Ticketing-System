@@ -121,7 +121,7 @@ class EscalationLogSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = EscalationLog
-        fields = ['id', 'escalation_type', 'from_user', 'to_user', 'to_external', 'notes', 'created_at']
+        fields = ['id', 'ticket', 'escalation_type', 'from_user', 'to_user', 'to_external', 'notes', 'created_at']
 
 
 class TicketSerializer(serializers.ModelSerializer):
@@ -237,6 +237,9 @@ class AdminCreateTicketSerializer(serializers.ModelSerializer):
             'estimated_resolution_days_override',
             'is_existing_client',
         ]
+        extra_kwargs = {
+            'email_address': {'required': False, 'allow_blank': True, 'default': ''},
+        }
 
 
 class EmployeeTicketActionSerializer(serializers.Serializer):

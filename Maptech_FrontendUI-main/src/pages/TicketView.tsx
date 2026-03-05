@@ -1353,8 +1353,8 @@ export function TicketView() {
                   )}
                 </button>
               )}
-              {/* Employee: Resolve Ticket (only if assigned to this ticket and not yet Resolved) */}
-              {isAssignedEmployee && ticket.status !== 'Resolved' && (
+              {/* Employee: Resolve Ticket (only if work has been started and not yet Resolved) */}
+              {isAssignedEmployee && !!btData?.time_in && ticket.status !== 'Resolved' && (
                 <button
                   type="button"
                   disabled={savingFields}

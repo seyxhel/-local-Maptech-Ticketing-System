@@ -30,6 +30,7 @@ import {
   Play,
   UserCheck,
   CheckCircle2,
+  Loader2,
   X,
   Cpu,
   HardDrive,
@@ -134,6 +135,7 @@ export function AdminCreateTicket() {
   const [callOnHold, setCallOnHold] = useState(false);
   const [holdOffset, setHoldOffset] = useState(0); // accumulated hold time in ms
   const [holdStartTime, setHoldStartTime] = useState<number | null>(null); // when hold started (ms)
+  const [isAssigning, setIsAssigning] = useState(false);
 
   // Employee working tickets (for expanded assign modal)
   const [employeeTickets, setEmployeeTickets] = useState<Record<number, BackendTicket[]>>({});
@@ -209,8 +211,10 @@ export function AdminCreateTicket() {
       }
     });
 
-    const emailErr = validateEmail(email);
-    if (emailErr) { newErrors['email'] = true; msgs['email'] = emailErr; }
+    if (email.trim()) {
+      const emailErr = validateEmail(email);
+      if (emailErr) { newErrors['email'] = true; msgs['email'] = emailErr; }
+    }
 
     const addrErr = validateAddress(address);
     if (addrErr) { newErrors['address'] = true; msgs['address'] = addrErr; }
@@ -312,6 +316,8 @@ export function AdminCreateTicket() {
       toast.error('Please select a technical to assign.');
       return;
     }
+    if (isAssigning) return;
+    setIsAssigning(true);
     const emp = employees.find((e) => e.id === selectedEmployee);
 
     // Map support type label to backend value
@@ -333,7 +339,7 @@ export function AdminCreateTicket() {
         mobile_no: contactValues.mobile,
         designation: contactValues.designation,
         department_organization: contactValues.department,
-        email_address: email,
+        email_address: email.trim(),
         address,
         description_of_problem: description,
         preferred_support_type: supportTypeMap[supportType] || '',
@@ -370,6 +376,8 @@ export function AdminCreateTicket() {
       navigate(`/admin/ticket-details?stf=${encodeURIComponent(created.stf_no)}`);
     } catch (err: any) {
       toast.error(err?.message || 'Failed to create ticket.');
+    } finally {
+      setIsAssigning(false);
     }
   };
 
@@ -453,7 +461,7 @@ export function AdminCreateTicket() {
               </div>
             ))}
             <div>
-              <label className={labelCls}>Email Address <span className="text-red-500 ml-1">*</span></label>
+              <label className={labelCls}>Email Address <span className="text-gray-400 text-xs font-normal">(optional)</span></label>
               <input type="text" placeholder="e.g. juandelacruz@email.com" value={email} maxLength={MAX_EMAIL} onChange={(e) => { setEmail(e.target.value); if (e.target.value.trim()) { setErrors((p) => ({ ...p, email: false })); setErrorMsgs((p) => ({ ...p, email: '' })); } }} className={`${inputCls} ${errors['email'] ? errorRing : ''}`} />
               {errors['email'] && <p className="text-red-500 text-xs mt-1">{errorMsgs['email'] || 'This field is required'}</p>}
             </div>
@@ -777,8 +785,8 @@ export function AdminCreateTicket() {
                 </div>
 
                 <div className="mt-5">
-                  <button onClick={handleAssign} disabled={!selectedEmployee} className="w-full px-4 py-2.5 rounded-lg bg-[#3BC25B] hover:bg-[#2ea34a] text-white text-sm font-bold transition-colors flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed">
-                    <UserCheck className="w-4 h-4" /> Assign Ticket
+                  <button onClick={handleAssign} disabled={!selectedEmployee || isAssigning} className="w-full px-4 py-2.5 rounded-lg bg-[#3BC25B] hover:bg-[#2ea34a] text-white text-sm font-bold transition-colors flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed">
+                    {isAssigning ? <><Loader2 className="w-4 h-4 animate-spin" /> Assigning…</> : <><UserCheck className="w-4 h-4" /> Assign Ticket</>}
                   </button>
                 </div>
               </div>
