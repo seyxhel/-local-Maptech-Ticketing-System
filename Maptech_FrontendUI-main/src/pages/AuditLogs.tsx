@@ -20,10 +20,12 @@ import { toast } from 'sonner';
 import {
   fetchAuditLogs,
   fetchAuditLogSummary,
-  exportAuditLogs,
   type AuditLogEntry,
   type AuditLogSummary,
 } from '../services/api';
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+import XLSXStyle from 'xlsx-js-style';
 
 // ── Constants ──
 
@@ -172,18 +174,241 @@ export function AuditLogs() {
     [logs, currentPage]
   );
 
-  const handleExport = async () => {
+  const handleExport = () => {
+    if (!logs.length) { toast.error('No logs to export.'); return; }
     setExporting(true);
     try {
-      await exportAuditLogs({
-        search: searchTerm || undefined,
-        entity: entityFilter || undefined,
-        action: actionFilter || undefined,
-        date_from: dateFrom || undefined,
-        date_to: dateTo || undefined,
+      const now    = new Date();
+      const dateStr = now.toISOString().slice(0, 10);
+      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+
+      // ── Active filter string ──
+      const filterParts: string[] = [];
+      if (searchTerm)   filterParts.push(`Search: "${searchTerm}"`);
+      if (entityFilter) filterParts.push(`Entity: ${entityFilter}`);
+      if (actionFilter) filterParts.push(`Action: ${actionFilter}`);
+      if (dateFrom)     filterParts.push(`From: ${dateFrom}`);
+      if (dateTo)       filterParts.push(`To: ${dateTo}`);
+      const filterStr = filterParts.length ? filterParts.join(' | ') : 'None — all records';
+
+      // ── Color palette (no # prefix for xlsx-js-style) ──
+      const C = {
+        GREEN_DARK  : '0A7A68',
+        GREEN_MID   : '2FAD52',
+        GREEN_PALE  : 'E8FAF0',
+        GREEN_TEXT  : '065F46',
+        WHITE       : 'FFFFFF',
+        GRAY_ROW    : 'F9FAFB',
+        ALT_ROW     : 'F0FDF4',
+        HEADER_TEXT : 'FFFFFF',
+        BORDER_CLR  : 'D1FAE5',
+      };
+
+      // ── Action color map [bgRGB, fgRGB] ──
+      const ACTION_COLORS: Record<string, [string, string]> = {
+        CREATE         : ['DCFCE7', '166534'],
+        UPDATE         : ['DBEAFE', '1D4ED8'],
+        DELETE         : ['FEE2E2', 'DC2626'],
+        LOGIN          : ['EDE9FE', '7C3AED'],
+        LOGOUT         : ['F3F4F6', '374151'],
+        ASSIGN         : ['CCFBF1', '0F766E'],
+        ESCALATE       : ['FFEDD5', 'C2410C'],
+        CLOSE          : ['E0E7FF', '4338CA'],
+        PASS           : ['CFFAFE', '0E7490'],
+        REVIEW         : ['E0F2FE', '0369A1'],
+        RESOLVE        : ['D1FAE5', '065F46'],
+        UPLOAD         : ['EDE9FE', '6D28D9'],
+        CONFIRM        : ['ECFCCB', '3F6212'],
+        STATUS_CHANGE  : ['FEF9C3', 'A16207'],
+        PASSWORD_RESET : ['FCE7F3', '9D174D'],
+      };
+
+      // ── Entity color map [bgRGB, fgRGB] ──
+      const ENTITY_COLORS: Record<string, [string, string]> = {
+        User          : ['EDE9FE', '6D28D9'],
+        Ticket        : ['DBEAFE', '1D4ED8'],
+        TypeOfService : ['CCFBF1', '0F766E'],
+        EscalationLog : ['FFEDD5', 'C2410C'],
+        Attachment    : ['D1FAE5', '065F46'],
+        Session       : ['F3F4F6', '374151'],
+      };
+
+      // ── Style factories ──
+      const THIN = (clr = C.BORDER_CLR) => ({ style: 'thin', color: { rgb: clr } });
+      const allBorders = (clr = C.BORDER_CLR) => ({ top: THIN(clr), bottom: THIN(clr), left: THIN(clr), right: THIN(clr) });
+
+      const cellStyle = (bg: string, fg: string, opts?: { bold?: boolean; italic?: boolean; sz?: number; center?: boolean; wrap?: boolean; border?: boolean }) => ({
+        fill  : { fgColor: { rgb: bg } },
+        font  : { name: 'Calibri', sz: opts?.sz ?? 11, color: { rgb: fg }, bold: !!opts?.bold, italic: !!opts?.italic },
+        alignment: { horizontal: opts?.center ? 'center' : 'left', vertical: 'center', wrapText: !!opts?.wrap },
+        ...(opts?.border !== false ? { border: allBorders() } : {}),
       });
-      toast.success('Audit logs exported successfully');
+
+      type XCell = { v: string | number; t: 's' | 'n'; s: object };
+      const sc = (v: string | number, bg: string, fg: string, opts?: Parameters<typeof cellStyle>[2]): XCell =>
+        ({ v, t: typeof v === 'number' ? 'n' : 's', s: cellStyle(bg, fg, opts) });
+
+      const ws: Record<string, unknown> = {};
+      const merges: { s: { r: number; c: number }; e: { r: number; c: number } }[] = [];
+      const colWidths = [{ wch: 5 }, { wch: 24 }, { wch: 16 }, { wch: 10 }, { wch: 16 }, { wch: 52 }, { wch: 22 }, { wch: 28 }, { wch: 16 }, { wch: 38 }];
+      const rowHeights: { hpt: number }[] = [];
+      const COLS = 10;
+      let   R    = 0; // current row index
+
+      const setCell = (r: number, c: number, cell: XCell) => {
+        const ref = XLSXStyle.utils.encode_cell({ r, c });
+        ws[ref]   = cell;
+      };
+
+      const mergeRow = (r: number, v: string, bg: string, fg: string, opts?: Parameters<typeof cellStyle>[2]) => {
+        setCell(r, 0, sc(v, bg, fg, { ...opts, border: false }));
+        for (let c = 1; c < COLS; c++) setCell(r, c, sc('', bg, fg, { border: false }));
+        merges.push({ s: { r, c: 0 }, e: { r, c: COLS - 1 } });
+      };
+
+      // ─── ROW 0: Main Title ───
+      mergeRow(R, 'MAPTECH TICKETING SYSTEM  —  AUDIT LOG REPORT', C.GREEN_DARK, C.WHITE, { bold: true, sz: 18, center: true });
+      rowHeights[R] = { hpt: 44 }; R++;
+
+      // ─── ROW 1: Subtitle ───
+      mergeRow(R, 'System Activity & Change Tracking Report', C.GREEN_MID, C.WHITE, { italic: true, sz: 11, center: true });
+      rowHeights[R] = { hpt: 22 }; R++;
+
+      // ─── ROWS 2-4: Info rows ───
+      const infoRows = [
+        [`Generated`, `${dateStr}  ${timeStr}`],
+        [`Filters`,   filterStr],
+        [`Records`,   `${logs.length} entries`],
+      ];
+      infoRows.forEach(([label, val]) => {
+        mergeRow(R, `   ${label}:   ${val}`, C.GREEN_PALE, C.GREEN_TEXT, { sz: 10, border: false });
+        rowHeights[R] = { hpt: 18 }; R++;
+      });
+
+      // ─── Spacer ───
+      mergeRow(R, '', C.WHITE, C.WHITE, { border: false }); rowHeights[R] = { hpt: 10 }; R++;
+
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      // SUMMARY SECTION
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      mergeRow(R, '  SUMMARY', C.GREEN_DARK, C.WHITE, { bold: true, sz: 12, border: false });
+      rowHeights[R] = { hpt: 26 }; R++;
+
+      // Summary col headers
+      ['Metric', 'Value'].forEach((h, c) => setCell(R, c, sc(h, C.GREEN_DARK, C.WHITE, { bold: true, center: true })));
+      for (let c = 2; c < COLS; c++) setCell(R, c, sc('', C.GREEN_DARK, C.WHITE, { border: false }));
+      merges.push({ s: { r: R, c: 1 }, e: { r: R, c: COLS - 1 } });
+      rowHeights[R] = { hpt: 20 }; R++;
+
+      const summaryData = [
+        ['Total Logs',    summary?.total          ?? 0],
+        ['Last 24 Hours', summary?.last_24h       ?? 0],
+        ['User Actions',  summary?.by_entity?.User   ?? 0],
+        ['Ticket Actions',summary?.by_entity?.Ticket ?? 0],
+      ] as [string, number][];
+
+      summaryData.forEach(([metric, val]) => {
+        setCell(R, 0, sc(metric, C.GREEN_PALE, C.GREEN_TEXT, { sz: 10 }));
+        setCell(R, 1, sc(val, C.GREEN_PALE, C.GREEN_DARK, { bold: true, sz: 10 }));
+        merges.push({ s: { r: R, c: 1 }, e: { r: R, c: COLS - 1 } });
+        for (let c = 2; c < COLS; c++) setCell(R, c, sc('', C.GREEN_PALE, C.GREEN_TEXT, { border: false }));
+        rowHeights[R] = { hpt: 18 }; R++;
+      });
+
+      // ── Action Breakdown ──
+      if (summary?.by_action && Object.keys(summary.by_action).length) {
+        mergeRow(R, '', C.WHITE, C.WHITE, { border: false }); rowHeights[R] = { hpt: 8 }; R++;
+        mergeRow(R, '  Action Breakdown', C.GREEN_MID, C.WHITE, { bold: true, sz: 10, border: false });
+        rowHeights[R] = { hpt: 20 }; R++;
+        ['Action', 'Count'].forEach((h, c) => setCell(R, c, sc(h, C.GREEN_DARK, C.WHITE, { bold: true, center: true })));
+        for (let c = 2; c < COLS; c++) setCell(R, c, sc('', C.GREEN_DARK, C.WHITE, { border: false }));
+        merges.push({ s: { r: R, c: 1 }, e: { r: R, c: COLS - 1 } });
+        rowHeights[R] = { hpt: 18 }; R++;
+        Object.entries(summary.by_action)
+          .sort(([, a], [, b]) => (b as number) - (a as number))
+          .forEach(([action, count]) => {
+            const [abg, afg] = ACTION_COLORS[action] ?? ['F3F4F6', '374151'];
+            setCell(R, 0, sc(action, abg, afg, { bold: true, sz: 10, center: true }));
+            setCell(R, 1, sc(count as number, C.GREEN_PALE, C.GREEN_DARK, { bold: true, sz: 10 }));
+            merges.push({ s: { r: R, c: 1 }, e: { r: R, c: COLS - 1 } });
+            for (let c = 2; c < COLS; c++) setCell(R, c, sc('', C.GREEN_PALE, C.GREEN_TEXT, { border: false }));
+            rowHeights[R] = { hpt: 18 }; R++;
+          });
+      }
+
+      // ── Entity Breakdown ──
+      if (summary?.by_entity && Object.keys(summary.by_entity).length) {
+        mergeRow(R, '', C.WHITE, C.WHITE, { border: false }); rowHeights[R] = { hpt: 8 }; R++;
+        mergeRow(R, '  Entity Breakdown', C.GREEN_MID, C.WHITE, { bold: true, sz: 10, border: false });
+        rowHeights[R] = { hpt: 20 }; R++;
+        ['Entity', 'Count'].forEach((h, c) => setCell(R, c, sc(h, C.GREEN_DARK, C.WHITE, { bold: true, center: true })));
+        for (let c = 2; c < COLS; c++) setCell(R, c, sc('', C.GREEN_DARK, C.WHITE, { border: false }));
+        merges.push({ s: { r: R, c: 1 }, e: { r: R, c: COLS - 1 } });
+        rowHeights[R] = { hpt: 18 }; R++;
+        Object.entries(summary.by_entity)
+          .sort(([, a], [, b]) => (b as number) - (a as number))
+          .forEach(([entity, count]) => {
+            const [ebg, efg] = ENTITY_COLORS[entity] ?? ['F3F4F6', '374151'];
+            setCell(R, 0, sc(entity, ebg, efg, { bold: true, sz: 10, center: true }));
+            setCell(R, 1, sc(count as number, C.GREEN_PALE, C.GREEN_DARK, { bold: true, sz: 10 }));
+            merges.push({ s: { r: R, c: 1 }, e: { r: R, c: COLS - 1 } });
+            for (let c = 2; c < COLS; c++) setCell(R, c, sc('', C.GREEN_PALE, C.GREEN_TEXT, { border: false }));
+            rowHeights[R] = { hpt: 18 }; R++;
+          });
+      }
+
+      // ─── Spacer ───
+      mergeRow(R, '', C.WHITE, C.WHITE, { border: false }); rowHeights[R] = { hpt: 14 }; R++;
+
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      // AUDIT LOG RECORDS
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      mergeRow(R, '  AUDIT LOG RECORDS', C.GREEN_DARK, C.WHITE, { bold: true, sz: 12, border: false });
+      rowHeights[R] = { hpt: 28 }; R++;
+
+      // Column headers
+      const COL_HEADERS = ['#', 'Timestamp', 'Entity', 'Entity ID', 'Action', 'Activity', 'Actor Name', 'Actor Email', 'IP Address', 'Changes (JSON)'];
+      COL_HEADERS.forEach((h, c) => setCell(R, c, sc(h, C.GREEN_DARK, C.WHITE, { bold: true, center: true, sz: 10 })));
+      rowHeights[R] = { hpt: 24 }; R++;
+
+      // Data rows
+      logs.forEach((log, i) => {
+        const rowBg = i % 2 === 0 ? C.WHITE : C.ALT_ROW;
+        const [abg, afg] = ACTION_COLORS[log.action] ?? ['F3F4F6', '374151'];
+        const [ebg, efg] = ENTITY_COLORS[log.entity] ?? ['F3F4F6', '374151'];
+        const changesStr = log.changes && Object.keys(log.changes).length ? JSON.stringify(log.changes) : '';
+
+        setCell(R, 0, sc(i + 1,                        rowBg,  '374151', { center: true, sz: 10 }));
+        setCell(R, 1, sc(formatDate(log.timestamp),    rowBg,  '1F2937', { sz: 10 }));
+        setCell(R, 2, sc(log.entity,                   ebg,    efg,      { bold: true, sz: 10, center: true }));
+        setCell(R, 3, sc(log.entity_id ?? '',          rowBg,  '374151', { center: true, sz: 10 }));
+        setCell(R, 4, sc(log.action,                   abg,    afg,      { bold: true, sz: 10, center: true }));
+        setCell(R, 5, sc(log.activity,                 rowBg,  '1F2937', { sz: 10, wrap: true }));
+        setCell(R, 6, sc(log.actor_name,               rowBg,  '1F2937', { sz: 10 }));
+        setCell(R, 7, sc(log.actor_email,              rowBg,  '6B7280', { sz: 10 }));
+        setCell(R, 8, sc(log.ip_address ?? '',         rowBg,  '6B7280', { sz: 10, center: true }));
+        setCell(R, 9, sc(changesStr,                   rowBg,  '374151', { sz: 9,  wrap: true }));
+        rowHeights[R] = { hpt: 20 }; R++;
+      });
+
+      // ─── Footer ───
+      mergeRow(R, '', C.WHITE, C.WHITE, { border: false }); rowHeights[R] = { hpt: 10 }; R++;
+      mergeRow(R, `   End of Report  •  ${logs.length} records exported  •  Generated ${dateStr} ${timeStr}`, C.GREEN_DARK, C.WHITE, { italic: true, sz: 9, center: true, border: false });
+      rowHeights[R] = { hpt: 20 }; R++;
+
+      // ─── Sheet metadata ───
+      ws['!ref']    = XLSXStyle.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: R - 1, c: COLS - 1 } });
+      ws['!cols']   = colWidths;
+      ws['!rows']   = rowHeights;
+      ws['!merges'] = merges;
+
+      const wb = XLSXStyle.utils.book_new();
+      XLSXStyle.utils.book_append_sheet(wb, ws, 'Audit Logs');
+      XLSXStyle.writeFile(wb, `audit_logs_${dateStr}.xlsx`);
+
+      toast.success(`Exported ${logs.length} audit log records to Excel.`);
     } catch (err) {
+      console.error('Export error:', err);
       toast.error('Export failed.');
     } finally {
       setExporting(false);
