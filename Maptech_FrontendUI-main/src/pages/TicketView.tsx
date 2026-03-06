@@ -22,6 +22,9 @@ import type { BackendTicket } from '../services/api';
 import { mapStatus, mapPriority, getAssigneeName, reverseMapStatus, reverseMapPriority } from '../services/ticketMapper';
 import { Loader2, Trash2, Star, Clock, PlayCircle, Eye, PenLine, Link2, AlertTriangle } from 'lucide-react';
 import { SignaturePad } from '../components/ui/SignaturePad';
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+import XLSXStyle from 'xlsx-js-style';
 
 const JOB_STATUSES = ['Completed', 'Under Warranty', 'For Quotation', 'Pending', 'Chargeable', 'Under Contract'];
 
@@ -887,6 +890,246 @@ export function TicketView() {
     }
   };
 
+  // ── Export ticket to XLSX ──
+  const handleExportTicket = () => {
+    if (!btData) return;
+    try {
+      const now = new Date();
+      const dateStr = now.toISOString().slice(0, 10);
+      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+
+      // Color palette
+      const C = {
+        GREEN_DARK: '0A7A68', GREEN_MID: '2FAD52', GREEN_PALE: 'E8FAF0',
+        GREEN_TEXT: '065F46', WHITE: 'FFFFFF', ALT_ROW: 'F0FDF4', BORDER_CLR: 'D1FAE5',
+      };
+
+      const STATUS_COLORS: Record<string, [string, string]> = {
+        New: ['DBEAFE', '1D4ED8'], Pending: ['FEF9C3', 'A16207'], Assigned: ['EDE9FE', '6D28D9'],
+        'In Progress': ['CCFBF1', '0F766E'], Escalated: ['FFEDD5', 'C2410C'],
+        Resolved: ['DCFCE7', '166534'], Closed: ['F3F4F6', '374151'],
+        'For Observation': ['E0F2FE', '0369A1'], Unresolved: ['FEE2E2', 'DC2626'],
+      };
+
+      const PRIORITY_COLORS: Record<string, [string, string]> = {
+        Critical: ['FEE2E2', 'DC2626'], High: ['FFEDD5', 'C2410C'],
+        Medium: ['FEF9C3', 'A16207'], Low: ['DCFCE7', '166534'],
+      };
+
+      // Style helpers
+      const THIN = (clr = C.BORDER_CLR) => ({ style: 'thin' as const, color: { rgb: clr } });
+      const allBorders = (clr = C.BORDER_CLR) => ({ top: THIN(clr), bottom: THIN(clr), left: THIN(clr), right: THIN(clr) });
+
+      type CellOpts = { bold?: boolean; italic?: boolean; sz?: number; center?: boolean; wrap?: boolean; border?: boolean };
+      const cellStyle = (bg: string, fg: string, opts?: CellOpts) => ({
+        fill: { fgColor: { rgb: bg } },
+        font: { name: 'Calibri', sz: opts?.sz ?? 11, color: { rgb: fg }, bold: !!opts?.bold, italic: !!opts?.italic },
+        alignment: { horizontal: opts?.center ? 'center' : 'left', vertical: 'center', wrapText: !!opts?.wrap },
+        ...(opts?.border !== false ? { border: allBorders() } : {}),
+      });
+
+      type XCell = { v: string | number; t: 's' | 'n'; s: object };
+      const sc = (v: string | number, bg: string, fg: string, opts?: CellOpts): XCell =>
+        ({ v, t: typeof v === 'number' ? 'n' : 's', s: cellStyle(bg, fg, opts) });
+
+      const ws: Record<string, unknown> = {};
+      const merges: { s: { r: number; c: number }; e: { r: number; c: number } }[] = [];
+      const COLS = 6;
+      const colWidths = [{ wch: 22 }, { wch: 36 }, { wch: 4 }, { wch: 22 }, { wch: 36 }, { wch: 4 }];
+      const rowHeights: { hpt: number }[] = [];
+      let R = 0;
+
+      const setCell = (r: number, c: number, cell: XCell) => {
+        ws[XLSXStyle.utils.encode_cell({ r, c })] = cell;
+      };
+
+      const mergeAll = (r: number, v: string, bg: string, fg: string, opts?: CellOpts) => {
+        setCell(r, 0, sc(v, bg, fg, { ...opts, border: false }));
+        for (let c = 1; c < COLS; c++) setCell(r, c, sc('', bg, fg, { ...opts, border: false }));
+        merges.push({ s: { r, c: 0 }, e: { r, c: COLS - 1 } });
+      };
+
+      // Two-column detail row: label in cols 0, value in col 1 (left side)
+      // OR label in col 3, value in col 4 (right side)
+      const detailRow = (
+        r: number,
+        lbl1: string, val1: string,
+        lbl2?: string, val2?: string,
+      ) => {
+        setCell(r, 0, sc(lbl1, C.GREEN_PALE, C.GREEN_TEXT, { bold: true, sz: 10, border: false }));
+        setCell(r, 1, sc(val1, C.WHITE, '1F2937', { sz: 10, wrap: true, border: false }));
+        setCell(r, 2, sc('', C.WHITE, C.WHITE, { border: false }));
+        if (lbl2) {
+          setCell(r, 3, sc(lbl2, C.GREEN_PALE, C.GREEN_TEXT, { bold: true, sz: 10, border: false }));
+          setCell(r, 4, sc(val2 ?? '', C.WHITE, '1F2937', { sz: 10, wrap: true, border: false }));
+        } else {
+          setCell(r, 3, sc('', C.WHITE, C.WHITE, { border: false }));
+          setCell(r, 4, sc('', C.WHITE, C.WHITE, { border: false }));
+        }
+        setCell(r, 5, sc('', C.WHITE, C.WHITE, { border: false }));
+      };
+
+      const sectionHeader = (r: number, title: string) => {
+        mergeAll(r, `    ${title}`, C.GREEN_DARK, C.WHITE, { bold: true, sz: 12, border: false });
+        rowHeights[r] = { hpt: 30 };
+      };
+
+      // ─── Title ───
+      mergeAll(R, 'MAPTECH TICKETING SYSTEM  —  TICKET DETAIL REPORT', C.GREEN_DARK, C.WHITE, { bold: true, sz: 18, center: true });
+      rowHeights[R] = { hpt: 52 }; R++;
+      mergeAll(R, `Service Ticket Form — ${ticket.id}`, C.GREEN_MID, C.WHITE, { italic: true, sz: 11, center: true });
+      rowHeights[R] = { hpt: 28 }; R++;
+
+      // Info rows
+      const [sBg, sFg] = STATUS_COLORS[ticket.status] ?? ['F3F4F6', '374151'];
+      const [pBg, pFg] = PRIORITY_COLORS[ticket.priority] ?? ['F3F4F6', '374151'];
+
+      // Status + Priority row
+      setCell(R, 0, sc('Status', C.GREEN_PALE, C.GREEN_TEXT, { bold: true, sz: 10, border: false }));
+      setCell(R, 1, sc(ticket.status, sBg, sFg, { bold: true, sz: 11, center: true, border: false }));
+      setCell(R, 2, sc('', C.WHITE, C.WHITE, { border: false }));
+      setCell(R, 3, sc('Priority', C.GREEN_PALE, C.GREEN_TEXT, { bold: true, sz: 10, border: false }));
+      setCell(R, 4, sc(ticket.priority, pBg, pFg, { bold: true, sz: 11, center: true, border: false }));
+      setCell(R, 5, sc('', C.WHITE, C.WHITE, { border: false }));
+      rowHeights[R] = { hpt: 24 }; R++;
+
+      detailRow(R, 'Generated', `${dateStr}  ${timeStr}`, 'Created', ticket.created);
+      rowHeights[R] = { hpt: 22 }; R++;
+      detailRow(R, 'Assigned To', ticket.assignedTo, 'Type of Service', ticket.typeOfService);
+      rowHeights[R] = { hpt: 22 }; R++;
+      detailRow(R, 'Support Type', ticket.preferredSupport);
+      rowHeights[R] = { hpt: 22 }; R++;
+
+      // Spacer
+      mergeAll(R, '', C.WHITE, C.WHITE, { border: false }); rowHeights[R] = { hpt: 14 }; R++;
+
+      // ─── CLIENT INFORMATION ───
+      sectionHeader(R, 'CLIENT INFORMATION'); R++;
+      detailRow(R, 'Client', ticket.client, 'Contact Person', ticket.contact); rowHeights[R] = { hpt: 22 }; R++;
+      detailRow(R, 'Email', ticket.emailAddress, 'Department', ticket.department); rowHeights[R] = { hpt: 22 }; R++;
+      detailRow(R, 'Mobile', ticket.mobile, 'Landline', ticket.landline); rowHeights[R] = { hpt: 22 }; R++;
+      detailRow(R, 'Designation', ticket.designation, 'Address', ticket.fullAddress); rowHeights[R] = { hpt: 22 }; R++;
+
+      mergeAll(R, '', C.WHITE, C.WHITE, { border: false }); rowHeights[R] = { hpt: 14 }; R++;
+
+      // ─── ISSUE DESCRIPTION ───
+      sectionHeader(R, 'ISSUE DESCRIPTION'); R++;
+      mergeAll(R, '', C.WHITE, C.WHITE, { border: false }); rowHeights[R] = { hpt: 4 }; R++;
+      setCell(R, 0, sc(ticket.description, C.WHITE, '1F2937', { sz: 10, wrap: true, border: false }));
+      for (let c = 1; c < COLS; c++) setCell(R, c, sc('', C.WHITE, '1F2937', { border: false }));
+      merges.push({ s: { r: R, c: 0 }, e: { r: R, c: COLS - 1 } });
+      const descLen = (ticket.description || '').length;
+      rowHeights[R] = { hpt: descLen > 200 ? 80 : descLen > 100 ? 60 : 40 }; R++;
+
+      mergeAll(R, '', C.WHITE, C.WHITE, { border: false }); rowHeights[R] = { hpt: 14 }; R++;
+
+      // ─── PRODUCT DETAILS (if any) ───
+      if (ticket.productDetails) {
+        sectionHeader(R, 'PRODUCT DETAILS'); R++;
+        const pd = ticket.productDetails;
+        detailRow(R, 'Device/Equipment', pd.deviceEquipment, 'Brand', pd.brand ?? ''); rowHeights[R] = { hpt: 22 }; R++;
+        detailRow(R, 'Product', pd.product ?? '', 'Model', pd.model ?? ''); rowHeights[R] = { hpt: 22 }; R++;
+        detailRow(R, 'Version No', pd.versionNo, 'Serial No', pd.serialNo); rowHeights[R] = { hpt: 22 }; R++;
+        detailRow(R, 'Warranty', pd.warranty, 'Date Purchased', pd.datePurchased); rowHeights[R] = { hpt: 22 }; R++;
+        mergeAll(R, '', C.WHITE, C.WHITE, { border: false }); rowHeights[R] = { hpt: 14 }; R++;
+      }
+
+      // ─── WORK DETAILS ───
+      if (ticket.actionTaken || ticket.remarks || ticket.jobStatus || ticket.timeIn !== 'N/A') {
+        sectionHeader(R, 'WORK DETAILS'); R++;
+        detailRow(R, 'Job Status', ticket.jobStatus, 'Progress', `${ticket.progressPercentage}%`); rowHeights[R] = { hpt: 22 }; R++;
+        detailRow(R, 'Time In', ticket.timeIn, 'Time Out', ticket.timeOut); rowHeights[R] = { hpt: 22 }; R++;
+        if (ticket.actionTaken) {
+          detailRow(R, 'Action Taken', ticket.actionTaken); rowHeights[R] = { hpt: Math.max(22, Math.ceil(ticket.actionTaken.length / 40) * 14) }; R++;
+        }
+        if (ticket.remarks) {
+          detailRow(R, 'Remarks', ticket.remarks); rowHeights[R] = { hpt: Math.max(22, Math.ceil(ticket.remarks.length / 40) * 14) }; R++;
+        }
+        if (ticket.observation) {
+          detailRow(R, 'Observation', ticket.observation); rowHeights[R] = { hpt: Math.max(22, Math.ceil(ticket.observation.length / 40) * 14) }; R++;
+        }
+        if (ticket.signedByName) {
+          detailRow(R, 'Signed By', ticket.signedByName); rowHeights[R] = { hpt: 22 }; R++;
+        }
+        mergeAll(R, '', C.WHITE, C.WHITE, { border: false }); rowHeights[R] = { hpt: 14 }; R++;
+      }
+
+      // ─── ESCALATION (if any) ───
+      if (btData.escalation_logs && btData.escalation_logs.length > 0) {
+        sectionHeader(R, 'ESCALATION HISTORY'); R++;
+        // Column headers
+        const escHeaders = ['Date', 'From', 'To', 'Type', 'Notes', ''];
+        escHeaders.forEach((h, c) => setCell(R, c, sc(h, C.GREEN_DARK, C.WHITE, { bold: true, sz: 10, center: true })));
+        rowHeights[R] = { hpt: 24 }; R++;
+        btData.escalation_logs.forEach((esc: any, i: number) => {
+          const bg = i % 2 === 0 ? C.WHITE : C.ALT_ROW;
+          setCell(R, 0, sc(esc.created_at ? new Date(esc.created_at).toLocaleString() : '', bg, '1F2937', { sz: 9 }));
+          setCell(R, 1, sc(esc.from_user_name || '', bg, '1F2937', { sz: 9 }));
+          setCell(R, 2, sc(esc.to_user_name || esc.external_escalated_to || '', bg, '1F2937', { sz: 9 }));
+          setCell(R, 3, sc(esc.cascade_type || '', bg, '6B7280', { sz: 9, center: true }));
+          setCell(R, 4, sc(esc.notes || '', bg, '1F2937', { sz: 9, wrap: true }));
+          setCell(R, 5, sc('', bg, bg, { border: false }));
+          rowHeights[R] = { hpt: 22 }; R++;
+        });
+        mergeAll(R, '', C.WHITE, C.WHITE, { border: false }); rowHeights[R] = { hpt: 14 }; R++;
+      }
+
+      // ─── ATTACHMENTS ───
+      const atts = btData.attachments || [];
+      if (atts.length > 0) {
+        sectionHeader(R, 'ATTACHMENTS'); R++;
+        const attHeaders = ['#', 'File Name', '', 'Type', 'Uploaded', ''];
+        attHeaders.forEach((h, c) => setCell(R, c, sc(h, C.GREEN_DARK, C.WHITE, { bold: true, sz: 10, center: true })));
+        rowHeights[R] = { hpt: 24 }; R++;
+        atts.forEach((att: any, i: number) => {
+          const bg = i % 2 === 0 ? C.WHITE : C.ALT_ROW;
+          const fname = att.file?.split('/').pop() || 'file';
+          const ftype = fname.match(/\.(mp4|webm)$/i) ? 'Recording' : fname.match(/\.(jpg|jpeg|png|gif)$/i) ? 'Screenshot' : 'Document';
+          setCell(R, 0, sc(i + 1, bg, '374151', { center: true, sz: 10 }));
+          setCell(R, 1, sc(fname, bg, '1D4ED8', { sz: 10 }));
+          merges.push({ s: { r: R, c: 1 }, e: { r: R, c: 2 } });
+          setCell(R, 2, sc('', bg, bg, { border: false }));
+          setCell(R, 3, sc(ftype, bg, '6B7280', { sz: 10, center: true }));
+          setCell(R, 4, sc(att.uploaded_at ? new Date(att.uploaded_at).toLocaleString() : '', bg, '6B7280', { sz: 9 }));
+          setCell(R, 5, sc('', bg, bg, { border: false }));
+          rowHeights[R] = { hpt: 22 }; R++;
+        });
+        mergeAll(R, '', C.WHITE, C.WHITE, { border: false }); rowHeights[R] = { hpt: 14 }; R++;
+      }
+
+      // ─── CSAT Feedback ───
+      if (ticket.csatFeedback) {
+        sectionHeader(R, 'CSAT FEEDBACK'); R++;
+        detailRow(R, 'Rating', `${ticket.csatFeedback.rating} / 5`, 'Date', ticket.csatFeedback.created_at ? new Date(ticket.csatFeedback.created_at).toLocaleString() : '');
+        rowHeights[R] = { hpt: 22 }; R++;
+        if (ticket.csatFeedback.comments) {
+          detailRow(R, 'Comments', ticket.csatFeedback.comments);
+          rowHeights[R] = { hpt: Math.max(22, Math.ceil((ticket.csatFeedback.comments || '').length / 40) * 14) }; R++;
+        }
+        mergeAll(R, '', C.WHITE, C.WHITE, { border: false }); rowHeights[R] = { hpt: 14 }; R++;
+      }
+
+      // ─── Footer ───
+      mergeAll(R, `   End of Ticket Report  •  ${ticket.id}  •  Generated ${dateStr} ${timeStr}`, C.GREEN_DARK, C.WHITE, { italic: true, sz: 9, center: true, border: false });
+      rowHeights[R] = { hpt: 26 }; R++;
+
+      // Sheet metadata
+      ws['!ref'] = XLSXStyle.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: R - 1, c: COLS - 1 } });
+      ws['!cols'] = colWidths;
+      ws['!rows'] = rowHeights;
+      ws['!merges'] = merges;
+
+      const wb = XLSXStyle.utils.book_new();
+      XLSXStyle.utils.book_append_sheet(wb, ws, 'Ticket Detail');
+      XLSXStyle.writeFile(wb, `ticket_${ticket.id}_${dateStr}.xlsx`);
+
+      toast.success(`Exported ticket ${ticket.id} to Excel.`);
+    } catch (err) {
+      console.error('Export error:', err);
+      toast.error('Export failed.');
+    }
+  };
+
   return (
     <div className="space-y-6">
       {btLoading ? (
@@ -915,6 +1158,15 @@ export function TicketView() {
               Escalate
             </button>
           )}
+          <button
+            onClick={handleExportTicket}
+            title="Export Ticket to Excel"
+            aria-label="Export ticket"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-sm text-gray-700 dark:text-gray-300"
+          >
+            <Download className="w-4 h-4 text-[#0E8F79]" />
+            Export
+          </button>
           <button
             onClick={() => setShowChat(true)}
             title="Messages"

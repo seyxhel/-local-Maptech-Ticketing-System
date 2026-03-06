@@ -250,7 +250,7 @@ export function AuditLogs() {
 
       const ws: Record<string, unknown> = {};
       const merges: { s: { r: number; c: number }; e: { r: number; c: number } }[] = [];
-      const colWidths = [{ wch: 5 }, { wch: 24 }, { wch: 16 }, { wch: 10 }, { wch: 16 }, { wch: 52 }, { wch: 22 }, { wch: 28 }, { wch: 16 }, { wch: 38 }];
+      const colWidths = [{ wch: 6 }, { wch: 26 }, { wch: 18 }, { wch: 12 }, { wch: 18 }, { wch: 62 }, { wch: 24 }, { wch: 30 }, { wch: 18 }, { wch: 50 }];
       const rowHeights: { hpt: number }[] = [];
       const COLS = 10;
       let   R    = 0; // current row index
@@ -262,17 +262,35 @@ export function AuditLogs() {
 
       const mergeRow = (r: number, v: string, bg: string, fg: string, opts?: Parameters<typeof cellStyle>[2]) => {
         setCell(r, 0, sc(v, bg, fg, { ...opts, border: false }));
-        for (let c = 1; c < COLS; c++) setCell(r, c, sc('', bg, fg, { border: false }));
+        for (let c = 1; c < COLS; c++) setCell(r, c, sc('', bg, fg, { ...opts, border: false }));
         merges.push({ s: { r, c: 0 }, e: { r, c: COLS - 1 } });
+      };
+
+      // Two-column merged row helper: cols 0-4 = label, cols 5-9 = value
+      const SPLIT = 5;
+      const twoCol = (
+        r: number,
+        label: string, val: string | number,
+        lBg: string, lFg: string,
+        vBg: string, vFg: string,
+        lOpts?: Parameters<typeof cellStyle>[2],
+        vOpts?: Parameters<typeof cellStyle>[2],
+      ) => {
+        setCell(r, 0, sc(label, lBg, lFg, lOpts));
+        for (let c = 1; c < SPLIT; c++) setCell(r, c, sc('', lBg, lFg, { ...lOpts, border: false }));
+        merges.push({ s: { r, c: 0 }, e: { r, c: SPLIT - 1 } });
+        setCell(r, SPLIT, sc(val, vBg, vFg, vOpts));
+        for (let c = SPLIT + 1; c < COLS; c++) setCell(r, c, sc('', vBg, vFg, { ...vOpts, border: false }));
+        merges.push({ s: { r, c: SPLIT }, e: { r, c: COLS - 1 } });
       };
 
       // ─── ROW 0: Main Title ───
       mergeRow(R, 'MAPTECH TICKETING SYSTEM  —  AUDIT LOG REPORT', C.GREEN_DARK, C.WHITE, { bold: true, sz: 18, center: true });
-      rowHeights[R] = { hpt: 44 }; R++;
+      rowHeights[R] = { hpt: 52 }; R++;
 
       // ─── ROW 1: Subtitle ───
       mergeRow(R, 'System Activity & Change Tracking Report', C.GREEN_MID, C.WHITE, { italic: true, sz: 11, center: true });
-      rowHeights[R] = { hpt: 22 }; R++;
+      rowHeights[R] = { hpt: 28 }; R++;
 
       // ─── ROWS 2-4: Info rows ───
       const infoRows = [
@@ -281,24 +299,34 @@ export function AuditLogs() {
         [`Records`,   `${logs.length} entries`],
       ];
       infoRows.forEach(([label, val]) => {
-        mergeRow(R, `   ${label}:   ${val}`, C.GREEN_PALE, C.GREEN_TEXT, { sz: 10, border: false });
-        rowHeights[R] = { hpt: 18 }; R++;
+        twoCol(R,
+          `    ${label}:`, val,
+          C.GREEN_PALE, C.GREEN_TEXT,
+          C.GREEN_PALE, C.GREEN_TEXT,
+          { sz: 10, bold: true, border: false },
+          { sz: 10, border: false },
+        );
+        rowHeights[R] = { hpt: 22 }; R++;
       });
 
       // ─── Spacer ───
-      mergeRow(R, '', C.WHITE, C.WHITE, { border: false }); rowHeights[R] = { hpt: 10 }; R++;
+      mergeRow(R, '', C.WHITE, C.WHITE, { border: false }); rowHeights[R] = { hpt: 16 }; R++;
 
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
       // SUMMARY SECTION
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-      mergeRow(R, '  SUMMARY', C.GREEN_DARK, C.WHITE, { bold: true, sz: 12, border: false });
-      rowHeights[R] = { hpt: 26 }; R++;
+      mergeRow(R, '    SUMMARY', C.GREEN_DARK, C.WHITE, { bold: true, sz: 13, border: false });
+      rowHeights[R] = { hpt: 32 }; R++;
 
       // Summary col headers
-      ['Metric', 'Value'].forEach((h, c) => setCell(R, c, sc(h, C.GREEN_DARK, C.WHITE, { bold: true, center: true })));
-      for (let c = 2; c < COLS; c++) setCell(R, c, sc('', C.GREEN_DARK, C.WHITE, { border: false }));
-      merges.push({ s: { r: R, c: 1 }, e: { r: R, c: COLS - 1 } });
-      rowHeights[R] = { hpt: 20 }; R++;
+      twoCol(R,
+        '  Metric', 'Value',
+        C.GREEN_DARK, C.WHITE,
+        C.GREEN_DARK, C.WHITE,
+        { bold: true, sz: 10, border: false },
+        { bold: true, sz: 10, center: true, border: false },
+      );
+      rowHeights[R] = { hpt: 24 }; R++;
 
       const summaryData = [
         ['Total Logs',    summary?.total          ?? 0],
@@ -308,68 +336,85 @@ export function AuditLogs() {
       ] as [string, number][];
 
       summaryData.forEach(([metric, val]) => {
-        setCell(R, 0, sc(metric, C.GREEN_PALE, C.GREEN_TEXT, { sz: 10 }));
-        setCell(R, 1, sc(val, C.GREEN_PALE, C.GREEN_DARK, { bold: true, sz: 10 }));
-        merges.push({ s: { r: R, c: 1 }, e: { r: R, c: COLS - 1 } });
-        for (let c = 2; c < COLS; c++) setCell(R, c, sc('', C.GREEN_PALE, C.GREEN_TEXT, { border: false }));
-        rowHeights[R] = { hpt: 18 }; R++;
+        twoCol(R,
+          `    ${metric}`, val,
+          C.GREEN_PALE, C.GREEN_TEXT,
+          C.GREEN_PALE, C.GREEN_DARK,
+          { sz: 10, border: false },
+          { bold: true, sz: 11, center: true, border: false },
+        );
+        rowHeights[R] = { hpt: 22 }; R++;
       });
 
       // ── Action Breakdown ──
       if (summary?.by_action && Object.keys(summary.by_action).length) {
-        mergeRow(R, '', C.WHITE, C.WHITE, { border: false }); rowHeights[R] = { hpt: 8 }; R++;
-        mergeRow(R, '  Action Breakdown', C.GREEN_MID, C.WHITE, { bold: true, sz: 10, border: false });
-        rowHeights[R] = { hpt: 20 }; R++;
-        ['Action', 'Count'].forEach((h, c) => setCell(R, c, sc(h, C.GREEN_DARK, C.WHITE, { bold: true, center: true })));
-        for (let c = 2; c < COLS; c++) setCell(R, c, sc('', C.GREEN_DARK, C.WHITE, { border: false }));
-        merges.push({ s: { r: R, c: 1 }, e: { r: R, c: COLS - 1 } });
-        rowHeights[R] = { hpt: 18 }; R++;
+        mergeRow(R, '', C.WHITE, C.WHITE, { border: false }); rowHeights[R] = { hpt: 12 }; R++;
+        mergeRow(R, '    Action Breakdown', C.GREEN_MID, C.WHITE, { bold: true, sz: 10, border: false });
+        rowHeights[R] = { hpt: 24 }; R++;
+        twoCol(R,
+          '  Action', 'Count',
+          C.GREEN_DARK, C.WHITE,
+          C.GREEN_DARK, C.WHITE,
+          { bold: true, sz: 10, border: false },
+          { bold: true, sz: 10, center: true, border: false },
+        );
+        rowHeights[R] = { hpt: 22 }; R++;
         Object.entries(summary.by_action)
           .sort(([, a], [, b]) => (b as number) - (a as number))
           .forEach(([action, count]) => {
             const [abg, afg] = ACTION_COLORS[action] ?? ['F3F4F6', '374151'];
-            setCell(R, 0, sc(action, abg, afg, { bold: true, sz: 10, center: true }));
-            setCell(R, 1, sc(count as number, C.GREEN_PALE, C.GREEN_DARK, { bold: true, sz: 10 }));
-            merges.push({ s: { r: R, c: 1 }, e: { r: R, c: COLS - 1 } });
-            for (let c = 2; c < COLS; c++) setCell(R, c, sc('', C.GREEN_PALE, C.GREEN_TEXT, { border: false }));
-            rowHeights[R] = { hpt: 18 }; R++;
+            twoCol(R,
+              `    ${action}`, count as number,
+              abg, afg,
+              C.GREEN_PALE, C.GREEN_DARK,
+              { bold: true, sz: 10, border: false },
+              { bold: true, sz: 11, center: true, border: false },
+            );
+            rowHeights[R] = { hpt: 22 }; R++;
           });
       }
 
       // ── Entity Breakdown ──
       if (summary?.by_entity && Object.keys(summary.by_entity).length) {
-        mergeRow(R, '', C.WHITE, C.WHITE, { border: false }); rowHeights[R] = { hpt: 8 }; R++;
-        mergeRow(R, '  Entity Breakdown', C.GREEN_MID, C.WHITE, { bold: true, sz: 10, border: false });
-        rowHeights[R] = { hpt: 20 }; R++;
-        ['Entity', 'Count'].forEach((h, c) => setCell(R, c, sc(h, C.GREEN_DARK, C.WHITE, { bold: true, center: true })));
-        for (let c = 2; c < COLS; c++) setCell(R, c, sc('', C.GREEN_DARK, C.WHITE, { border: false }));
-        merges.push({ s: { r: R, c: 1 }, e: { r: R, c: COLS - 1 } });
-        rowHeights[R] = { hpt: 18 }; R++;
+        mergeRow(R, '', C.WHITE, C.WHITE, { border: false }); rowHeights[R] = { hpt: 12 }; R++;
+        mergeRow(R, '    Entity Breakdown', C.GREEN_MID, C.WHITE, { bold: true, sz: 10, border: false });
+        rowHeights[R] = { hpt: 24 }; R++;
+        twoCol(R,
+          '  Entity', 'Count',
+          C.GREEN_DARK, C.WHITE,
+          C.GREEN_DARK, C.WHITE,
+          { bold: true, sz: 10, border: false },
+          { bold: true, sz: 10, center: true, border: false },
+        );
+        rowHeights[R] = { hpt: 22 }; R++;
         Object.entries(summary.by_entity)
           .sort(([, a], [, b]) => (b as number) - (a as number))
           .forEach(([entity, count]) => {
             const [ebg, efg] = ENTITY_COLORS[entity] ?? ['F3F4F6', '374151'];
-            setCell(R, 0, sc(entity, ebg, efg, { bold: true, sz: 10, center: true }));
-            setCell(R, 1, sc(count as number, C.GREEN_PALE, C.GREEN_DARK, { bold: true, sz: 10 }));
-            merges.push({ s: { r: R, c: 1 }, e: { r: R, c: COLS - 1 } });
-            for (let c = 2; c < COLS; c++) setCell(R, c, sc('', C.GREEN_PALE, C.GREEN_TEXT, { border: false }));
-            rowHeights[R] = { hpt: 18 }; R++;
+            twoCol(R,
+              `    ${entity}`, count as number,
+              ebg, efg,
+              C.GREEN_PALE, C.GREEN_DARK,
+              { bold: true, sz: 10, border: false },
+              { bold: true, sz: 11, center: true, border: false },
+            );
+            rowHeights[R] = { hpt: 22 }; R++;
           });
       }
 
       // ─── Spacer ───
-      mergeRow(R, '', C.WHITE, C.WHITE, { border: false }); rowHeights[R] = { hpt: 14 }; R++;
+      mergeRow(R, '', C.WHITE, C.WHITE, { border: false }); rowHeights[R] = { hpt: 20 }; R++;
 
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
       // AUDIT LOG RECORDS
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-      mergeRow(R, '  AUDIT LOG RECORDS', C.GREEN_DARK, C.WHITE, { bold: true, sz: 12, border: false });
-      rowHeights[R] = { hpt: 28 }; R++;
+      mergeRow(R, '    AUDIT LOG RECORDS', C.GREEN_DARK, C.WHITE, { bold: true, sz: 13, border: false });
+      rowHeights[R] = { hpt: 34 }; R++;
 
       // Column headers
       const COL_HEADERS = ['#', 'Timestamp', 'Entity', 'Entity ID', 'Action', 'Activity', 'Actor Name', 'Actor Email', 'IP Address', 'Changes (JSON)'];
       COL_HEADERS.forEach((h, c) => setCell(R, c, sc(h, C.GREEN_DARK, C.WHITE, { bold: true, center: true, sz: 10 })));
-      rowHeights[R] = { hpt: 24 }; R++;
+      rowHeights[R] = { hpt: 28 }; R++;
 
       // Data rows
       logs.forEach((log, i) => {
@@ -388,13 +433,18 @@ export function AuditLogs() {
         setCell(R, 7, sc(log.actor_email,              rowBg,  '6B7280', { sz: 10 }));
         setCell(R, 8, sc(log.ip_address ?? '',         rowBg,  '6B7280', { sz: 10, center: true }));
         setCell(R, 9, sc(changesStr,                   rowBg,  '374151', { sz: 9,  wrap: true }));
-        rowHeights[R] = { hpt: 20 }; R++;
+        // auto-size: longer content gets taller rows
+        const actLen = (log.activity || '').length;
+        const chgLen = changesStr.length;
+        const maxLen = Math.max(actLen, chgLen);
+        const rh = maxLen > 120 ? 48 : maxLen > 60 ? 36 : 28;
+        rowHeights[R] = { hpt: rh }; R++;
       });
 
       // ─── Footer ───
-      mergeRow(R, '', C.WHITE, C.WHITE, { border: false }); rowHeights[R] = { hpt: 10 }; R++;
+      mergeRow(R, '', C.WHITE, C.WHITE, { border: false }); rowHeights[R] = { hpt: 16 }; R++;
       mergeRow(R, `   End of Report  •  ${logs.length} records exported  •  Generated ${dateStr} ${timeStr}`, C.GREEN_DARK, C.WHITE, { italic: true, sz: 9, center: true, border: false });
-      rowHeights[R] = { hpt: 20 }; R++;
+      rowHeights[R] = { hpt: 26 }; R++;
 
       // ─── Sheet metadata ───
       ws['!ref']    = XLSXStyle.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: R - 1, c: COLS - 1 } });
