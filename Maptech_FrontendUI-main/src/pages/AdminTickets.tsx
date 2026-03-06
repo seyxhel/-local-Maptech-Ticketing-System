@@ -197,7 +197,7 @@ export function AdminTickets() {
                     ) : ticket.totalSla === 0 ? (
                       <span className="text-xs text-gray-400 dark:text-gray-500">No SLA</span>
                     ) : (
-                      <SLATimer hoursRemaining={ticket.sla} totalHours={ticket.totalSla} />
+                      <SLATimer hoursRemaining={ticket.sla} totalHours={ticket.totalSla} status={ticket.status} />
                     )}
                   </td>
                   <td className="px-6 py-4">

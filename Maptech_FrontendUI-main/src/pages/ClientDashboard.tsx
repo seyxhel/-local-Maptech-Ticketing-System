@@ -83,7 +83,8 @@ export function ClientDashboard() {
                     {ticket.status !== 'Resolved' && ticket.status !== 'Closed' &&
                   <SLATimer
                     hoursRemaining={ticket.sla}
-                    totalHours={ticket.total} />
+                    totalHours={ticket.total}
+                    status={ticket.status} />
 
                   }
                     {ticket.status === 'Resolved' &&

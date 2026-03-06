@@ -132,7 +132,7 @@ export function EmployeeMyTickets() {
                   <td className="px-4 py-3"><StatusBadge status={ticket.status} /></td>
                   <td className="px-4 py-3">
                     {ticket.status !== 'Resolved' && ticket.status !== 'Closed' && (
-                      <SLATimer hoursRemaining={ticket.sla} totalHours={ticket.total} />
+                      <SLATimer hoursRemaining={ticket.sla} totalHours={ticket.total} status={ticket.status} />
                     )}
                     {ticket.status === 'Resolved' && (
                       <span className="text-xs text-green-600 dark:text-green-400 font-medium">✓ Resolved</span>

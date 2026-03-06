@@ -15,7 +15,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { TicketChatSocket } from '../services/chatService';
 import type { ChatMessage, ChatEvent, ChatAttachment } from '../services/chatService';
-import { fetchTicketByStf, fetchTicketById, uploadResolutionProof, deleteAttachment, closeTicket, updateEmployeeFields, saveProductDetails, escalateTicket, escalateExternal, startWork, createCSATFeedback, updateTicket, deleteTicket as apiDeleteTicket, fetchProducts, submitForObservation, markUnresolved } from '../services/api';
+import { fetchTicketByStf, fetchTicketById, uploadResolutionProof, deleteAttachment, closeTicket, updateEmployeeFields, saveProductDetails, escalateTicket, escalateExternal, startWork, createCSATFeedback, updateTicket, deleteTicket as apiDeleteTicket, fetchProducts, submitForObservation } from '../services/api';
 import type { Product } from '../services/api';
 import { toast } from 'sonner';
 import type { BackendTicket } from '../services/api';
@@ -70,9 +70,11 @@ type TrackerStepState = 'done' | 'active' | 'skipped' | 'pending';
 function computeTrackerStates(
   backendStatus: string,
   timeIn: string | null,
+  wasObserved: boolean,
+  wasEscalated: boolean,
 ): Record<string, TrackerStepState> {
   const s = backendStatus;
-  const started = !!(timeIn || ['in_progress','for_observation','escalated','escalated_external','pending_closure','closed','unresolved'].includes(s));
+  const started = !!(timeIn || ['in_progress','for_observation','escalated','pending_closure','closed','unresolved'].includes(s));
 
   if (!started) return {
     assigned: 'active', in_progress: 'pending', observation: 'pending', escalated: 'pending', resolved: 'pending', closed: 'pending',
@@ -80,18 +82,18 @@ function computeTrackerStates(
   if (s === 'for_observation') return {
     assigned: 'done', in_progress: 'done', observation: 'active', escalated: 'pending', resolved: 'pending', closed: 'pending',
   };
-  if (s === 'escalated' || s === 'escalated_external') return {
-    assigned: 'done', in_progress: 'done', observation: 'skipped', escalated: 'active', resolved: 'pending', closed: 'pending',
+  if (s === 'escalated') return {
+    assigned: 'done', in_progress: 'done', observation: wasObserved ? 'done' : 'skipped', escalated: 'active', resolved: 'pending', closed: 'pending',
   };
   if (s === 'pending_closure') return {
-    assigned: 'done', in_progress: 'done', observation: 'skipped', escalated: 'skipped', resolved: 'active', closed: 'pending',
+    assigned: 'done', in_progress: 'done', observation: wasObserved ? 'done' : 'skipped', escalated: wasEscalated ? 'done' : 'skipped', resolved: 'active', closed: 'pending',
   };
   if (s === 'closed' || s === 'unresolved') return {
-    assigned: 'done', in_progress: 'done', observation: 'skipped', escalated: 'skipped', resolved: 'done', closed: 'done',
+    assigned: 'done', in_progress: 'done', observation: wasObserved ? 'done' : 'skipped', escalated: wasEscalated ? 'done' : 'skipped', resolved: 'done', closed: 'done',
   };
   // in_progress or has time_in
   return {
-    assigned: 'done', in_progress: 'active', observation: 'pending', escalated: 'pending', resolved: 'pending', closed: 'pending',
+    assigned: 'done', in_progress: 'active', observation: wasObserved ? 'done' : 'pending', escalated: wasEscalated ? 'done' : 'pending', resolved: 'pending', closed: 'pending',
   };
 }
 
@@ -144,8 +146,10 @@ function renderTrackerIcon(key: string, state: TrackerStepState): React.ReactEle
 const TicketProgressTracker: React.FC<{
   backendStatus: string;
   timeIn: string | null;
-}> = ({ backendStatus, timeIn }) => {
-  const states = computeTrackerStates(backendStatus, timeIn);
+  wasObserved: boolean;
+  wasEscalated: boolean;
+}> = ({ backendStatus, timeIn, wasObserved, wasEscalated }) => {
+  const states = computeTrackerStates(backendStatus, timeIn, wasObserved, wasEscalated);
   return (
     <div className="flex items-start w-full">
       {TRACKER_STEPS.map((step, idx) => {
@@ -597,6 +601,7 @@ export function TicketView() {
   const [remarksText, setRemarksText] = useState(ticket.remarks || '');
   const [savingFields, setSavingFields] = useState(false);
   const [closingTicket, setClosingTicket] = useState(false);
+  const [showCloseConfirmModal, setShowCloseConfirmModal] = useState(false);
 
   // Admin edit/delete modal state
   const [adminEditOpen, setAdminEditOpen] = useState(false);
@@ -690,16 +695,13 @@ export function TicketView() {
   // Fields are only editable by the assigned employee AND ticket is not Resolved/Closed
   // Admins can also edit fields when the ticket is escalated (to process it like an employee)
   const isAssignedEmployee = isEmployee && btData?.assigned_to?.id === user?.id;
-  const isAdminProcessingEscalated = isAdmin && (btData?.status === 'escalated' || btData?.status === 'escalated_external');
+  const isAdminProcessingEscalated = isAdmin && btData?.assigned_to?.id === user?.id;
   /** Admin or assigned employee who is actively processing this ticket */
   const canProcessTicket = isAssignedEmployee || isAdminProcessingEscalated;
-  const canEdit = (canProcessTicket) && ticket.status !== 'Resolved' && ticket.status !== 'Closed' && ticket.status !== 'Unresolved';
+  const canEdit = (canProcessTicket) && ticket.status !== 'Resolved' && ticket.status !== 'Closed';
 
   const [savingProductDetails, setSavingProductDetails] = useState(false);
   const [submittingObservation, setSubmittingObservation] = useState(false);
-  const [markingUnresolved, setMarkingUnresolved] = useState(false);
-  const [showUnresolvedModal, setShowUnresolvedModal] = useState(false);
-  const [unresolvedNotes, setUnresolvedNotes] = useState('');
 
 
   /** Employee saves product details only (no status change) */
@@ -770,31 +772,6 @@ export function TicketView() {
     }
   };
 
-  /** Employee marks ticket as unresolved */
-  const handleMarkUnresolved = async () => {
-    if (!backendTicketId) return;
-    setMarkingUnresolved(true);
-    try {
-      const updated = await markUnresolved(backendTicketId, {
-        notes: unresolvedNotes,
-        action_taken: actionTaken,
-        remarks: remarksText,
-        observation: observation,
-        job_status: jobStatus,
-        signature: signatureData || '',
-        signed_by_name: signedByName,
-      });
-      setBtData(updated);
-      setShowUnresolvedModal(false);
-      setUnresolvedNotes('');
-      toast.success('Ticket marked as unresolved.');
-    } catch (err: any) {
-      toast.error(err?.message || 'Failed to mark ticket as unresolved.');
-    } finally {
-      setMarkingUnresolved(false);
-    }
-  };
-
   /** Employee escalates the ticket */
   const handleEscalateTicket = async () => {
     let hasErr = false;
@@ -809,8 +786,8 @@ export function TicketView() {
         toast.success('Ticket escalated to supervisor. It will be reassigned.');
       } else {
         const updated = await escalateExternal(backendTicketId, {
-          external_escalated_to: escalateTo.trim(),
-          external_escalation_notes: escalateNotes,
+          escalated_to: escalateTo.trim(),
+          notes: escalateNotes,
         });
         setBtData(updated);
         toast.success(`Ticket escalated externally to "${escalateTo.trim()}".`);
@@ -830,7 +807,7 @@ export function TicketView() {
   /** Admin closes the ticket */
   const handleCloseTicket = async () => {
     if (!backendTicketId) return;
-    if (!confirm('Are you sure you want to close this ticket?')) return;
+    setShowCloseConfirmModal(false);
     setClosingTicket(true);
     try {
       const updated = await closeTicket(backendTicketId);
@@ -1259,9 +1236,10 @@ export function TicketView() {
           </GreenButton>
         </div>
         <div className="flex items-center gap-2">
-          {isAssignedEmployee && ticket.status !== 'Closed' && ticket.status !== 'Escalated' && ticket.status !== 'Resolved' && (
+          {/* Employee or admin: escalate (internal or external) when not already escalated/closed/resolved */}
+          {canProcessTicket && ticket.status !== 'Closed' && ticket.status !== 'Escalated' && ticket.status !== 'Resolved' && (
             <button
-              onClick={() => setShowEscalateModal(true)}
+              onClick={() => { setEscalateType('internal'); setShowEscalateModal(true); }}
               title="Escalate Ticket"
               aria-label="Escalate ticket"
               className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium transition-colors"
@@ -1331,6 +1309,8 @@ export function TicketView() {
               {React.createElement(TicketProgressTracker, {
                 backendStatus: btData?.status || 'open',
                 timeIn: btData?.time_in || null,
+                wasObserved: !!(btData?.observation),
+                wasEscalated: !!(btData?.escalation_logs?.some((l: any) => l.escalation_type === 'internal')),
               })}
               {ticket.slaEstimatedDays ? (
                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-3">
@@ -1350,6 +1330,20 @@ export function TicketView() {
                   {ticket.cascadeType === 'internal' ? <Shield className="w-3 h-3" /> : <Share2 className="w-3 h-3" />}
                   {ticket.cascadeType === 'internal' ? 'Internal Cascade' : 'External Cascade'}
                 </span>
+              </div>
+            )}
+
+            {/* External Escalation Tag */}
+            {btData?.external_escalated_to && (
+              <div className="mb-5 p-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-500/30 rounded-xl">
+                <div className="flex items-center gap-2 mb-1">
+                  <Share2 className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-purple-700 dark:text-purple-400">Escalated to External</span>
+                </div>
+                <p className="text-sm font-medium text-purple-800 dark:text-purple-300">{btData.external_escalated_to}</p>
+                {btData.external_escalation_notes && (
+                  <p className="text-xs text-purple-600 dark:text-purple-400 mt-1">{btData.external_escalation_notes}</p>
+                )}
               </div>
             )}
 
@@ -1420,6 +1414,19 @@ export function TicketView() {
                   {ticket.description}
                 </p>
               </div>
+              {/* External Escalation Info — shown when ticket is tagged as externally escalated */}
+              {btData?.external_escalated_to && (
+                <>
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wider text-purple-600 dark:text-purple-400 mb-1">Escalated To (External)</div>
+                    <div className="text-gray-900 dark:text-gray-100">{btData.external_escalated_to}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wider text-purple-600 dark:text-purple-400 mb-1">Escalation Notes</div>
+                    <div className="text-gray-900 dark:text-gray-100">{btData.external_escalation_notes || 'N/A'}</div>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Product Details & Digital Signature — hidden for employee until Start Work is clicked; always shown for admin processing escalated */}
@@ -1836,8 +1843,8 @@ export function TicketView() {
           </Card>
           </>}
 
-          {/* Employee Performance Rating (visible to admin only) */}
-          {isAdmin && <Card>
+          {/* Employee Performance Rating (visible to admin only, hidden when admin is processing their own escalated ticket) */}
+          {isAdmin && !isAdminProcessingEscalated && <Card>
             <h3 className="text-xs font-bold uppercase tracking-wider text-[#0E8F79] mb-3 flex items-center gap-2">
               <Star className="w-4 h-4" /> Technical Performance Rating
             </h3>
@@ -1942,27 +1949,11 @@ export function TicketView() {
                 </button>
               )}
 
-              {/* Mark Unresolved — shown to assigned employee or admin processing escalated ticket */}
-              {canProcessTicket && (ticket.status === 'In Progress' || ticket.status === 'For Observation' || ticket.status === 'Escalated') && (
+              {/* Admin: Close Ticket */}
+              {isAdmin && ticket.status === 'Resolved' && (
                 <button
                   type="button"
-                  disabled={markingUnresolved}
-                  onClick={() => setShowUnresolvedModal(true)}
-                  className="w-full py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-red-400 to-red-500 hover:shadow-lg hover:shadow-red-400/20 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all text-sm"
-                >
-                  {markingUnresolved ? (
-                    <><Loader2 className="w-4 h-4 animate-spin" /> Marking...</>
-                  ) : (
-                    <><AlertTriangle className="w-4 h-4" /> Mark Unresolved</>
-                  )}
-                </button>
-              )}
-
-              {/* Admin: Close Ticket (triggers rating modal) */}
-              {isAdmin && (ticket.status === 'Resolved' || ticket.status === 'Unresolved') && (
-                <button
-                  type="button"
-                  onClick={() => setShowCsatModal(true)}
+                  onClick={() => isAdminProcessingEscalated ? setShowCloseConfirmModal(true) : setShowCsatModal(true)}
                   className="w-full py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-red-500 to-red-600 hover:shadow-lg hover:shadow-red-500/20 flex items-center justify-center gap-2 transition-all text-sm"
                 >
                   <X className="w-4 h-4" /> Close Ticket
@@ -2729,47 +2720,46 @@ export function TicketView() {
         document.body
       )}
 
-      {/* ── Mark Unresolved Modal ── */}
-      {showUnresolvedModal && createPortal(
+      {/* ── Close Ticket Confirmation Modal ── */}
+      {showCloseConfirmModal && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white dark:bg-[#0f172a] border border-gray-200 dark:border-white/10 rounded-2xl w-full max-w-md shadow-2xl">
+          <div className="bg-white dark:bg-[#0f172a] border border-gray-200 dark:border-white/10 rounded-2xl w-full max-w-sm shadow-2xl">
+            {/* Header */}
             <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-200 dark:border-white/10">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center">
-                  <AlertTriangle className="w-4 h-4 text-red-400" />
+                  <AlertTriangle className="w-4 h-4 text-red-500" />
                 </div>
-                <div>
-                  <h3 className="text-gray-900 dark:text-white font-semibold text-sm">Mark as Unresolved</h3>
-                  <p className="text-gray-400 dark:text-white/40 text-xs">This ticket could not be resolved at this time</p>
-                </div>
+                <h3 className="text-gray-900 dark:text-white font-semibold text-sm">Close Ticket</h3>
               </div>
-              <button onClick={() => setShowUnresolvedModal(false)} className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 flex items-center justify-center text-gray-400 dark:text-white/50 hover:text-gray-600 dark:hover:text-white transition-all">
+              <button onClick={() => setShowCloseConfirmModal(false)} className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 flex items-center justify-center text-gray-400 dark:text-white/50 hover:text-gray-600 dark:hover:text-white transition-all">
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="px-6 py-5 space-y-4">
-              <div>
-                <label className="block text-xs text-gray-500 dark:text-white/50 font-medium mb-1.5 uppercase tracking-wider">Reason / Notes (Optional)</label>
-                <textarea
-                  value={unresolvedNotes}
-                  onChange={(e) => setUnresolvedNotes(e.target.value)}
-                  rows={3}
-                  placeholder="Describe why this ticket is being marked as unresolved..."
-                  className="w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white text-sm placeholder-gray-300 dark:placeholder-white/20 focus:outline-none focus:border-red-500/60 resize-none transition-colors"
-                />
-              </div>
+            {/* Body */}
+            <div className="px-6 py-5">
+              <p className="text-sm text-gray-600 dark:text-gray-300">Are you sure you want to close this ticket? This action cannot be undone.</p>
             </div>
+            {/* Footer */}
             <div className="flex items-center gap-3 px-6 pb-6">
-              <button type="button" onClick={() => setShowUnresolvedModal(false)} className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-white/10 text-gray-500 dark:text-white/60 hover:text-gray-700 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-white/5 text-sm font-medium transition-all">
+              <button
+                type="button"
+                onClick={() => setShowCloseConfirmModal(false)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-white/10 text-gray-500 dark:text-white/60 hover:text-gray-700 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-white/5 text-sm font-medium transition-all"
+              >
                 Cancel
               </button>
               <button
                 type="button"
-                disabled={markingUnresolved}
-                onClick={handleMarkUnresolved}
+                disabled={closingTicket}
+                onClick={handleCloseTicket}
                 className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-red-500 to-red-600 text-white text-sm font-semibold hover:shadow-lg hover:shadow-red-500/20 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all"
               >
-                {markingUnresolved ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Marking...</> : <><AlertTriangle className="w-3.5 h-3.5" /> Confirm Unresolved</>}
+                {closingTicket ? (
+                  <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Closing...</>
+                ) : (
+                  <><X className="w-3.5 h-3.5" /> Close Ticket</>
+                )}
               </button>
             </div>
           </div>
@@ -2802,7 +2792,19 @@ export function TicketView() {
 
             {/* Body */}
             <div className="px-6 py-5 space-y-4">
-              {/* Escalation Type */}
+              {/* Escalation Type — employees choose internal/external; admins are locked to external */}
+              {isAdmin ? (
+                <div>
+                  <label className="block text-xs text-gray-500 dark:text-white/50 font-medium mb-2 uppercase tracking-wider">Escalation Type</label>
+                  <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-orange-500 bg-orange-500/10 text-orange-500 dark:text-orange-400 text-sm font-medium">
+                    <Share2 className="w-4 h-4" />
+                    External
+                  </div>
+                  <p className="mt-1.5 text-xs text-gray-400 dark:text-white/30">
+                    Escalate to an external distributor or vendor.
+                  </p>
+                </div>
+              ) : (
               <div>
                 <label className="block text-xs text-gray-500 dark:text-white/50 font-medium mb-2 uppercase tracking-wider">Escalation Type</label>
                 <div className="grid grid-cols-2 gap-2">
@@ -2820,15 +2822,18 @@ export function TicketView() {
                   </button>
                   <button
                     type="button"
+                    disabled={!!btData?.external_escalated_to}
                     onClick={() => setEscalateType('external')}
                     className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${
-                      escalateType === 'external'
-                        ? 'border-orange-500 bg-orange-500/10 text-orange-500 dark:text-orange-400'
-                        : 'border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 text-gray-500 dark:text-white/60 hover:bg-gray-100 dark:hover:bg-white/10'
+                      btData?.external_escalated_to
+                        ? 'border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-white/5 text-gray-300 dark:text-white/20 cursor-not-allowed'
+                        : escalateType === 'external'
+                          ? 'border-orange-500 bg-orange-500/10 text-orange-500 dark:text-orange-400'
+                          : 'border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 text-gray-500 dark:text-white/60 hover:bg-gray-100 dark:hover:bg-white/10'
                     }`}
                   >
                     <Share2 className="w-4 h-4" />
-                    External
+                    External {btData?.external_escalated_to ? '(Done)' : ''}
                   </button>
                 </div>
                 <p className="mt-1.5 text-xs text-gray-400 dark:text-white/30">
@@ -2837,6 +2842,7 @@ export function TicketView() {
                     : 'Escalate to an external distributor or vendor.'}
                 </p>
               </div>
+              )}
 
               {/* External: Distributor/Vendor field */}
               {escalateType === 'external' && (

@@ -172,7 +172,7 @@ class TicketViewSet(viewsets.ModelViewSet):
             'pass_ticket':              [IsAuthenticated(), IsAssignedEmployee()],
             'request_closure':          [IsAuthenticated(), IsAssignedEmployee()],
             # Admin or assigned employee
-            'escalate_external':        [IsAuthenticated(), IsAssignedEmployee()],
+            'escalate_external':        [IsAuthenticated(), IsAdminOrAssignedEmployee()],
             'upload_resolution_proof':  [IsAuthenticated(), IsAdminOrAssignedEmployee()],
             'update_task':              [IsAuthenticated(), IsAdminOrAssignedEmployee()],
             # Admin or assigned employee — processing actions
@@ -180,7 +180,6 @@ class TicketViewSet(viewsets.ModelViewSet):
             'submit_for_observation':   [IsAuthenticated(), IsAdminOrAssignedEmployee()],
             'update_employee_fields':   [IsAuthenticated(), IsAdminOrAssignedEmployee()],
             'save_product_details':     [IsAuthenticated(), IsAdminOrAssignedEmployee()],
-            'mark_unresolved':          [IsAuthenticated(), IsAdminOrAssignedEmployee()],
             # Admin: link tickets
             'link_tickets':             [IsAuthenticated(), IsAdminLevel()],
             # Delete attachment (resolution proofs)
@@ -197,7 +196,6 @@ class TicketViewSet(viewsets.ModelViewSet):
         reassignable_statuses = [
             Ticket.STATUS_OPEN,
             Ticket.STATUS_ESCALATED,
-            Ticket.STATUS_ESCALATED_EXTERNAL,
         ]
         if ticket.status not in reassignable_statuses:
             return Response(
@@ -316,8 +314,12 @@ class TicketViewSet(viewsets.ModelViewSet):
         )
 
         ticket.status = Ticket.STATUS_ESCALATED
-        ticket.assigned_to = None
-        ticket.current_session = None
+
+        # Assign ticket to the admin who originally created it
+        admin_creator = ticket.created_by
+        new_session = AssignmentSession.objects.create(ticket=ticket, employee=admin_creator)
+        ticket.assigned_to = admin_creator
+        ticket.current_session = new_session
         ticket.save()
 
         # System message
@@ -542,7 +544,7 @@ class TicketViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def escalate_external(self, request, pk=None):
         """Admin or assigned employee escalates to distributor/principal (external).
-        Once externally escalated, the ticket cannot bounce back — resolution must occur externally."""
+        The ticket is tagged as externally escalated but continues normal processing."""
         user = request.user
         ticket = self.get_object()
 
@@ -559,7 +561,7 @@ class TicketViewSet(viewsets.ModelViewSet):
             notes=notes,
         )
 
-        ticket.status = Ticket.STATUS_ESCALATED_EXTERNAL
+        # Tag as externally escalated but keep current status unchanged
         ticket.external_escalated_to = escalated_to
         ticket.external_escalation_notes = notes
         ticket.external_escalated_at = timezone.now()
@@ -593,7 +595,8 @@ class TicketViewSet(viewsets.ModelViewSet):
         # Require CSAT feedback before closing
         if not hasattr(ticket, 'csat_feedback') or not ticket.csat_feedback:
             # Allow closing without CSAT if no employee is assigned
-            if ticket.assigned_to:
+            # or if the admin processed the ticket themselves (assigned_to is the closer)
+            if ticket.assigned_to and ticket.assigned_to != request.user:
                 return Response(
                     {'detail': 'Please submit CSAT feedback for the employee before closing this ticket.'},
                     status=status.HTTP_400_BAD_REQUEST,
@@ -721,11 +724,10 @@ class TicketViewSet(viewsets.ModelViewSet):
         ticket = self.get_object()
         if not ticket.time_in:
             ticket.time_in = timezone.now()
-        # Allow transitioning from open OR from any escalated state back to in_progress
+        # Allow transitioning from open OR from escalated state back to in_progress
         processable_statuses = [
             Ticket.STATUS_OPEN,
             Ticket.STATUS_ESCALATED,
-            Ticket.STATUS_ESCALATED_EXTERNAL,
         ]
         if ticket.status in processable_statuses:
             ticket.status = Ticket.STATUS_IN_PROGRESS
@@ -734,46 +736,6 @@ class TicketViewSet(viewsets.ModelViewSet):
         self._audit_ticket(request, ticket, AuditLog.ACTION_UPDATE,
                            f"{request.user.email} started working on ticket {ticket.stf_no}",
                            changes={'time_in': str(ticket.time_in), 'status': ticket.status})
-
-        return Response(self.get_serializer(ticket).data)
-
-    @action(detail=True, methods=['post'], url_path='mark_unresolved')
-    def mark_unresolved(self, request, pk=None):
-        """Mark a ticket as unresolved (admin or assigned employee)."""
-        ticket = self.get_object()
-        user = request.user
-
-        allowed_fields = [
-            'action_taken', 'remarks', 'observation',
-            'job_status', 'signature', 'signed_by_name',
-        ]
-        for field in allowed_fields:
-            if field in request.data:
-                setattr(ticket, field, request.data[field])
-
-        old_status = ticket.status
-        ticket.status = Ticket.STATUS_UNRESOLVED
-        if not ticket.time_out:
-            ticket.time_out = timezone.now()
-        ticket.save()
-
-        sys_content = f"{user.get_full_name() or user.username} marked this ticket as unresolved."
-        notes = request.data.get('notes', '')
-        if notes:
-            sys_content += f" Notes: {notes}"
-        for ch in ['admin_employee']:
-            Message.objects.create(
-                ticket=ticket,
-                channel_type=ch,
-                sender=user,
-                content=sys_content,
-                is_system_message=True,
-            )
-            self._broadcast_system_message(ticket.id, ch, sys_content, user)
-
-        self._audit_ticket(request, ticket, AuditLog.ACTION_UPDATE,
-                           f"{user.email} marked ticket {ticket.stf_no} as unresolved (status: {old_status} → {ticket.status})",
-                           changes={f: request.data[f] for f in allowed_fields if f in request.data})
 
         return Response(self.get_serializer(ticket).data)
 

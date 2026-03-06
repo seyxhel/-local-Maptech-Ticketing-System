@@ -338,7 +338,7 @@ export async function escalateTicket(ticketId: number, data: { notes: string }):
 }
 
 /** External escalation. */
-export async function escalateExternal(ticketId: number, data: { external_escalated_to: string; external_escalation_notes: string }): Promise<BackendTicket> {
+export async function escalateExternal(ticketId: number, data: { escalated_to: string; notes: string }): Promise<BackendTicket> {
   const res = await fetch(`${API_BASE}/tickets/${ticketId}/escalate_external/`, {
     method: 'POST',
     headers: authHeaders(),
