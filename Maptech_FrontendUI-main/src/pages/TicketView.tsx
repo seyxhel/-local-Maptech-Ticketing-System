@@ -20,7 +20,7 @@ import type { Product } from '../services/api';
 import { toast } from 'sonner';
 import type { BackendTicket } from '../services/api';
 import { mapStatus, mapPriority, getAssigneeName, reverseMapStatus, reverseMapPriority } from '../services/ticketMapper';
-import { Loader2, Trash2, Star, Clock, PlayCircle, Eye, PenLine, Link2, AlertTriangle } from 'lucide-react';
+import { Loader2, Trash2, Star, Clock, PlayCircle, Eye, PenLine, Link2, AlertTriangle, Minus } from 'lucide-react';
 import { SignaturePad } from '../components/ui/SignaturePad';
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
@@ -63,6 +63,115 @@ function getInitials(name: string): string {
     .map((w) => w[0].toUpperCase())
     .join('');
 }
+
+// ── Ticket Progress Tracker ────────────────────────────────────────────────── //
+type TrackerStepState = 'done' | 'active' | 'skipped' | 'pending';
+
+function computeTrackerStates(
+  backendStatus: string,
+  timeIn: string | null,
+): Record<string, TrackerStepState> {
+  const s = backendStatus;
+  const started = !!(timeIn || ['in_progress','for_observation','escalated','escalated_external','pending_closure','closed','unresolved'].includes(s));
+
+  if (!started) return {
+    assigned: 'active', in_progress: 'pending', observation: 'pending', escalated: 'pending', resolved: 'pending', closed: 'pending',
+  };
+  if (s === 'for_observation') return {
+    assigned: 'done', in_progress: 'done', observation: 'active', escalated: 'pending', resolved: 'pending', closed: 'pending',
+  };
+  if (s === 'escalated' || s === 'escalated_external') return {
+    assigned: 'done', in_progress: 'done', observation: 'skipped', escalated: 'active', resolved: 'pending', closed: 'pending',
+  };
+  if (s === 'pending_closure') return {
+    assigned: 'done', in_progress: 'done', observation: 'skipped', escalated: 'skipped', resolved: 'active', closed: 'pending',
+  };
+  if (s === 'closed' || s === 'unresolved') return {
+    assigned: 'done', in_progress: 'done', observation: 'skipped', escalated: 'skipped', resolved: 'done', closed: 'done',
+  };
+  // in_progress or has time_in
+  return {
+    assigned: 'done', in_progress: 'active', observation: 'pending', escalated: 'pending', resolved: 'pending', closed: 'pending',
+  };
+}
+
+const TRACKER_STEPS: { key: string; label: string }[] = [
+  { key: 'assigned',    label: 'Assigned'         },
+  { key: 'in_progress', label: 'Start Work'        },
+  { key: 'observation', label: 'For Observation'   },
+  { key: 'escalated',   label: 'Escalated'         },
+  { key: 'resolved',    label: 'Resolved'          },
+  { key: 'closed',      label: 'Closed'            },
+];
+
+function stepCircleClass(key: string, state: TrackerStepState): string {
+  if (state === 'done') return 'bg-green-500 border-green-500';
+  if (state === 'active') {
+    if (key === 'observation') return 'bg-amber-500 border-amber-500 ring-4 ring-amber-100 dark:ring-amber-900/40';
+    if (key === 'escalated')   return 'bg-orange-500 border-orange-500 ring-4 ring-orange-100 dark:ring-orange-900/40';
+    if (key === 'resolved')    return 'bg-green-500 border-green-500 ring-4 ring-green-100 dark:ring-green-900/40';
+    if (key === 'closed')      return 'bg-green-600 border-green-600 ring-4 ring-green-100 dark:ring-green-900/40';
+    return 'bg-[#0E8F79] border-[#0E8F79] ring-4 ring-teal-100 dark:ring-teal-900/40';
+  }
+  if (state === 'skipped') return 'bg-gray-100 border-gray-300 dark:bg-gray-800 dark:border-gray-600';
+  return 'bg-white border-2 border-gray-300 dark:bg-gray-800 dark:border-gray-600';
+}
+
+function stepLabelClass(key: string, state: TrackerStepState): string {
+  if (state === 'done') return 'text-green-600 dark:text-green-400 font-semibold';
+  if (state === 'active') {
+    if (key === 'observation') return 'text-amber-600 dark:text-amber-400 font-bold';
+    if (key === 'escalated')   return 'text-orange-600 dark:text-orange-400 font-bold';
+    if (key === 'resolved')    return 'text-green-600 dark:text-green-400 font-bold';
+    if (key === 'closed')      return 'text-green-700 dark:text-green-300 font-bold';
+    return 'text-[#0E8F79] dark:text-teal-400 font-bold';
+  }
+  return 'text-gray-400 dark:text-gray-500';
+}
+
+function renderTrackerIcon(key: string, state: TrackerStepState): React.ReactElement {
+  if (state === 'done')    return <Check className="w-4 h-4 text-white" />;
+  if (state === 'skipped') return <Minus className="w-3.5 h-3.5 text-gray-400 dark:text-gray-600" />;
+  const cls = 'w-4 h-4 text-white';
+  if (key === 'assigned')    return <UserIcon className={cls} />;
+  if (key === 'in_progress') return <PlayCircle className={cls} />;
+  if (key === 'observation') return <Eye className={cls} />;
+  if (key === 'escalated')   return <AlertTriangle className={cls} />;
+  if (key === 'resolved')    return <CheckCircle className={cls} />;
+  return <CheckCheck className={cls} />;
+}
+
+const TicketProgressTracker: React.FC<{
+  backendStatus: string;
+  timeIn: string | null;
+}> = ({ backendStatus, timeIn }) => {
+  const states = computeTrackerStates(backendStatus, timeIn);
+  return (
+    <div className="flex items-start w-full">
+      {TRACKER_STEPS.map((step, idx) => {
+        const state = states[step.key];
+        const isLast = idx === TRACKER_STEPS.length - 1;
+        return (
+          <div key={step.key} className="flex items-start flex-1">
+            <div className="flex flex-col items-center flex-1">
+              <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${stepCircleClass(step.key, state)}`}>
+                {renderTrackerIcon(step.key, state)}
+              </div>
+              <span className={`text-[10px] mt-1.5 text-center leading-tight max-w-[56px] ${stepLabelClass(step.key, state)}`}>
+                {step.label}
+                {state === 'skipped' && <span className="block text-gray-400 dark:text-gray-500">N/A</span>}
+              </span>
+            </div>
+            {!isLast && (
+              <div className={`h-0.5 mt-4 w-full ${state === 'done' ? 'bg-green-400' : 'bg-gray-200 dark:bg-gray-700'}`} />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+// ──────────────────────────────────────────────────────────────────────────── //
 
 export function TicketView() {
   const { user } = useAuth();
@@ -1213,25 +1322,18 @@ export function TicketView() {
               </div>
             </div>
 
-            {/* Progress Bar */}
+            {/* Progress Tracker */}
             <div className="mb-5">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs font-semibold uppercase tracking-wider text-[#0E8F79]">Progress</span>
-                <span className="text-xs font-bold text-gray-700 dark:text-gray-300">{ticket.progressPercentage}%</span>
-              </div>
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
-                <div
-                  className={`h-2.5 rounded-full transition-all duration-500 ${
-                    ticket.progressPercentage >= 100 ? 'bg-green-500' : ticket.progressPercentage >= 50 ? 'bg-[#0E8F79]' : 'bg-yellow-500'
-                  }`}
-                  style={{ width: `${Math.min(ticket.progressPercentage, 100)}%` }}
-                />
-              </div>
-              {ticket.slaEstimatedDays && (
-                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+              <span className="text-xs font-semibold uppercase tracking-wider text-[#0E8F79] mb-3 block">Progress Tracker</span>
+              {React.createElement(TicketProgressTracker, {
+                backendStatus: btData?.status || 'open',
+                timeIn: btData?.time_in || null,
+              })}
+              {ticket.slaEstimatedDays ? (
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-3">
                   SLA Estimated Resolution: <span className="font-medium">{ticket.slaEstimatedDays} day{ticket.slaEstimatedDays !== 1 ? 's' : ''}</span>
                 </p>
-              )}
+              ) : null}
             </div>
 
             {/* Cascade Type Badge */}
@@ -1836,16 +1938,7 @@ export function TicketView() {
                   )}
                 </button>
               )}
-              {/* Employee: Mark Unresolved (only after observation) */}
-              {isAssignedEmployee && ticket.status === 'For Observation' && (
-                <button
-                  type="button"
-                  onClick={() => setShowUnresolvedModal(true)}
-                  className="w-full py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-rose-500 to-rose-600 hover:shadow-lg hover:shadow-rose-500/20 flex items-center justify-center gap-2 transition-all text-sm"
-                >
-                  <AlertTriangle className="w-4 h-4" /> Unresolved
-                </button>
-              )}
+
               {/* Admin: Close Ticket (triggers rating modal) */}
               {isAdmin && (ticket.status === 'Resolved' || ticket.status === 'Unresolved') && (
                 <button
@@ -2747,66 +2840,7 @@ export function TicketView() {
         </div>,
         document.body
       )}
-      {/* Unresolved Modal */}
-      {showUnresolvedModal && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white dark:bg-[#0f172a] border border-gray-200 dark:border-white/10 rounded-2xl w-full max-w-md shadow-2xl">
-            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-200 dark:border-white/10">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-rose-500/20 flex items-center justify-center">
-                  <AlertTriangle className="w-4 h-4 text-rose-400" />
-                </div>
-                <div>
-                  <h3 className="text-gray-900 dark:text-white font-semibold text-sm">Mark as Unresolved</h3>
-                  <p className="text-gray-400 dark:text-white/40 text-xs">This ticket could not be resolved</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowUnresolvedModal(false)}
-                className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 flex items-center justify-center text-gray-400 dark:text-white/50 hover:text-gray-600 dark:hover:text-white transition-all"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="px-6 py-5 space-y-4">
-              <div>
-                <label className="block text-xs text-gray-500 dark:text-white/50 font-medium mb-1.5 uppercase tracking-wider">
-                  Reason / Notes <span className="text-rose-400">*</span>
-                </label>
-                <textarea
-                  value={unresolvedNotes}
-                  onChange={e => setUnresolvedNotes(e.target.value)}
-                  rows={3}
-                  placeholder="Describe why this ticket cannot be resolved…"
-                  className="w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white text-sm placeholder-gray-300 dark:placeholder-white/20 focus:outline-none focus:border-rose-500/60 resize-none transition-colors"
-                />
-              </div>
-            </div>
-            <div className="flex items-center gap-3 px-6 pb-6">
-              <button
-                type="button"
-                onClick={() => { setShowUnresolvedModal(false); setUnresolvedNotes(''); }}
-                className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-white/10 text-gray-500 dark:text-white/60 hover:text-gray-700 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-white/5 text-sm font-medium transition-all"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={markingUnresolved || !unresolvedNotes.trim()}
-                onClick={handleMarkUnresolved}
-                className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-rose-500 to-rose-600 text-white text-sm font-semibold hover:shadow-lg hover:shadow-rose-500/20 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all"
-              >
-                {markingUnresolved ? (
-                  <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Submitting…</>
-                ) : (
-                  <><AlertTriangle className="w-3.5 h-3.5" /> Mark Unresolved</>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
+
 
       </>
       )}

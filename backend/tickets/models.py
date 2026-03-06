@@ -273,18 +273,22 @@ class Ticket(models.Model):
 
     @property
     def progress_percentage(self):
-        """Auto-calculate progress based on time elapsed vs SLA estimated resolution days."""
-        est_days = self.sla_estimated_days
-        if est_days <= 0:
-            return 0
-        start = self.time_in
-        if not start:
-            return 0
-        end = self.time_out or timezone.now()
-        elapsed = (end - start).total_seconds()
-        total_seconds = est_days * 24 * 3600
-        pct = (elapsed / total_seconds) * 100
-        return min(round(pct, 1), 100.0)
+        """Milestone-based progress reflecting the ticket's lifecycle stage."""
+        if self.status in (self.STATUS_CLOSED, self.STATUS_UNRESOLVED):
+            return 100
+        if self.status == self.STATUS_PENDING_CLOSURE:
+            return 90
+        if self.status in (self.STATUS_ESCALATED, self.STATUS_ESCALATED_EXTERNAL):
+            return 70
+        if self.status == self.STATUS_FOR_OBSERVATION:
+            return 60
+        if self.status == self.STATUS_IN_PROGRESS or self.time_in:
+            return 40
+        if self.assigned_to and self.confirmed_by_admin:
+            return 25
+        if self.confirmed_by_admin:
+            return 15
+        return 5
 
     @staticmethod
     def _generate_stf_no():
