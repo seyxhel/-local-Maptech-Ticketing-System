@@ -17,43 +17,148 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchCallLogs, type CallLog } from '../services/api';
+// @ts-ignore
+import XLSXStyle from 'xlsx-js-style';
 
 const PAGE_SIZE = 15;
 
-function escapeCsv(val: string | number | null | undefined): string {
-  if (val === null || val === undefined) return '';
-  const s = String(val);
-  if (s.includes(',') || s.includes('"') || s.includes('\n')) {
-    return `"${s.replace(/"/g, '""')}"`;
+function exportToXlsx(
+  logs: CallLog[],
+  stats: { totalCalls: number; activeCalls: number; completedCalls: number; avgDuration: number | null },
+  filters: { searchTerm: string; statusFilter: string; dateFrom: string; dateTo: string },
+) {
+  const now = new Date();
+  const dateStr = now.toISOString().slice(0, 10);
+  const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+
+  // Color palette (same as AuditLogs)
+  const C = {
+    GREEN_DARK: '0A7A68', GREEN_MID: '2FAD52', GREEN_PALE: 'E8FAF0',
+    GREEN_TEXT: '065F46', WHITE: 'FFFFFF', ALT_ROW: 'F0FDF4', BORDER_CLR: 'D1FAE5',
+  };
+
+  const STATUS_CLR: Record<string, [string, string]> = {
+    Active: ['FEF9C3', 'A16207'], Completed: ['DCFCE7', '166534'],
+  };
+
+  const THIN = (clr = C.BORDER_CLR) => ({ style: 'thin' as const, color: { rgb: clr } });
+  const allBorders = (clr = C.BORDER_CLR) => ({ top: THIN(clr), bottom: THIN(clr), left: THIN(clr), right: THIN(clr) });
+
+  type CellOpts = { bold?: boolean; italic?: boolean; sz?: number; center?: boolean; wrap?: boolean; border?: boolean };
+  const cellStyle = (bg: string, fg: string, opts?: CellOpts) => ({
+    fill: { fgColor: { rgb: bg } },
+    font: { name: 'Calibri', sz: opts?.sz ?? 11, color: { rgb: fg }, bold: !!opts?.bold, italic: !!opts?.italic },
+    alignment: { horizontal: opts?.center ? 'center' : 'left', vertical: 'center', wrapText: !!opts?.wrap },
+    ...(opts?.border !== false ? { border: allBorders() } : {}),
+  });
+
+  type XCell = { v: string | number; t: 's' | 'n'; s: object };
+  const sc = (v: string | number, bg: string, fg: string, opts?: CellOpts): XCell =>
+    ({ v, t: typeof v === 'number' ? 'n' : 's', s: cellStyle(bg, fg, opts) });
+
+  const ws: Record<string, unknown> = {};
+  const merges: { s: { r: number; c: number }; e: { r: number; c: number } }[] = [];
+  const COLS = 10;
+  const colWidths = [{ wch: 6 }, { wch: 12 }, { wch: 22 }, { wch: 22 }, { wch: 16 }, { wch: 22 }, { wch: 22 }, { wch: 14 }, { wch: 12 }, { wch: 40 }];
+  const rowHeights: { hpt: number }[] = [];
+  let R = 0;
+
+  const setCell = (r: number, c: number, cell: XCell) => {
+    ws[XLSXStyle.utils.encode_cell({ r, c })] = cell;
+  };
+
+  const mergeRow = (r: number, v: string, bg: string, fg: string, opts?: CellOpts) => {
+    setCell(r, 0, sc(v, bg, fg, { ...opts, border: false }));
+    for (let c = 1; c < COLS; c++) setCell(r, c, sc('', bg, fg, { ...opts, border: false }));
+    merges.push({ s: { r, c: 0 }, e: { r, c: COLS - 1 } });
+  };
+
+  const twoCol = (r: number, lbl: string, val: string, lOpts?: CellOpts, vOpts?: CellOpts) => {
+    setCell(r, 0, sc(lbl, C.GREEN_PALE, C.GREEN_TEXT, { bold: true, sz: 10, ...lOpts, border: false }));
+    for (let c = 1; c < 5; c++) setCell(r, c, sc('', C.GREEN_PALE, C.GREEN_TEXT, { ...lOpts, border: false }));
+    merges.push({ s: { r, c: 0 }, e: { r, c: 4 } });
+    setCell(r, 5, sc(val, C.WHITE, '374151', { center: true, sz: 11, ...vOpts, border: false }));
+    for (let c = 6; c < COLS; c++) setCell(r, c, sc('', C.WHITE, '374151', { ...vOpts, border: false }));
+    merges.push({ s: { r, c: 5 }, e: { r, c: COLS - 1 } });
+  };
+
+  // ─── Title ───
+  mergeRow(R, 'MAPTECH TICKETING SYSTEM  —  CALL LOGS REPORT', C.GREEN_DARK, C.WHITE, { bold: true, sz: 18, center: true });
+  rowHeights[R] = { hpt: 52 }; R++;
+  mergeRow(R, 'Call Logging Summary & Records', C.GREEN_MID, C.WHITE, { italic: true, sz: 11, center: true });
+  rowHeights[R] = { hpt: 28 }; R++;
+
+  // Info rows
+  twoCol(R, '   Generated', `${dateStr}  ${timeStr}`); rowHeights[R] = { hpt: 22 }; R++;
+  twoCol(R, '   Total Records', String(logs.length)); rowHeights[R] = { hpt: 22 }; R++;
+
+  // Active filters
+  const filterParts: string[] = [];
+  if (filters.statusFilter) filterParts.push(`Status: ${filters.statusFilter}`);
+  if (filters.dateFrom) filterParts.push(`From: ${filters.dateFrom}`);
+  if (filters.dateTo) filterParts.push(`To: ${filters.dateTo}`);
+  if (filters.searchTerm) filterParts.push(`Search: "${filters.searchTerm}"`);
+  if (filterParts.length > 0) {
+    twoCol(R, '   Filters Applied', filterParts.join('  |  ')); rowHeights[R] = { hpt: 22 }; R++;
   }
-  return s;
-}
 
-function exportToCsv(logs: CallLog[]) {
-  const headers = ['ID', 'Status', 'Admin', 'Client', 'Phone', 'Call Start', 'Call End', 'Duration (s)', 'Ticket ID', 'Notes'];
-  const rows = logs.map((l) => [
-    l.id,
-    l.call_end ? 'Completed' : 'Active',
-    l.admin_name,
-    l.client_name,
-    l.phone_number,
-    l.call_start,
-    l.call_end ?? '',
-    l.duration_seconds ?? '',
-    l.ticket ?? '',
-    l.notes,
-  ].map(escapeCsv).join(','));
+  // Spacer
+  mergeRow(R, '', C.WHITE, C.WHITE, { border: false }); rowHeights[R] = { hpt: 16 }; R++;
 
-  const csv = [headers.join(','), ...rows].join('\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `call_logs_${new Date().toISOString().slice(0, 10)}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+  // ─── SUMMARY ───
+  mergeRow(R, '     SUMMARY', C.GREEN_DARK, C.WHITE, { bold: true, sz: 13 }); rowHeights[R] = { hpt: 32 }; R++;
+  twoCol(R, '    Total Calls', String(stats.totalCalls), { sz: 11 }, { bold: true, sz: 12 }); rowHeights[R] = { hpt: 24 }; R++;
+  twoCol(R, '    Active / Ongoing', String(stats.activeCalls), { sz: 11 }, { bold: true, sz: 12 }); rowHeights[R] = { hpt: 24 }; R++;
+  twoCol(R, '    Completed', String(stats.completedCalls), { sz: 11 }, { bold: true, sz: 12 }); rowHeights[R] = { hpt: 24 }; R++;
+  const avgStr = stats.avgDuration !== null ? `${Math.round(stats.avgDuration)}s` : 'N/A';
+  twoCol(R, '    Average Duration', avgStr, { sz: 11 }, { bold: true, sz: 12 }); rowHeights[R] = { hpt: 24 }; R++;
+
+  // Spacer
+  mergeRow(R, '', C.WHITE, C.WHITE, { border: false }); rowHeights[R] = { hpt: 20 }; R++;
+
+  // ─── DATA SECTION HEADER ───
+  mergeRow(R, '     CALL LOG RECORDS', C.GREEN_DARK, C.WHITE, { bold: true, sz: 13 }); rowHeights[R] = { hpt: 34 }; R++;
+
+  // Column headers
+  const headers = ['#', 'Status', 'Admin', 'Client', 'Phone', 'Call Start', 'Call End', 'Duration', 'Ticket ID', 'Notes'];
+  headers.forEach((h, c) => setCell(R, c, sc(h, C.GREEN_MID, C.WHITE, { bold: true, sz: 10, center: true })));
+  rowHeights[R] = { hpt: 28 }; R++;
+
+  // Data rows
+  logs.forEach((l, i) => {
+    const bg = i % 2 === 0 ? C.WHITE : C.ALT_ROW;
+    const status = l.call_end ? 'Completed' : 'Active';
+    const [sBg, sFg] = STATUS_CLR[status] ?? [bg, '374151'];
+
+    setCell(R, 0, sc(i + 1, bg, '374151', { center: true, sz: 10 }));
+    setCell(R, 1, sc(status, sBg, sFg, { bold: true, center: true, sz: 10 }));
+    setCell(R, 2, sc(l.admin_name || '', bg, '374151', { sz: 10 }));
+    setCell(R, 3, sc(l.client_name || '', bg, '374151', { sz: 10 }));
+    setCell(R, 4, sc(l.phone_number || '', bg, '374151', { sz: 10 }));
+    setCell(R, 5, sc(l.call_start ? new Date(l.call_start).toLocaleString() : '', bg, '374151', { sz: 9 }));
+    setCell(R, 6, sc(l.call_end ? new Date(l.call_end).toLocaleString() : '', bg, '374151', { sz: 9 }));
+    setCell(R, 7, sc(l.duration_seconds != null ? `${l.duration_seconds}s` : '', bg, '374151', { center: true, sz: 10 }));
+    setCell(R, 8, sc(l.ticket != null ? String(l.ticket) : '', bg, '1D4ED8', { center: true, sz: 10 }));
+    setCell(R, 9, sc(l.notes || '', bg, '374151', { sz: 9, wrap: true }));
+
+    const notesLen = (l.notes || '').length;
+    rowHeights[R] = { hpt: notesLen > 120 ? 48 : notesLen > 60 ? 36 : 28 };
+    R++;
+  });
+
+  // Footer
+  mergeRow(R, `   End of Call Logs Report  •  ${logs.length} records  •  Generated ${dateStr} ${timeStr}`, C.GREEN_DARK, C.WHITE, { italic: true, sz: 9, center: true, border: false });
+  rowHeights[R] = { hpt: 26 }; R++;
+
+  // Sheet metadata
+  ws['!ref'] = XLSXStyle.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: R - 1, c: COLS - 1 } });
+  ws['!cols'] = colWidths;
+  ws['!rows'] = rowHeights;
+  ws['!merges'] = merges;
+
+  const wb = XLSXStyle.utils.book_new();
+  XLSXStyle.utils.book_append_sheet(wb, ws, 'Call Logs');
+  XLSXStyle.writeFile(wb, `call_logs_${dateStr}.xlsx`);
 }
 
 function formatDate(iso: string) {
@@ -171,7 +276,11 @@ export function CallLogs() {
     }
     setExporting(true);
     try {
-      exportToCsv(filtered);
+      exportToXlsx(
+        filtered,
+        { totalCalls, activeCalls, completedCalls, avgDuration },
+        { searchTerm, statusFilter, dateFrom, dateTo },
+      );
       toast.success(`Exported ${filtered.length} call log${filtered.length !== 1 ? 's' : ''}.`);
     } catch {
       toast.error('Export failed.');
