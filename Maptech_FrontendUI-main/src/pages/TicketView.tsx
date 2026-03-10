@@ -3056,11 +3056,25 @@ export function TicketView() {
                     External {btData?.external_escalated_to ? '(Done)' : ''}
                   </button>
                 </div>
-                <p className="mt-1.5 text-xs text-gray-400 dark:text-white/30">
-                  {escalateType === 'internal'
-                    ? 'Escalate to a supervisor for reassignment.'
-                    : 'Escalate to an external distributor or vendor.'}
-                </p>
+                <div className="mt-2 px-3 py-2.5 rounded-xl bg-orange-50 dark:bg-orange-900/10 border border-orange-100 dark:border-orange-500/20">
+                  {escalateType === 'internal' ? (
+                    <div className="flex gap-2">
+                      <Shield className="w-3.5 h-3.5 text-orange-400 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-xs font-semibold text-orange-500 dark:text-orange-400 mb-0.5">Internal Escalation</p>
+                        <p className="text-xs text-gray-500 dark:text-white/50 leading-relaxed">Routes this ticket to a supervisor or admin for review and reassignment. Use this when the issue is beyond your current level and requires higher-level internal support.</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Share2 className="w-3.5 h-3.5 text-orange-400 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-xs font-semibold text-orange-500 dark:text-orange-400 mb-0.5">External Escalation</p>
+                        <p className="text-xs text-gray-500 dark:text-white/50 leading-relaxed">Tags this ticket to an outside distributor or vendor for resolution. Use this when the issue requires third-party support, warranty service, or specialized external expertise.</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
               )}
 
