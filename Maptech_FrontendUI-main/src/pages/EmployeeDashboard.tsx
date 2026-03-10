@@ -10,6 +10,7 @@ import type { TicketStats } from '../services/api';
 import { mapBackendTicketToEmployee } from '../services/ticketMapper';
 import type { UIEmployeeTicket } from '../services/ticketMapper';
 import { useAuth } from '../context/AuthContext';
+import { AnnouncementBanner } from '../components/ui/AnnouncementBanner';
 import {
   CheckCircle,
   Clock,
@@ -78,6 +79,8 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
           Status: Online
         </div>
       </div>
+
+      <AnnouncementBanner />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <StatCard

@@ -18,6 +18,7 @@ import {
   ChevronRight as ChevronRightIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { AnnouncementBanner } from '../components/ui/AnnouncementBanner';
 import {
   fetchTickets,
   fetchTicketStats,
@@ -215,6 +216,8 @@ export function AdminDashboard() {
         </div>
         <GreenButton onClick={() => navigate('/admin/create-ticket')}>+ Create Ticket</GreenButton>
       </div>
+
+      <AnnouncementBanner />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <StatCard title="Unassigned" value={String(tickets.filter(t => !t.assignee).length)} icon={Ticket} color="orange" subtext="Needs immediate assignment" />

@@ -10,7 +10,8 @@ import {
   MessageSquare, ArrowLeft, Camera, Video, Upload, FileText, ClipboardList, Package,
   Paperclip, CheckCircle, Wifi, WifiOff, Send, X, Smile, Reply, ChevronDown,
   Search as SearchIcon, Check, CheckCheck, CornerDownRight, Maximize2, Minimize2,
-  User as UserIcon, Shield, Image, Film, File, Download, Play, ArrowUpRight, Share2
+  User as UserIcon, Shield, Image, Film, File, Download, Play, ArrowUpRight, Share2,
+  FileDown, FileSpreadsheet
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { TicketChatSocket } from '../services/chatService';
@@ -1043,6 +1044,108 @@ export function TicketView() {
   };
 
   // ── Export ticket to XLSX ──
+  const [showExportMenu, setShowExportMenu] = useState(false);
+
+  const handleExportPDF = () => {
+    setShowExportMenu(false);
+    if (!btData) return;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    const now = new Date();
+    const dateStrPdf = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const timeStrPdf = now.toLocaleTimeString();
+    const pd = ticket.productDetails;
+    const escLogs = btData.escalation_logs || [];
+    const atts = btData.attachments || [];
+    printWindow.document.write(`<!DOCTYPE html><html><head>
+      <title>Ticket ${ticket.id} - Maptech Ticketing System</title>
+      <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding:40px;color:#1f2937}
+        h1{font-size:24px;margin-bottom:8px}
+        h2{font-size:16px;margin:20px 0 10px;color:#154734;border-bottom:1px solid #e5e7eb;padding-bottom:6px}
+        .subtitle{font-size:14px;color:#6b7280;margin-bottom:24px}
+        .header{border-bottom:2px solid #154734;padding-bottom:16px;margin-bottom:24px}
+        .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:32px}
+        .stat-card{border:1px solid #e5e7eb;border-radius:8px;padding:16px}
+        .stat-value{font-size:20px;font-weight:700;color:#111827}
+        .stat-label{font-size:12px;color:#6b7280;text-transform:uppercase;margin-bottom:4px}
+        table{width:100%;border-collapse:collapse;margin-bottom:16px}
+        th,td{padding:8px 10px;text-align:left;border-bottom:1px solid #e5e7eb;font-size:12px}
+        th{background:#f9fafb;font-weight:600;color:#374151;text-transform:uppercase;font-size:10px}
+        .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 32px;margin-bottom:16px}
+        .info-row{display:flex;gap:8px;padding:4px 0;font-size:13px}
+        .info-label{font-weight:600;color:#6b7280;min-width:130px}
+        .info-value{color:#1f2937}
+        .desc{padding:12px;background:#f9fafb;border-radius:8px;font-size:13px;line-height:1.6;margin-bottom:16px;white-space:pre-wrap}
+        .footer{font-size:11px;color:#9ca3af;text-align:center;margin-top:32px;padding-top:16px;border-top:1px solid #e5e7eb}
+        .logo{color:#154734;font-weight:700}
+        .badge{display:inline-block;padding:2px 10px;border-radius:4px;font-size:11px;font-weight:600}
+        @media print{body{padding:20px}}
+      </style></head><body>
+      <div class="header">
+        <h1><span class="logo">Maptech</span> — Ticket Detail Report</h1>
+        <p class="subtitle">Service Ticket ${ticket.id} &bull; Generated on ${dateStrPdf} at ${timeStrPdf}</p>
+      </div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">Status</div><div class="stat-value">${ticket.status}</div></div>
+        <div class="stat-card"><div class="stat-label">Priority</div><div class="stat-value">${ticket.priority}</div></div>
+        <div class="stat-card"><div class="stat-label">Type of Service</div><div class="stat-value">${ticket.typeOfService}</div></div>
+        <div class="stat-card"><div class="stat-label">Assigned To</div><div class="stat-value">${ticket.assignedTo}</div></div>
+      </div>
+      <h2>Client Information</h2>
+      <div class="info-grid">
+        <div class="info-row"><span class="info-label">Client:</span><span class="info-value">${ticket.client}</span></div>
+        <div class="info-row"><span class="info-label">Contact Person:</span><span class="info-value">${ticket.contact}</span></div>
+        <div class="info-row"><span class="info-label">Email:</span><span class="info-value">${ticket.emailAddress}</span></div>
+        <div class="info-row"><span class="info-label">Department:</span><span class="info-value">${ticket.department}</span></div>
+        <div class="info-row"><span class="info-label">Mobile:</span><span class="info-value">${ticket.mobile}</span></div>
+        <div class="info-row"><span class="info-label">Landline:</span><span class="info-value">${ticket.landline}</span></div>
+        <div class="info-row"><span class="info-label">Designation:</span><span class="info-value">${ticket.designation}</span></div>
+        <div class="info-row"><span class="info-label">Address:</span><span class="info-value">${ticket.fullAddress}</span></div>
+      </div>
+      <h2>Issue Description</h2>
+      <div class="desc">${ticket.description}</div>
+      ${pd ? `<h2>Product Details</h2>
+      <div class="info-grid">
+        <div class="info-row"><span class="info-label">Device/Equipment:</span><span class="info-value">${pd.deviceEquipment}</span></div>
+        <div class="info-row"><span class="info-label">Brand:</span><span class="info-value">${pd.brand || ''}</span></div>
+        <div class="info-row"><span class="info-label">Product:</span><span class="info-value">${pd.product || ''}</span></div>
+        <div class="info-row"><span class="info-label">Model:</span><span class="info-value">${pd.model || ''}</span></div>
+        <div class="info-row"><span class="info-label">Version No:</span><span class="info-value">${pd.versionNo}</span></div>
+        <div class="info-row"><span class="info-label">Serial No:</span><span class="info-value">${pd.serialNo}</span></div>
+        <div class="info-row"><span class="info-label">Warranty:</span><span class="info-value">${pd.warranty}</span></div>
+        <div class="info-row"><span class="info-label">Date Purchased:</span><span class="info-value">${pd.datePurchased}</span></div>
+      </div>` : ''}
+      ${(ticket.actionTaken || ticket.remarks || ticket.jobStatus || ticket.timeIn !== 'N/A') ? `<h2>Work Details</h2>
+      <div class="info-grid">
+        <div class="info-row"><span class="info-label">Job Status:</span><span class="info-value">${ticket.jobStatus}</span></div>
+        <div class="info-row"><span class="info-label">Progress:</span><span class="info-value">${ticket.progressPercentage}%</span></div>
+        <div class="info-row"><span class="info-label">Time In:</span><span class="info-value">${ticket.timeIn}</span></div>
+        <div class="info-row"><span class="info-label">Time Out:</span><span class="info-value">${ticket.timeOut}</span></div>
+      </div>
+      ${ticket.actionTaken ? `<div class="info-row" style="margin-bottom:8px"><span class="info-label">Action Taken:</span><span class="info-value">${ticket.actionTaken}</span></div>` : ''}
+      ${ticket.remarks ? `<div class="info-row" style="margin-bottom:8px"><span class="info-label">Remarks:</span><span class="info-value">${ticket.remarks}</span></div>` : ''}
+      ${ticket.observation ? `<div class="info-row" style="margin-bottom:8px"><span class="info-label">Observation:</span><span class="info-value">${ticket.observation}</span></div>` : ''}
+      ${ticket.signedByName ? `<div class="info-row" style="margin-bottom:8px"><span class="info-label">Signed By:</span><span class="info-value">${ticket.signedByName}</span></div>` : ''}` : ''}
+      ${escLogs.length > 0 ? `<h2>Escalation History</h2>
+      <table><thead><tr><th>Date</th><th>From</th><th>To</th><th>Type</th><th>Notes</th></tr></thead>
+      <tbody>${escLogs.map((esc: any) => `<tr><td>${esc.created_at ? new Date(esc.created_at).toLocaleString() : ''}</td><td>${esc.from_user_name || ''}</td><td>${esc.to_user_name || esc.external_escalated_to || ''}</td><td>${esc.cascade_type || ''}</td><td>${esc.notes || ''}</td></tr>`).join('')}</tbody></table>` : ''}
+      ${atts.length > 0 ? `<h2>Attachments</h2>
+      <table><thead><tr><th>#</th><th>File Name</th><th>Type</th></tr></thead>
+      <tbody>${atts.map((att: any, i: number) => { const fname = att.file?.split('/').pop() || 'file'; const ftype = fname.match(/\\.(mp4|webm)$/i) ? 'Recording' : fname.match(/\\.(jpg|jpeg|png|gif)$/i) ? 'Screenshot' : 'Document'; return `<tr><td>${i+1}</td><td>${fname}</td><td>${ftype}</td></tr>`; }).join('')}</tbody></table>` : ''}
+      ${ticket.csatFeedback ? `<h2>CSAT Feedback</h2>
+      <div class="info-grid">
+        <div class="info-row"><span class="info-label">Rating:</span><span class="info-value">${ticket.csatFeedback.rating} / 5</span></div>
+        ${ticket.csatFeedback.comments ? `<div class="info-row"><span class="info-label">Comments:</span><span class="info-value">${ticket.csatFeedback.comments}</span></div>` : ''}
+      </div>` : ''}
+      <p class="footer">End of Ticket Report &bull; ${ticket.id} &bull; Generated ${now.toISOString().slice(0, 10)} ${timeStrPdf}<br/>Maptech Information Solutions Inc. &mdash; Confidential Report</p>
+    </body></html>`);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => { printWindow.print(); printWindow.close(); }, 400);
+  };
+
   const handleExportTicket = () => {
     if (!btData) return;
     try {
@@ -1052,14 +1155,14 @@ export function TicketView() {
 
       // Color palette
       const C = {
-        GREEN_DARK: '0A7A68', GREEN_MID: '2FAD52', GREEN_PALE: 'E8FAF0',
+        GREEN_DARK: '154734', GREEN_MID: '2FAD52', GREEN_PALE: 'E8FAF0',
         GREEN_TEXT: '065F46', WHITE: 'FFFFFF', ALT_ROW: 'F0FDF4', BORDER_CLR: 'D1FAE5',
       };
 
       const STATUS_COLORS: Record<string, [string, string]> = {
         New: ['DBEAFE', '1D4ED8'], Pending: ['FEF9C3', 'A16207'], Assigned: ['EDE9FE', '6D28D9'],
         'In Progress': ['CCFBF1', '0F766E'], Escalated: ['FFEDD5', 'C2410C'],
-        Resolved: ['DCFCE7', '166534'], Closed: ['F3F4F6', '374151'],
+        Resolved: ['DCFCE7', '166534'], Closed: ['F3F4F6', '000000'],
         'For Observation': ['E0F2FE', '0369A1'], Unresolved: ['FEE2E2', 'DC2626'],
       };
 
@@ -1109,11 +1212,11 @@ export function TicketView() {
         lbl2?: string, val2?: string,
       ) => {
         setCell(r, 0, sc(lbl1, C.GREEN_PALE, C.GREEN_TEXT, { bold: true, sz: 10, border: false }));
-        setCell(r, 1, sc(val1, C.WHITE, '1F2937', { sz: 10, wrap: true, border: false }));
+        setCell(r, 1, sc(val1, C.WHITE, '000000', { sz: 10, wrap: true, border: false }));
         setCell(r, 2, sc('', C.WHITE, C.WHITE, { border: false }));
         if (lbl2) {
           setCell(r, 3, sc(lbl2, C.GREEN_PALE, C.GREEN_TEXT, { bold: true, sz: 10, border: false }));
-          setCell(r, 4, sc(val2 ?? '', C.WHITE, '1F2937', { sz: 10, wrap: true, border: false }));
+          setCell(r, 4, sc(val2 ?? '', C.WHITE, '000000', { sz: 10, wrap: true, border: false }));
         } else {
           setCell(r, 3, sc('', C.WHITE, C.WHITE, { border: false }));
           setCell(r, 4, sc('', C.WHITE, C.WHITE, { border: false }));
@@ -1129,12 +1232,12 @@ export function TicketView() {
       // ─── Title ───
       mergeAll(R, 'MAPTECH TICKETING SYSTEM  —  TICKET DETAIL REPORT', C.GREEN_DARK, C.WHITE, { bold: true, sz: 18, center: true });
       rowHeights[R] = { hpt: 52 }; R++;
-      mergeAll(R, `Service Ticket Form — ${ticket.id}`, C.GREEN_MID, C.WHITE, { italic: true, sz: 11, center: true });
+      mergeAll(R, `Service Ticket Form — ${ticket.id}`, C.GREEN_MID, '000000', { italic: true, sz: 11, center: true });
       rowHeights[R] = { hpt: 28 }; R++;
 
       // Info rows
-      const [sBg, sFg] = STATUS_COLORS[ticket.status] ?? ['F3F4F6', '374151'];
-      const [pBg, pFg] = PRIORITY_COLORS[ticket.priority] ?? ['F3F4F6', '374151'];
+      const [sBg, sFg] = STATUS_COLORS[ticket.status] ?? ['F3F4F6', '000000'];
+      const [pBg, pFg] = PRIORITY_COLORS[ticket.priority] ?? ['F3F4F6', '000000'];
 
       // Status + Priority row
       setCell(R, 0, sc('Status', C.GREEN_PALE, C.GREEN_TEXT, { bold: true, sz: 10, border: false }));
@@ -1167,8 +1270,8 @@ export function TicketView() {
       // ─── ISSUE DESCRIPTION ───
       sectionHeader(R, 'ISSUE DESCRIPTION'); R++;
       mergeAll(R, '', C.WHITE, C.WHITE, { border: false }); rowHeights[R] = { hpt: 4 }; R++;
-      setCell(R, 0, sc(ticket.description, C.WHITE, '1F2937', { sz: 10, wrap: true, border: false }));
-      for (let c = 1; c < COLS; c++) setCell(R, c, sc('', C.WHITE, '1F2937', { border: false }));
+      setCell(R, 0, sc(ticket.description, C.WHITE, '000000', { sz: 10, wrap: true, border: false }));
+      for (let c = 1; c < COLS; c++) setCell(R, c, sc('', C.WHITE, '000000', { border: false }));
       merges.push({ s: { r: R, c: 0 }, e: { r: R, c: COLS - 1 } });
       const descLen = (ticket.description || '').length;
       rowHeights[R] = { hpt: descLen > 200 ? 80 : descLen > 100 ? 60 : 40 }; R++;
@@ -1215,11 +1318,11 @@ export function TicketView() {
         rowHeights[R] = { hpt: 24 }; R++;
         btData.escalation_logs.forEach((esc: any, i: number) => {
           const bg = i % 2 === 0 ? C.WHITE : C.ALT_ROW;
-          setCell(R, 0, sc(esc.created_at ? new Date(esc.created_at).toLocaleString() : '', bg, '1F2937', { sz: 9 }));
-          setCell(R, 1, sc(esc.from_user_name || '', bg, '1F2937', { sz: 9 }));
-          setCell(R, 2, sc(esc.to_user_name || esc.external_escalated_to || '', bg, '1F2937', { sz: 9 }));
+          setCell(R, 0, sc(esc.created_at ? new Date(esc.created_at).toLocaleString() : '', bg, '000000', { sz: 9 }));
+          setCell(R, 1, sc(esc.from_user_name || '', bg, '000000', { sz: 9 }));
+          setCell(R, 2, sc(esc.to_user_name || esc.external_escalated_to || '', bg, '000000', { sz: 9 }));
           setCell(R, 3, sc(esc.cascade_type || '', bg, '6B7280', { sz: 9, center: true }));
-          setCell(R, 4, sc(esc.notes || '', bg, '1F2937', { sz: 9, wrap: true }));
+          setCell(R, 4, sc(esc.notes || '', bg, '000000', { sz: 9, wrap: true }));
           setCell(R, 5, sc('', bg, bg, { border: false }));
           rowHeights[R] = { hpt: 22 }; R++;
         });
@@ -1237,7 +1340,7 @@ export function TicketView() {
           const bg = i % 2 === 0 ? C.WHITE : C.ALT_ROW;
           const fname = att.file?.split('/').pop() || 'file';
           const ftype = fname.match(/\.(mp4|webm)$/i) ? 'Recording' : fname.match(/\.(jpg|jpeg|png|gif)$/i) ? 'Screenshot' : 'Document';
-          setCell(R, 0, sc(i + 1, bg, '374151', { center: true, sz: 10 }));
+          setCell(R, 0, sc(i + 1, bg, '000000', { center: true, sz: 10 }));
           setCell(R, 1, sc(fname, bg, '1D4ED8', { sz: 10 }));
           merges.push({ s: { r: R, c: 1 }, e: { r: R, c: 2 } });
           setCell(R, 2, sc('', bg, bg, { border: false }));
@@ -1311,15 +1414,39 @@ export function TicketView() {
               Escalate
             </button>
           )}
-          <button
-            onClick={handleExportTicket}
-            title="Export Ticket to Excel"
-            aria-label="Export ticket"
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-sm text-gray-700 dark:text-gray-300"
-          >
-            <Download className="w-4 h-4 text-[#0E8F79]" />
-            Export
-          </button>
+          <div className="relative">
+            <button
+              onClick={() => setShowExportMenu((v) => !v)}
+              title="Export Ticket"
+              aria-label="Export ticket"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-sm text-gray-700 dark:text-gray-300"
+            >
+              <Download className="w-4 h-4 text-[#0E8F79]" />
+              Export
+              <ChevronDown className="w-3 h-3 ml-0.5" />
+            </button>
+            {showExportMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowExportMenu(false)} />
+                <div className="absolute right-0 mt-2 w-48 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 z-50 overflow-hidden">
+                  <button
+                    onClick={handleExportPDF}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    <FileDown className="w-4 h-4 text-red-500" />
+                    Export as PDF
+                  </button>
+                  <button
+                    onClick={() => { setShowExportMenu(false); handleExportTicket(); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    <FileSpreadsheet className="w-4 h-4 text-[#0E8F79]" />
+                    Export as XLSX
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
           <button
             onClick={() => setShowChat(true)}
             title="Messages"

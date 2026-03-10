@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '../components/ui/Card';
 import { GreenButton } from '../components/ui/GreenButton';
-import { User, Lock, Mail, Phone, Building, Shield, Pencil, X, Loader2, Camera, Eye } from 'lucide-react';
+import { User, Lock, Mail, Phone, Building, Shield, Pencil, X, Loader2, Camera, Eye, Archive } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { changePassword, updateProfile, uploadAvatar, removeAvatar } from '../services/authService';
+import { fetchRetentionPolicy, updateRetentionPolicy, type RetentionPolicyData } from '../services/api';
 import { toast } from 'sonner';
 import {
   validatePassword,
@@ -145,6 +146,23 @@ export function Settings() {
   const [pwLoading, setPwLoading] = useState(false);
   const [pwRules, setPwRules] = useState<PasswordRules | null>(null);
   const [breachChecking, setBreachChecking] = useState(false);
+
+  /* ── Retention Policy state (superadmin only) ── */
+  const [retentionPolicy, setRetentionPolicy] = useState<RetentionPolicyData | null>(null);
+  const [retentionForm, setRetentionForm] = useState({ audit_log_retention_days: 365, call_log_retention_days: 365 });
+  const [retentionEditing, setRetentionEditing] = useState(false);
+  const [retentionLoading, setRetentionLoading] = useState(false);
+
+  useEffect(() => {
+    if (user?.role === 'superadmin') {
+      fetchRetentionPolicy()
+        .then((p) => {
+          setRetentionPolicy(p);
+          setRetentionForm({ audit_log_retention_days: p.audit_log_retention_days, call_log_retention_days: p.call_log_retention_days });
+        })
+        .catch(() => {});
+    }
+  }, [user?.role]);
   const hibpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Real-time debounced HIBP breach check while typing
@@ -459,6 +477,110 @@ export function Settings() {
           </GreenButton>
         </form>
       </Card>
+
+      {/* ── Retention Policy (Superadmin only) ── */}
+      {user?.role === 'superadmin' && (
+        <Card accent>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Archive className="w-5 h-5 text-amber-500" />
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Log Retention Policy</h2>
+            </div>
+            {!retentionEditing ? (
+              <button onClick={() => setRetentionEditing(true)} className="inline-flex items-center gap-1.5 text-sm font-medium text-[#3BC25B] hover:text-[#63D44A] transition-colors">
+                <Pencil className="w-4 h-4" /> Edit
+              </button>
+            ) : (
+              <button onClick={() => { setRetentionEditing(false); if (retentionPolicy) setRetentionForm({ audit_log_retention_days: retentionPolicy.audit_log_retention_days, call_log_retention_days: retentionPolicy.call_log_retention_days }); }} className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-400 hover:text-gray-300 transition-colors">
+                <X className="w-4 h-4" /> Cancel
+              </button>
+            )}
+          </div>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+            Configure how long audit logs and call logs are retained before automatic cleanup. Set to 0 to keep logs indefinitely.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Audit Log Retention (days)</label>
+              {retentionEditing ? (
+                <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus-within:ring-2 focus-within:ring-[#3BC25B]">
+                  <Shield className="w-4 h-4 text-gray-400" />
+                  <input
+                    type="number"
+                    min={0}
+                    max={9999}
+                    value={retentionForm.audit_log_retention_days}
+                    onChange={(e) => setRetentionForm((p) => ({ ...p, audit_log_retention_days: Math.max(0, Math.min(9999, parseInt(e.target.value) || 0)) }))}
+                    className="w-full bg-transparent outline-none text-sm text-gray-900 dark:text-white placeholder-gray-400"
+                  />
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                  <Shield className="w-4 h-4 text-gray-400" />
+                  <span className="text-sm text-gray-700 dark:text-gray-300">
+                    {retentionPolicy?.audit_log_retention_days === 0 ? 'Indefinite (keep forever)' : `${retentionPolicy?.audit_log_retention_days ?? 365} days`}
+                  </span>
+                </div>
+              )}
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Call Log Retention (days)</label>
+              {retentionEditing ? (
+                <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus-within:ring-2 focus-within:ring-[#3BC25B]">
+                  <Phone className="w-4 h-4 text-gray-400" />
+                  <input
+                    type="number"
+                    min={0}
+                    max={9999}
+                    value={retentionForm.call_log_retention_days}
+                    onChange={(e) => setRetentionForm((p) => ({ ...p, call_log_retention_days: Math.max(0, Math.min(9999, parseInt(e.target.value) || 0)) }))}
+                    className="w-full bg-transparent outline-none text-sm text-gray-900 dark:text-white placeholder-gray-400"
+                  />
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                  <Phone className="w-4 h-4 text-gray-400" />
+                  <span className="text-sm text-gray-700 dark:text-gray-300">
+                    {retentionPolicy?.call_log_retention_days === 0 ? 'Indefinite (keep forever)' : `${retentionPolicy?.call_log_retention_days ?? 365} days`}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {retentionEditing && (
+            <div className="flex gap-3 pt-4">
+              <GreenButton
+                type="button"
+                disabled={retentionLoading}
+                onClick={async () => {
+                  setRetentionLoading(true);
+                  try {
+                    const updated = await updateRetentionPolicy(retentionForm);
+                    setRetentionPolicy(updated);
+                    setRetentionEditing(false);
+                    toast.success('Retention policy updated successfully.');
+                  } catch (err) {
+                    toast.error(err instanceof Error ? err.message : 'Failed to update retention policy.');
+                  } finally {
+                    setRetentionLoading(false);
+                  }
+                }}
+              >
+                {retentionLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</> : 'Save Policy'}
+              </GreenButton>
+              <button
+                type="button"
+                onClick={() => { setRetentionEditing(false); if (retentionPolicy) setRetentionForm({ audit_log_retention_days: retentionPolicy.audit_log_retention_days, call_log_retention_days: retentionPolicy.call_log_retention_days }); }}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white border border-gray-600 hover:border-gray-500 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+        </Card>
+      )}
     </div>
   );
 }
