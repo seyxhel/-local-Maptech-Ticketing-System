@@ -18,13 +18,16 @@ import {
   FileDown,
   FileSpreadsheet,
   ChevronDown,
+  Info,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   fetchAuditLogs,
   fetchAuditLogSummary,
+  fetchRetentionPolicy,
   type AuditLogEntry,
   type AuditLogSummary,
+  type RetentionPolicyData,
 } from '../services/api';
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
@@ -120,6 +123,7 @@ export function AuditLogs() {
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [retentionPolicy, setRetentionPolicy] = useState<RetentionPolicyData | null>(null);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -161,6 +165,11 @@ export function AuditLogs() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Load retention policy once
+  useEffect(() => {
+    fetchRetentionPolicy().then(setRetentionPolicy).catch(() => {});
+  }, []);
 
   // Debounced search
   useEffect(() => {
@@ -580,6 +589,19 @@ export function AuditLogs() {
           )}
         </div>
       </div>
+
+      {/* Retention Policy Notice */}
+      {retentionPolicy && (
+        <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 text-amber-800 dark:text-amber-300 text-sm">
+          <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
+          <span>
+            <strong>Retention Policy:</strong>{' '}
+            {retentionPolicy.audit_log_retention_days > 0
+              ? `Audit logs are retained for ${retentionPolicy.audit_log_retention_days} day${retentionPolicy.audit_log_retention_days !== 1 ? 's' : ''} and automatically removed thereafter.`
+              : 'Audit logs are retained indefinitely (no automatic cleanup).'}
+          </span>
+        </div>
+      )}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

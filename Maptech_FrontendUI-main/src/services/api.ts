@@ -951,6 +951,35 @@ export async function fetchCallLogs(): Promise<CallLog[]> {
   return handleResponse<CallLog[]>(res);
 }
 
+// ── Retention Policy endpoints ──
+
+export interface RetentionPolicyData {
+  id: number;
+  audit_log_retention_days: number;
+  call_log_retention_days: number;
+  updated_at: string;
+  updated_by: number | null;
+  updated_by_name: string | null;
+}
+
+/** Fetch the current retention policy (superadmin only). */
+export async function fetchRetentionPolicy(): Promise<RetentionPolicyData> {
+  const res = await fetch(`${API_BASE}/retention-policy/`, { headers: authHeaders() });
+  const data = await handleResponse<RetentionPolicyData[] | RetentionPolicyData>(res);
+  // ViewSet.list returns an array for router-registered viewsets
+  return Array.isArray(data) ? data[0] ?? { id: 1, audit_log_retention_days: 365, call_log_retention_days: 365, updated_at: '', updated_by: null, updated_by_name: null } : data;
+}
+
+/** Update the retention policy (superadmin only). */
+export async function updateRetentionPolicy(data: { audit_log_retention_days?: number; call_log_retention_days?: number }): Promise<RetentionPolicyData> {
+  const res = await fetch(`${API_BASE}/retention-policy/`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(data),
+  });
+  return handleResponse<RetentionPolicyData>(res);
+}
+
 // ── CSAT Feedback endpoints ──
 
 /** Submit CSAT feedback (admin rates employee before closing). */
@@ -1035,4 +1064,76 @@ export async function clearAllNotifications(): Promise<{ deleted: number }> {
     headers: authHeaders(),
   });
   return handleResponse<{ deleted: number }>(res);
+}
+
+// ── Announcement endpoints ──
+
+export interface AnnouncementData {
+  id: number;
+  title: string;
+  description: string;
+  announcement_type: 'info' | 'warning' | 'success' | 'critical';
+  visibility: 'all' | 'admin' | 'employee';
+  is_active: boolean;
+  start_date: string;
+  end_date: string | null;
+  created_by: number | null;
+  created_by_name: string | null;
+  is_currently_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Fetch announcements (filtered by role on the backend). */
+export async function fetchAnnouncements(): Promise<AnnouncementData[]> {
+  const res = await fetch(`${API_BASE}/announcements/`, { headers: authHeaders() });
+  return handleResponse<AnnouncementData[]>(res);
+}
+
+/** Create a new announcement (superadmin only). */
+export async function createAnnouncement(data: {
+  title: string;
+  description: string;
+  announcement_type: string;
+  visibility: string;
+  is_active?: boolean;
+  start_date?: string;
+  end_date?: string | null;
+}): Promise<AnnouncementData> {
+  const res = await fetch(`${API_BASE}/announcements/`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(data),
+  });
+  return handleResponse<AnnouncementData>(res);
+}
+
+/** Update an announcement (superadmin only). */
+export async function updateAnnouncement(id: number, data: Partial<{
+  title: string;
+  description: string;
+  announcement_type: string;
+  visibility: string;
+  is_active: boolean;
+  start_date: string;
+  end_date: string | null;
+}>): Promise<AnnouncementData> {
+  const res = await fetch(`${API_BASE}/announcements/${id}/`, {
+    method: 'PATCH',
+    headers: authHeaders(),
+    body: JSON.stringify(data),
+  });
+  return handleResponse<AnnouncementData>(res);
+}
+
+/** Delete an announcement (superadmin only). */
+export async function deleteAnnouncement(id: number): Promise<void> {
+  const res = await fetch(`${API_BASE}/announcements/${id}/`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error((data as Record<string, string>).detail || `Delete failed (${res.status})`);
+  }
 }

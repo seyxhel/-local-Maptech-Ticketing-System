@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth import get_user_model
-from .models import Ticket, TicketTask, TypeOfService, TicketAttachment, EscalationLog, AuditLog, Product, Client, CallLog, CSATFeedback, Notification, Category
+from .models import Ticket, TicketTask, TypeOfService, TicketAttachment, EscalationLog, AuditLog, Product, Client, CallLog, CSATFeedback, Notification, Category, RetentionPolicy, Announcement
 
 User = get_user_model()
 
@@ -91,3 +91,16 @@ class NotificationAdmin(admin.ModelAdmin):
     list_filter = ('notification_type', 'is_read')
     search_fields = ('title', 'message', 'recipient__username', 'recipient__email')
     readonly_fields = ('created_at',)
+
+
+@admin.register(RetentionPolicy)
+class RetentionPolicyAdmin(admin.ModelAdmin):
+    list_display = ('audit_log_retention_days', 'call_log_retention_days', 'updated_at', 'updated_by')
+    readonly_fields = ('updated_at',)
+
+
+@admin.register(Announcement)
+class AnnouncementAdmin(admin.ModelAdmin):
+    list_display = ('title', 'announcement_type', 'visibility', 'is_active', 'start_date', 'end_date', 'created_by', 'created_at')
+    list_filter = ('announcement_type', 'visibility', 'is_active')
+    search_fields = ('title', 'description')
