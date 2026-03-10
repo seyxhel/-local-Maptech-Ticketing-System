@@ -15,6 +15,9 @@ import {
   ChevronRight,
   X,
   Eye,
+  FileDown,
+  FileSpreadsheet,
+  ChevronDown,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -116,6 +119,7 @@ export function AuditLogs() {
   const [summary, setSummary] = useState<AuditLogSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -193,7 +197,7 @@ export function AuditLogs() {
 
       // ── Color palette (no # prefix for xlsx-js-style) ──
       const C = {
-        GREEN_DARK  : '0A7A68',
+        GREEN_DARK  : '154734',
         GREEN_MID   : '2FAD52',
         GREEN_PALE  : 'E8FAF0',
         GREEN_TEXT  : '065F46',
@@ -289,7 +293,7 @@ export function AuditLogs() {
       rowHeights[R] = { hpt: 52 }; R++;
 
       // ─── ROW 1: Subtitle ───
-      mergeRow(R, 'System Activity & Change Tracking Report', C.GREEN_MID, C.WHITE, { italic: true, sz: 11, center: true });
+      mergeRow(R, 'System Activity & Change Tracking Report', C.GREEN_MID, '000000', { italic: true, sz: 11, center: true });
       rowHeights[R] = { hpt: 28 }; R++;
 
       // ─── ROWS 2-4: Info rows ───
@@ -349,7 +353,7 @@ export function AuditLogs() {
       // ── Action Breakdown ──
       if (summary?.by_action && Object.keys(summary.by_action).length) {
         mergeRow(R, '', C.WHITE, C.WHITE, { border: false }); rowHeights[R] = { hpt: 12 }; R++;
-        mergeRow(R, '    Action Breakdown', C.GREEN_MID, C.WHITE, { bold: true, sz: 10, border: false });
+        mergeRow(R, '    Action Breakdown', C.GREEN_MID, '000000', { bold: true, sz: 10, border: false });
         rowHeights[R] = { hpt: 24 }; R++;
         twoCol(R,
           '  Action', 'Count',
@@ -362,7 +366,7 @@ export function AuditLogs() {
         Object.entries(summary.by_action)
           .sort(([, a], [, b]) => (b as number) - (a as number))
           .forEach(([action, count]) => {
-            const [abg, afg] = ACTION_COLORS[action] ?? ['F3F4F6', '374151'];
+            const [abg, afg] = ACTION_COLORS[action] ?? ['F3F4F6', '000000'];
             twoCol(R,
               `    ${action}`, count as number,
               abg, afg,
@@ -377,7 +381,7 @@ export function AuditLogs() {
       // ── Entity Breakdown ──
       if (summary?.by_entity && Object.keys(summary.by_entity).length) {
         mergeRow(R, '', C.WHITE, C.WHITE, { border: false }); rowHeights[R] = { hpt: 12 }; R++;
-        mergeRow(R, '    Entity Breakdown', C.GREEN_MID, C.WHITE, { bold: true, sz: 10, border: false });
+        mergeRow(R, '    Entity Breakdown', C.GREEN_MID, '000000', { bold: true, sz: 10, border: false });
         rowHeights[R] = { hpt: 24 }; R++;
         twoCol(R,
           '  Entity', 'Count',
@@ -390,7 +394,7 @@ export function AuditLogs() {
         Object.entries(summary.by_entity)
           .sort(([, a], [, b]) => (b as number) - (a as number))
           .forEach(([entity, count]) => {
-            const [ebg, efg] = ENTITY_COLORS[entity] ?? ['F3F4F6', '374151'];
+            const [ebg, efg] = ENTITY_COLORS[entity] ?? ['F3F4F6', '000000'];
             twoCol(R,
               `    ${entity}`, count as number,
               ebg, efg,
@@ -419,20 +423,20 @@ export function AuditLogs() {
       // Data rows
       logs.forEach((log, i) => {
         const rowBg = i % 2 === 0 ? C.WHITE : C.ALT_ROW;
-        const [abg, afg] = ACTION_COLORS[log.action] ?? ['F3F4F6', '374151'];
-        const [ebg, efg] = ENTITY_COLORS[log.entity] ?? ['F3F4F6', '374151'];
+        const [abg, afg] = ACTION_COLORS[log.action] ?? ['F3F4F6', '000000'];
+        const [ebg, efg] = ENTITY_COLORS[log.entity] ?? ['F3F4F6', '000000'];
         const changesStr = log.changes && Object.keys(log.changes).length ? JSON.stringify(log.changes) : '';
 
-        setCell(R, 0, sc(i + 1,                        rowBg,  '374151', { center: true, sz: 10 }));
-        setCell(R, 1, sc(formatDate(log.timestamp),    rowBg,  '1F2937', { sz: 10 }));
+        setCell(R, 0, sc(i + 1,                        rowBg,  '000000', { center: true, sz: 10 }));
+        setCell(R, 1, sc(formatDate(log.timestamp),    rowBg,  '000000', { sz: 10 }));
         setCell(R, 2, sc(log.entity,                   ebg,    efg,      { bold: true, sz: 10, center: true }));
-        setCell(R, 3, sc(log.entity_id ?? '',          rowBg,  '374151', { center: true, sz: 10 }));
+        setCell(R, 3, sc(log.entity_id ?? '',          rowBg,  '000000', { center: true, sz: 10 }));
         setCell(R, 4, sc(log.action,                   abg,    afg,      { bold: true, sz: 10, center: true }));
-        setCell(R, 5, sc(log.activity,                 rowBg,  '1F2937', { sz: 10, wrap: true }));
-        setCell(R, 6, sc(log.actor_name,               rowBg,  '1F2937', { sz: 10 }));
+        setCell(R, 5, sc(log.activity,                 rowBg,  '000000', { sz: 10, wrap: true }));
+        setCell(R, 6, sc(log.actor_name,               rowBg,  '000000', { sz: 10 }));
         setCell(R, 7, sc(log.actor_email,              rowBg,  '6B7280', { sz: 10 }));
         setCell(R, 8, sc(log.ip_address ?? '',         rowBg,  '6B7280', { sz: 10, center: true }));
-        setCell(R, 9, sc(changesStr,                   rowBg,  '374151', { sz: 9,  wrap: true }));
+        setCell(R, 9, sc(changesStr,                   rowBg,  '000000', { sz: 9,  wrap: true }));
         // auto-size: longer content gets taller rows
         const actLen = (log.activity || '').length;
         const chgLen = changesStr.length;
@@ -465,6 +469,61 @@ export function AuditLogs() {
     }
   };
 
+  const handleExportPDF = () => {
+    setShowExportMenu(false);
+    if (!logs.length) { toast.error('No logs to export.'); return; }
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    const now = new Date();
+    const dateStrPdf = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const timeStrPdf = now.toLocaleTimeString();
+    printWindow.document.write(`<!DOCTYPE html><html><head>
+      <title>Audit Logs Report - Maptech Ticketing System</title>
+      <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding:40px;color:#1f2937}
+        h1{font-size:24px;margin-bottom:8px}
+        h2{font-size:18px;margin:24px 0 12px;color:#374151}
+        .subtitle{font-size:14px;color:#6b7280;margin-bottom:24px}
+        .header{border-bottom:2px solid #154734;padding-bottom:16px;margin-bottom:24px}
+        .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:32px}
+        .stat-card{border:1px solid #e5e7eb;border-radius:8px;padding:16px}
+        .stat-value{font-size:28px;font-weight:700;color:#111827}
+        .stat-label{font-size:12px;color:#6b7280;text-transform:uppercase;margin-bottom:4px}
+        table{width:100%;border-collapse:collapse;margin-bottom:24px}
+        th,td{padding:8px 10px;text-align:left;border-bottom:1px solid #e5e7eb;font-size:11px}
+        th{background:#f9fafb;font-weight:600;color:#374151;text-transform:uppercase;font-size:10px}
+        .footer{font-size:11px;color:#9ca3af;text-align:center;margin-top:32px;padding-top:16px;border-top:1px solid #e5e7eb}
+        .logo{color:#154734;font-weight:700}
+        .badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600}
+        @media print{body{padding:20px}}
+      </style></head><body>
+      <div class="header">
+        <h1><span class="logo">Maptech</span> \u2014 Audit Log Report</h1>
+        <p class="subtitle">Generated on ${dateStrPdf} at ${timeStrPdf}</p>
+      </div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">Total Logs</div><div class="stat-value">${summary?.total ?? logs.length}</div></div>
+        <div class="stat-card"><div class="stat-label">Last 24 Hours</div><div class="stat-value">${summary?.last_24h ?? 'N/A'}</div></div>
+        <div class="stat-card"><div class="stat-label">User Actions</div><div class="stat-value">${summary?.by_entity?.User ?? 0}</div></div>
+        <div class="stat-card"><div class="stat-label">Ticket Actions</div><div class="stat-value">${summary?.by_entity?.Ticket ?? 0}</div></div>
+      </div>
+      ${summary?.by_action && Object.keys(summary.by_action).length ? `<h2>Action Breakdown</h2><table><thead><tr><th>Action</th><th>Count</th></tr></thead><tbody>${Object.entries(summary.by_action).sort(([,a],[,b]) => (b as number) - (a as number)).map(([action, count]) => `<tr><td><strong>${action}</strong></td><td>${count}</td></tr>`).join('')}</tbody></table>` : ''}
+      ${summary?.by_entity && Object.keys(summary.by_entity).length ? `<h2>Entity Breakdown</h2><table><thead><tr><th>Entity</th><th>Count</th></tr></thead><tbody>${Object.entries(summary.by_entity).sort(([,a],[,b]) => (b as number) - (a as number)).map(([entity, count]) => `<tr><td><strong>${entity}</strong></td><td>${count}</td></tr>`).join('')}</tbody></table>` : ''}
+      <h2>Audit Log Records</h2>
+      <table>
+        <thead><tr><th>#</th><th>Timestamp</th><th>Entity</th><th>Action</th><th>Activity</th><th>Actor</th><th>IP Address</th></tr></thead>
+        <tbody>
+          ${logs.map((log, i) => `<tr><td>${i + 1}</td><td>${formatDate(log.timestamp)}</td><td><strong>${log.entity}</strong></td><td><strong>${log.action}</strong></td><td>${log.activity}</td><td>${log.actor_name}</td><td>${log.ip_address || ''}</td></tr>`).join('')}
+        </tbody>
+      </table>
+      <p class="footer">End of Audit Log Report &bull; ${logs.length} records &bull; Generated ${now.toISOString().slice(0, 10)} ${timeStrPdf}<br/>Maptech Information Solutions Inc. &mdash; Confidential Report</p>
+    </body></html>`);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => { printWindow.print(); printWindow.close(); }, 400);
+  };
+
   const clearFilters = () => {
     setSearchTerm('');
     setEntityFilter('');
@@ -488,14 +547,38 @@ export function AuditLogs() {
             Track all system activities and changes across the platform
           </p>
         </div>
-        <GreenButton
-          onClick={handleExport}
-          isLoading={exporting}
-          className="flex items-center gap-2 self-start md:self-auto"
-        >
-          <Download className="w-4 h-4" />
-          Export Audit Logs
-        </GreenButton>
+        <div className="relative">
+          <GreenButton
+            onClick={() => setShowExportMenu((v) => !v)}
+            isLoading={exporting}
+            className="flex items-center gap-2 self-start md:self-auto"
+          >
+            <Download className="w-4 h-4" />
+            Export Audit Logs
+            <ChevronDown className="w-4 h-4 ml-1" />
+          </GreenButton>
+          {showExportMenu && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setShowExportMenu(false)} />
+              <div className="absolute right-0 mt-2 w-48 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 z-50 overflow-hidden">
+                <button
+                  onClick={handleExportPDF}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <FileDown className="w-4 h-4 text-red-500" />
+                  Export as PDF
+                </button>
+                <button
+                  onClick={() => { setShowExportMenu(false); handleExport(); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-[#0E8F79]" />
+                  Export as XLSX
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Summary Cards */}

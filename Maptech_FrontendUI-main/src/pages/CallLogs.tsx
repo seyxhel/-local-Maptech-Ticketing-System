@@ -14,6 +14,9 @@ import {
   Filter,
   User,
   Download,
+  FileDown,
+  FileSpreadsheet,
+  ChevronDown,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchCallLogs, type CallLog } from '../services/api';
@@ -33,7 +36,7 @@ function exportToXlsx(
 
   // Color palette (same as AuditLogs)
   const C = {
-    GREEN_DARK: '0A7A68', GREEN_MID: '2FAD52', GREEN_PALE: 'E8FAF0',
+    GREEN_DARK: '154734', GREEN_MID: '2FAD52', GREEN_PALE: 'E8FAF0',
     GREEN_TEXT: '065F46', WHITE: 'FFFFFF', ALT_ROW: 'F0FDF4', BORDER_CLR: 'D1FAE5',
   };
 
@@ -77,15 +80,15 @@ function exportToXlsx(
     setCell(r, 0, sc(lbl, C.GREEN_PALE, C.GREEN_TEXT, { bold: true, sz: 10, ...lOpts, border: false }));
     for (let c = 1; c < 5; c++) setCell(r, c, sc('', C.GREEN_PALE, C.GREEN_TEXT, { ...lOpts, border: false }));
     merges.push({ s: { r, c: 0 }, e: { r, c: 4 } });
-    setCell(r, 5, sc(val, C.WHITE, '374151', { center: true, sz: 11, ...vOpts, border: false }));
-    for (let c = 6; c < COLS; c++) setCell(r, c, sc('', C.WHITE, '374151', { ...vOpts, border: false }));
+    setCell(r, 5, sc(val, C.WHITE, '000000', { center: true, sz: 11, ...vOpts, border: false }));
+    for (let c = 6; c < COLS; c++) setCell(r, c, sc('', C.WHITE, '000000', { ...vOpts, border: false }));
     merges.push({ s: { r, c: 5 }, e: { r, c: COLS - 1 } });
   };
 
   // ─── Title ───
   mergeRow(R, 'MAPTECH TICKETING SYSTEM  —  CALL LOGS REPORT', C.GREEN_DARK, C.WHITE, { bold: true, sz: 18, center: true });
   rowHeights[R] = { hpt: 52 }; R++;
-  mergeRow(R, 'Call Logging Summary & Records', C.GREEN_MID, C.WHITE, { italic: true, sz: 11, center: true });
+  mergeRow(R, 'Call Logging Summary & Records', C.GREEN_MID, '000000', { italic: true, sz: 11, center: true });
   rowHeights[R] = { hpt: 28 }; R++;
 
   // Info rows
@@ -121,25 +124,25 @@ function exportToXlsx(
 
   // Column headers
   const headers = ['#', 'Status', 'Admin', 'Client', 'Phone', 'Call Start', 'Call End', 'Duration', 'Ticket ID', 'Notes'];
-  headers.forEach((h, c) => setCell(R, c, sc(h, C.GREEN_MID, C.WHITE, { bold: true, sz: 10, center: true })));
+  headers.forEach((h, c) => setCell(R, c, sc(h, C.GREEN_MID, '000000', { bold: true, sz: 10, center: true })));
   rowHeights[R] = { hpt: 28 }; R++;
 
   // Data rows
   logs.forEach((l, i) => {
     const bg = i % 2 === 0 ? C.WHITE : C.ALT_ROW;
     const status = l.call_end ? 'Completed' : 'Active';
-    const [sBg, sFg] = STATUS_CLR[status] ?? [bg, '374151'];
+    const [sBg, sFg] = STATUS_CLR[status] ?? [bg, '000000'];
 
-    setCell(R, 0, sc(i + 1, bg, '374151', { center: true, sz: 10 }));
+    setCell(R, 0, sc(i + 1, bg, '000000', { center: true, sz: 10 }));
     setCell(R, 1, sc(status, sBg, sFg, { bold: true, center: true, sz: 10 }));
-    setCell(R, 2, sc(l.admin_name || '', bg, '374151', { sz: 10 }));
-    setCell(R, 3, sc(l.client_name || '', bg, '374151', { sz: 10 }));
-    setCell(R, 4, sc(l.phone_number || '', bg, '374151', { sz: 10 }));
-    setCell(R, 5, sc(l.call_start ? new Date(l.call_start).toLocaleString() : '', bg, '374151', { sz: 9 }));
-    setCell(R, 6, sc(l.call_end ? new Date(l.call_end).toLocaleString() : '', bg, '374151', { sz: 9 }));
-    setCell(R, 7, sc(l.duration_seconds != null ? `${l.duration_seconds}s` : '', bg, '374151', { center: true, sz: 10 }));
+    setCell(R, 2, sc(l.admin_name || '', bg, '000000', { sz: 10 }));
+    setCell(R, 3, sc(l.client_name || '', bg, '000000', { sz: 10 }));
+    setCell(R, 4, sc(l.phone_number || '', bg, '000000', { sz: 10 }));
+    setCell(R, 5, sc(l.call_start ? new Date(l.call_start).toLocaleString() : '', bg, '000000', { sz: 9 }));
+    setCell(R, 6, sc(l.call_end ? new Date(l.call_end).toLocaleString() : '', bg, '000000', { sz: 9 }));
+    setCell(R, 7, sc(l.duration_seconds != null ? `${l.duration_seconds}s` : '', bg, '000000', { center: true, sz: 10 }));
     setCell(R, 8, sc(l.ticket != null ? String(l.ticket) : '', bg, '1D4ED8', { center: true, sz: 10 }));
-    setCell(R, 9, sc(l.notes || '', bg, '374151', { sz: 9, wrap: true }));
+    setCell(R, 9, sc(l.notes || '', bg, '000000', { sz: 9, wrap: true }));
 
     const notesLen = (l.notes || '').length;
     rowHeights[R] = { hpt: notesLen > 120 ? 48 : notesLen > 60 ? 36 : 28 };
@@ -268,8 +271,10 @@ export function CallLogs() {
   const hasActiveFilters = statusFilter || dateFrom || dateTo;
 
   const [exporting, setExporting] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   const handleExport = () => {
+    setShowExportMenu(false);
     if (filtered.length === 0) {
       toast.error('No records to export.');
       return;
@@ -287,6 +292,64 @@ export function CallLogs() {
     } finally {
       setExporting(false);
     }
+  };
+
+  const handleExportPDF = () => {
+    setShowExportMenu(false);
+    if (filtered.length === 0) {
+      toast.error('No records to export.');
+      return;
+    }
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    const now = new Date();
+    const dateStrPdf = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const timeStrPdf = now.toLocaleTimeString();
+    printWindow.document.write(`<!DOCTYPE html><html><head>
+      <title>Call Logs Report - Maptech Ticketing System</title>
+      <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding:40px;color:#1f2937}
+        h1{font-size:24px;margin-bottom:8px}
+        h2{font-size:18px;margin:24px 0 12px;color:#374151}
+        .subtitle{font-size:14px;color:#6b7280;margin-bottom:24px}
+        .header{border-bottom:2px solid #154734;padding-bottom:16px;margin-bottom:24px}
+        .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:32px}
+        .stat-card{border:1px solid #e5e7eb;border-radius:8px;padding:16px}
+        .stat-value{font-size:28px;font-weight:700;color:#111827}
+        .stat-label{font-size:12px;color:#6b7280;text-transform:uppercase;margin-bottom:4px}
+        table{width:100%;border-collapse:collapse;margin-bottom:24px}
+        th,td{padding:8px 10px;text-align:left;border-bottom:1px solid #e5e7eb;font-size:11px}
+        th{background:#f9fafb;font-weight:600;color:#374151;text-transform:uppercase;font-size:10px}
+        .footer{font-size:11px;color:#9ca3af;text-align:center;margin-top:32px;padding-top:16px;border-top:1px solid #e5e7eb}
+        .logo{color:#154734;font-weight:700}
+        @media print{body{padding:20px}}
+      </style></head><body>
+      <div class="header">
+        <h1><span class="logo">Maptech</span> — Call Logs Report</h1>
+        <p class="subtitle">Generated on ${dateStrPdf} at ${timeStrPdf}</p>
+      </div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">Total Calls</div><div class="stat-value">${totalCalls}</div></div>
+        <div class="stat-card"><div class="stat-label">Active / Ongoing</div><div class="stat-value">${activeCalls}</div></div>
+        <div class="stat-card"><div class="stat-label">Completed</div><div class="stat-value">${completedCalls}</div></div>
+        <div class="stat-card"><div class="stat-label">Avg Duration</div><div class="stat-value">${formatDuration(avgDuration)}</div></div>
+      </div>
+      <h2>Call Log Records</h2>
+      <table>
+        <thead><tr><th>#</th><th>Status</th><th>Admin</th><th>Client</th><th>Phone</th><th>Call Start</th><th>Call End</th><th>Duration</th><th>Ticket ID</th><th>Notes</th></tr></thead>
+        <tbody>
+          ${filtered.map((l, i) => {
+            const status = l.call_end ? 'Completed' : 'Active';
+            return `<tr><td>${i + 1}</td><td><strong>${status}</strong></td><td>${l.admin_name || '\u2014'}</td><td>${l.client_name || '\u2014'}</td><td>${l.phone_number || '\u2014'}</td><td>${l.call_start ? new Date(l.call_start).toLocaleString() : '\u2014'}</td><td>${l.call_end ? new Date(l.call_end).toLocaleString() : '\u2014'}</td><td>${l.duration_seconds != null ? formatDuration(l.duration_seconds) : '\u2014'}</td><td>${l.ticket != null ? l.ticket : ''}</td><td>${l.notes || ''}</td></tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+      <p class="footer">End of Call Logs Report &bull; ${filtered.length} records &bull; Generated ${now.toISOString().slice(0, 10)} ${timeStrPdf}<br/>Maptech Information Solutions Inc. &mdash; Confidential Report</p>
+    </body></html>`);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => { printWindow.print(); printWindow.close(); }, 400);
   };
 
   const clearFilters = () => {
@@ -307,14 +370,38 @@ export function CallLogs() {
             Records of all client calls made during ticket creation
           </p>
         </div>
-        <GreenButton
-          onClick={handleExport}
-          isLoading={exporting}
-          className="flex items-center gap-2 self-start md:self-auto"
-        >
-          <Download className="w-4 h-4" />
-          Export Call Logs
-        </GreenButton>
+        <div className="relative">
+          <GreenButton
+            onClick={() => setShowExportMenu((v) => !v)}
+            isLoading={exporting}
+            className="flex items-center gap-2 self-start md:self-auto"
+          >
+            <Download className="w-4 h-4" />
+            Export Call Logs
+            <ChevronDown className="w-4 h-4 ml-1" />
+          </GreenButton>
+          {showExportMenu && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setShowExportMenu(false)} />
+              <div className="absolute right-0 mt-2 w-48 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 z-50 overflow-hidden">
+                <button
+                  onClick={handleExportPDF}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <FileDown className="w-4 h-4 text-red-500" />
+                  Export as PDF
+                </button>
+                <button
+                  onClick={handleExport}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-[#0E8F79]" />
+                  Export as XLSX
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Summary Cards */}

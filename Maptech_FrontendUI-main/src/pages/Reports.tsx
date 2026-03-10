@@ -68,7 +68,7 @@ export function Reports() {
           h1 { font-size: 24px; margin-bottom: 8px; }
           h2 { font-size: 18px; margin: 24px 0 12px; color: #374151; }
           .subtitle { font-size: 14px; color: #6b7280; margin-bottom: 24px; }
-          .header { border-bottom: 2px solid #3BC25B; padding-bottom: 16px; margin-bottom: 24px; }
+          .header { border-bottom: 2px solid #154734; padding-bottom: 16px; margin-bottom: 24px; }
           .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
           .stat-card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; }
           .stat-value { font-size: 28px; font-weight: 700; color: #111827; }
@@ -77,7 +77,7 @@ export function Reports() {
           .table th, .table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #e5e7eb; font-size: 13px; }
           .table th { background: #f9fafb; font-weight: 600; color: #374151; text-transform: uppercase; font-size: 11px; }
           .timestamp { font-size: 11px; color: #9ca3af; text-align: right; margin-top: 32px; }
-          .logo { color: #0E8F79; font-weight: 700; }
+          .logo { color: #154734; font-weight: 700; }
           @media print { body { padding: 20px; } }
         </style>
       </head>
@@ -131,7 +131,7 @@ export function Reports() {
       const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
 
       const C = {
-        GREEN_DARK: '0A7A68', GREEN_MID: '2FAD52', GREEN_PALE: 'E8FAF0',
+        GREEN_DARK: '154734', GREEN_MID: '2FAD52', GREEN_PALE: 'E8FAF0',
         GREEN_TEXT: '065F46', WHITE: 'FFFFFF', ALT_ROW: 'F0FDF4', BORDER_CLR: 'D1FAE5',
       };
 
@@ -171,15 +171,15 @@ export function Reports() {
         setCell(r, 0, sc(lbl, C.GREEN_PALE, C.GREEN_TEXT, { bold: true, sz: 10, ...lOpts, border: false }));
         for (let c = 1; c < 5; c++) setCell(r, c, sc('', C.GREEN_PALE, C.GREEN_TEXT, { ...lOpts, border: false }));
         merges.push({ s: { r, c: 0 }, e: { r, c: 4 } });
-        setCell(r, 5, sc(val, C.WHITE, '374151', { center: true, sz: 11, ...vOpts, border: false }));
-        for (let c = 6; c < COLS; c++) setCell(r, c, sc('', C.WHITE, '374151', { ...vOpts, border: false }));
+        setCell(r, 5, sc(val, C.WHITE, '000000', { center: true, sz: 11, ...vOpts, border: false }));
+        for (let c = 6; c < COLS; c++) setCell(r, c, sc('', C.WHITE, '000000', { ...vOpts, border: false }));
         merges.push({ s: { r, c: 5 }, e: { r, c: COLS - 1 } });
       };
 
       // ─── Title ───
       mergeRow(R, 'MAPTECH TICKETING SYSTEM  —  REPORTS', C.GREEN_DARK, C.WHITE, { bold: true, sz: 18, center: true });
       rowHeights[R] = { hpt: 52 }; R++;
-      mergeRow(R, 'Analytics and Performance Overview', C.GREEN_MID, C.WHITE, { italic: true, sz: 11, center: true });
+      mergeRow(R, 'Analytics and Performance Overview', C.GREEN_MID, '000000', { italic: true, sz: 11, center: true });
       rowHeights[R] = { hpt: 28 }; R++;
 
       // Info
@@ -202,19 +202,19 @@ export function Reports() {
       // ─── MONTHLY TICKET VOLUME ───
       mergeRow(R, '     MONTHLY TICKET VOLUME', C.GREEN_DARK, C.WHITE, { bold: true, sz: 13 }); rowHeights[R] = { hpt: 34 }; R++;
       const mHeaders = ['#', 'Month', '', 'Total Tickets', '', 'Resolved', '', 'Resolution Rate', '', ''];
-      mHeaders.forEach((h, c) => setCell(R, c, sc(h, C.GREEN_MID, C.WHITE, { bold: true, sz: 10, center: true })));
+      mHeaders.forEach((h, c) => setCell(R, c, sc(h, C.GREEN_MID, '000000', { bold: true, sz: 10, center: true })));
       rowHeights[R] = { hpt: 28 }; R++;
       monthlyData.forEach((d, i) => {
         const bg = i % 2 === 0 ? C.WHITE : C.ALT_ROW;
         const rate = d.tickets > 0 ? `${Math.round((d.resolved / d.tickets) * 100)}%` : '0%';
-        setCell(R, 0, sc(i + 1, bg, '374151', { center: true, sz: 10 }));
-        setCell(R, 1, sc(d.name, bg, '374151', { sz: 10 })); setCell(R, 2, sc('', bg, bg));
+        setCell(R, 0, sc(i + 1, bg, '000000', { center: true, sz: 10 }));
+        setCell(R, 1, sc(d.name, bg, '000000', { sz: 10 })); setCell(R, 2, sc('', bg, bg));
         merges.push({ s: { r: R, c: 1 }, e: { r: R, c: 2 } });
-        setCell(R, 3, sc(d.tickets, bg, '374151', { center: true, sz: 10 })); setCell(R, 4, sc('', bg, bg));
+        setCell(R, 3, sc(d.tickets, bg, '000000', { center: true, sz: 10 })); setCell(R, 4, sc('', bg, bg));
         merges.push({ s: { r: R, c: 3 }, e: { r: R, c: 4 } });
         setCell(R, 5, sc(d.resolved, bg, C.GREEN_TEXT, { center: true, bold: true, sz: 10 })); setCell(R, 6, sc('', bg, bg));
         merges.push({ s: { r: R, c: 5 }, e: { r: R, c: 6 } });
-        setCell(R, 7, sc(rate, bg, '374151', { center: true, sz: 10 })); setCell(R, 8, sc('', bg, bg)); setCell(R, 9, sc('', bg, bg));
+        setCell(R, 7, sc(rate, bg, '000000', { center: true, sz: 10 })); setCell(R, 8, sc('', bg, bg)); setCell(R, 9, sc('', bg, bg));
         merges.push({ s: { r: R, c: 7 }, e: { r: R, c: 9 } });
         rowHeights[R] = { hpt: 26 }; R++;
       });
@@ -225,16 +225,16 @@ export function Reports() {
       // ─── SLA COMPLIANCE ───
       mergeRow(R, '     SLA COMPLIANCE TREND', C.GREEN_DARK, C.WHITE, { bold: true, sz: 13 }); rowHeights[R] = { hpt: 34 }; R++;
       const sHeaders = ['#', 'Month', '', 'Within SLA (%)', '', 'Breached (%)', '', '', '', ''];
-      sHeaders.forEach((h, c) => setCell(R, c, sc(h, C.GREEN_MID, C.WHITE, { bold: true, sz: 10, center: true })));
+      sHeaders.forEach((h, c) => setCell(R, c, sc(h, C.GREEN_MID, '000000', { bold: true, sz: 10, center: true })));
       rowHeights[R] = { hpt: 28 }; R++;
       slaData.forEach((d, i) => {
         const bg = i % 2 === 0 ? C.WHITE : C.ALT_ROW;
-        setCell(R, 0, sc(i + 1, bg, '374151', { center: true, sz: 10 }));
-        setCell(R, 1, sc(d.name, bg, '374151', { sz: 10 })); setCell(R, 2, sc('', bg, bg));
+        setCell(R, 0, sc(i + 1, bg, '000000', { center: true, sz: 10 }));
+        setCell(R, 1, sc(d.name, bg, '000000', { sz: 10 })); setCell(R, 2, sc('', bg, bg));
         merges.push({ s: { r: R, c: 1 }, e: { r: R, c: 2 } });
         setCell(R, 3, sc(`${d.withinSla}%`, bg, C.GREEN_TEXT, { center: true, bold: true, sz: 10 })); setCell(R, 4, sc('', bg, bg));
         merges.push({ s: { r: R, c: 3 }, e: { r: R, c: 4 } });
-        setCell(R, 5, sc(`${d.breached}%`, bg, d.breached > 0 ? 'DC2626' : '374151', { center: true, sz: 10 })); setCell(R, 6, sc('', bg, bg));
+        setCell(R, 5, sc(`${d.breached}%`, bg, d.breached > 0 ? 'DC2626' : '000000', { center: true, sz: 10 })); setCell(R, 6, sc('', bg, bg));
         merges.push({ s: { r: R, c: 5 }, e: { r: R, c: 6 } });
         setCell(R, 7, sc('', bg, bg)); setCell(R, 8, sc('', bg, bg)); setCell(R, 9, sc('', bg, bg));
         merges.push({ s: { r: R, c: 7 }, e: { r: R, c: 9 } });
@@ -247,12 +247,12 @@ export function Reports() {
       // ─── TICKETS BY CATEGORY ───
       mergeRow(R, '     TICKETS BY CATEGORY', C.GREEN_DARK, C.WHITE, { bold: true, sz: 13 }); rowHeights[R] = { hpt: 34 }; R++;
       const cHeaders = ['#', 'Category', '', '', '', '', 'Count', '', '', ''];
-      cHeaders.forEach((h, c) => setCell(R, c, sc(h, C.GREEN_MID, C.WHITE, { bold: true, sz: 10, center: true })));
+      cHeaders.forEach((h, c) => setCell(R, c, sc(h, C.GREEN_MID, '000000', { bold: true, sz: 10, center: true })));
       rowHeights[R] = { hpt: 28 }; R++;
       categoryData.forEach((d, i) => {
         const bg = i % 2 === 0 ? C.WHITE : C.ALT_ROW;
-        setCell(R, 0, sc(i + 1, bg, '374151', { center: true, sz: 10 }));
-        setCell(R, 1, sc(d.name, bg, '374151', { sz: 10 }));
+        setCell(R, 0, sc(i + 1, bg, '000000', { center: true, sz: 10 }));
+        setCell(R, 1, sc(d.name, bg, '000000', { sz: 10 }));
         for (let c = 2; c < 6; c++) setCell(R, c, sc('', bg, bg));
         merges.push({ s: { r: R, c: 1 }, e: { r: R, c: 5 } });
         setCell(R, 6, sc(d.count, bg, C.GREEN_TEXT, { center: true, bold: true, sz: 11 }));
