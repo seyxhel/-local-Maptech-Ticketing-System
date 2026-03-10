@@ -62,11 +62,20 @@ export class TicketChatSocket {
       return
     }
 
-    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-    const host = window.location.hostname
-    // In development the Django ASGI server runs on port 8000
-    const port = import.meta.env.VITE_WS_PORT || '8000'
-    const url = `${protocol}://${host}:${port}/ws/chat/${this.ticketId}/${this.channelType}/?token=${token}`
+    // Derive WebSocket URL from VITE_API_URL (backend) for production
+    let wsBase: string
+    const apiUrl = import.meta.env.VITE_API_URL
+    if (apiUrl && /^https?:\/\//.test(apiUrl)) {
+      const parsed = new URL(apiUrl)
+      const wsProtocol = parsed.protocol === 'https:' ? 'wss:' : 'ws:'
+      wsBase = `${wsProtocol}//${parsed.host}`
+    } else {
+      const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
+      const host = window.location.hostname
+      const port = import.meta.env.VITE_WS_PORT || '8000'
+      wsBase = `${protocol}://${host}:${port}`
+    }
+    const url = `${wsBase}/ws/chat/${this.ticketId}/${this.channelType}/?token=${token}`
 
     this.ws = new WebSocket(url)
 

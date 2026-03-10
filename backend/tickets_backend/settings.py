@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from urllib.parse import urlparse
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -16,6 +17,13 @@ ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
 _railway_domain = os.environ.get('RAILWAY_PUBLIC_DOMAIN', '')
 if _railway_domain and _railway_domain not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append(_railway_domain)
+
+# Also allow frontend origins for WebSocket origin checks (AllowedHostsOriginValidator)
+_cors_hosts_raw = os.environ.get('CORS_ALLOWED_ORIGINS', '')
+for _origin in _cors_hosts_raw.split(','):
+    _host = urlparse(_origin.strip()).hostname
+    if _host and _host not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(_host)
 
 # CSRF trusted origins for production (required for Django 4.x+)
 _csrf_origins = os.environ.get('CSRF_TRUSTED_ORIGINS', '')

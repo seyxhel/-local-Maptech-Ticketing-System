@@ -38,6 +38,22 @@ function getAccessToken(): string | null {
   return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY) || null;
 }
 
+/** Build the WebSocket base URL from VITE_API_URL (points to the backend). */
+function getWsBaseUrl(): string {
+  const apiUrl = import.meta.env.VITE_API_URL;
+  if (apiUrl && /^https?:\/\//.test(apiUrl)) {
+    // VITE_API_URL = "https://backend.up.railway.app/api" → "wss://backend.up.railway.app"
+    const url = new URL(apiUrl);
+    const wsProtocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${wsProtocol}//${url.host}`;
+  }
+  // Local development fallback: same host, port 8000
+  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  const host = window.location.hostname;
+  const port = import.meta.env.VITE_WS_PORT || '8000';
+  return `${protocol}://${host}:${port}`;
+}
+
 // ── Socket class ───────────────────────────────────────
 
 export class NotificationSocket {
@@ -59,10 +75,7 @@ export class NotificationSocket {
       return;
     }
 
-    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    const host = window.location.hostname;
-    const port = import.meta.env.VITE_WS_PORT || '8000';
-    const url = `${protocol}://${host}:${port}/ws/notifications/?token=${token}`;
+    const url = `${getWsBaseUrl()}/ws/notifications/?token=${token}`;
 
     this.ws = new WebSocket(url);
 
