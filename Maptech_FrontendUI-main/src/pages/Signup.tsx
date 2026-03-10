@@ -306,7 +306,7 @@ export function Signup() {
       const breached = await checkPasswordPwned(password);
       if (breached) {
         setFieldErrors((p) => ({ ...p, password: 'This password has been found in a data breach. Please choose a different one.' }));
-        setError('This password has been found in a data breach (haveibeenpwned.com). Please choose a different password.');
+        setError('This password has been found in a data breach. Please choose a different password.');
         return;
       }
       // Client registration — placeholder until backend supports client signup

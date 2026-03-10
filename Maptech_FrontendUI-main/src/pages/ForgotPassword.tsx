@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Key, Loader2, ArrowLeft, CheckCircle, Eye, EyeOff } from 'lucide-react';
+import { Key, Mail, Loader2, ArrowLeft, CheckCircle, Eye, EyeOff } from 'lucide-react';
 import { resetPasswordByKey } from '../services/authService';
 
 const LOGO_SRC = '/Maptech%20Official%20Logo%20version2%20(1).png';
 
 export function ForgotPassword() {
+  const [email, setEmail] = useState('');
   const [recoveryKey, setRecoveryKey] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -16,10 +17,11 @@ export function ForgotPassword() {
   const [success, setSuccess] = useState(false);
 
   const keyPattern = /^[a-f0-9]{4}(-[a-f0-9]{4}){7}$/i;
+  const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   const isKeyValid = keyPattern.test(recoveryKey.trim());
   const isPasswordValid = newPassword.length >= 8;
   const doPasswordsMatch = newPassword === confirmPassword;
-  const canSubmit = isKeyValid && isPasswordValid && doPasswordsMatch;
+  const canSubmit = isEmailValid && isKeyValid && isPasswordValid && doPasswordsMatch;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,10 +29,10 @@ export function ForgotPassword() {
     setError('');
     setLoading(true);
     try {
-      await resetPasswordByKey(recoveryKey.trim(), newPassword);
+      await resetPasswordByKey(recoveryKey.trim(), newPassword, email.trim());
       setSuccess(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to reset password. Please try again.');
+      setError(err instanceof Error ? err.message : 'Wrong email or recovery key.');
     } finally {
       setLoading(false);
     }
@@ -66,7 +68,7 @@ export function ForgotPassword() {
           <>
             <h1 className="text-xl font-bold text-white text-center">Forgot Password</h1>
             <p className="text-sm text-gray-400 text-center mt-1 mb-6">
-              Enter your unique recovery key and set a new password.
+              Enter your email and recovery key to set a new password.
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-5">
@@ -75,6 +77,26 @@ export function ForgotPassword() {
                   {error}
                 </div>
               )}
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
+                  Email Address
+                </label>
+                <div className="relative flex items-center bg-gray-800 border border-gray-700 rounded-lg focus-within:ring-2 focus-within:ring-[#3BC25B] focus-within:border-[#3BC25B] transition-all">
+                  <Mail className="w-4 h-4 text-gray-500 ml-3 flex-shrink-0" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="your@email.com"
+                    className="w-full bg-transparent border-none py-3 pl-3 pr-4 text-white placeholder-gray-500 focus:outline-none text-sm"
+                    autoFocus
+                  />
+                </div>
+                {email.trim() && !isEmailValid && (
+                  <p className="text-xs text-red-400 mt-1">Enter a valid email address.</p>
+                )}
+              </div>
 
               <div>
                 <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
@@ -88,7 +110,6 @@ export function ForgotPassword() {
                     onChange={(e) => setRecoveryKey(e.target.value)}
                     placeholder="xxxx-xxxx-xxxx-xxxx-xxxx-xxxx-xxxx-xxxx"
                     className="w-full bg-transparent border-none py-3 pl-3 pr-4 text-white placeholder-gray-500 focus:outline-none text-sm font-mono"
-                    autoFocus
                   />
                 </div>
                 {recoveryKey.trim() && !isKeyValid && (

@@ -110,11 +110,11 @@ export async function resetPasswordConfirm(uid: string, token: string, newPasswo
 }
 
 /** Reset password using the unique recovery key. */
-export async function resetPasswordByKey(recoveryKey: string, newPassword: string): Promise<{ detail: string }> {
+export async function resetPasswordByKey(recoveryKey: string, newPassword: string, email: string): Promise<{ detail: string }> {
   const res = await fetch(`${API_BASE}/auth/password-reset-by-key/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ recovery_key: recoveryKey, new_password: newPassword }),
+    body: JSON.stringify({ recovery_key: recoveryKey, new_password: newPassword, email }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {

@@ -125,7 +125,7 @@ class AuthViewSet(viewsets.GenericViewSet):
         # HIBP breach check — warn but allow
         breach_warning = ''
         if _is_password_pwned(new_pw):
-            breach_warning = 'Warning: this password has been found in a data breach (haveibeenpwned.com). Consider changing it later.'
+            breach_warning = 'Warning: this password has been found in a data breach. Consider changing it later.'
 
         user.set_password(new_pw)
         user.save()
@@ -163,21 +163,22 @@ class AuthViewSet(viewsets.GenericViewSet):
 
     @action(detail=False, methods=['post'], permission_classes=[], url_path='password-reset-by-key')
     def password_reset_by_key(self, request):
-        """Reset password using the user's unique recovery key."""
+        """Reset password using the user's unique recovery key and email."""
         recovery_key = (request.data.get('recovery_key') or '').strip()
+        email = (request.data.get('email') or '').strip().lower()
         new_password = request.data.get('new_password', '')
-        if not recovery_key or not new_password:
+        if not recovery_key or not email or not new_password:
             return Response(
-                {'detail': 'Recovery key and new password are required.'},
+                {'detail': 'Email, recovery key, and new password are required.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        _WRONG = 'Wrong email or recovery key.'
         try:
             user = User.objects.get(recovery_key=recovery_key)
         except User.DoesNotExist:
-            return Response(
-                {'detail': 'Invalid recovery key.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            return Response({'detail': _WRONG}, status=status.HTTP_400_BAD_REQUEST)
+        if user.email.lower() != email:
+            return Response({'detail': _WRONG}, status=status.HTTP_400_BAD_REQUEST)
         if not user.is_active:
             return Response(
                 {'detail': 'This account has been deactivated. Please contact an administrator.'},
@@ -190,7 +191,7 @@ class AuthViewSet(viewsets.GenericViewSet):
             )
         if _is_password_pwned(new_password):
             return Response(
-                {'detail': 'This password has been found in a data breach (haveibeenpwned.com). Please choose a different password.'},
+                {'detail': 'This password has been found in a data breach. Please choose a different password.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         user.set_password(new_password)
@@ -216,7 +217,7 @@ class AuthViewSet(viewsets.GenericViewSet):
             return Response({'detail': 'Password must be at least 8 characters.'}, status=status.HTTP_400_BAD_REQUEST)
         if _is_password_pwned(new_password):
             return Response(
-                {'detail': 'This password has been found in a data breach (haveibeenpwned.com). Please choose a different password.'},
+                {'detail': 'This password has been found in a data breach. Please choose a different password.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         user.set_password(new_password)

@@ -161,7 +161,7 @@ export default function EmployeeSettings() {
     try {
       const breached = await checkPasswordPwned(newPassword);
       if (breached) {
-        setPwError('This password has been found in a data breach (haveibeenpwned.com). Please choose a different password.');
+        setPwError('This password has been found in a data breach. Please choose a different password.');
         setPwRules((prev) => prev ? { ...prev, notBreached: false } : prev);
         return;
       }
