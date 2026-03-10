@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 // @ts-ignore
 import XLSXStyle from 'xlsx-js-style';
+import { buildPdfDocument, openPrintWindow } from '../utils/pdfTemplate';
 import {
   BarChart,
   Bar,
@@ -53,73 +54,36 @@ export function Reports() {
     setShowExportMenu(false);
     const printContents = reportRef.current;
     if (!printContents) return;
-
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Supervisor Reports - Maptech Ticketing System</title>
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; color: #1f2937; }
-          h1 { font-size: 24px; margin-bottom: 8px; }
-          h2 { font-size: 18px; margin: 24px 0 12px; color: #374151; }
-          .subtitle { font-size: 14px; color: #6b7280; margin-bottom: 24px; }
-          .header { border-bottom: 2px solid #154734; padding-bottom: 16px; margin-bottom: 24px; }
-          .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
-          .stat-card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; }
-          .stat-value { font-size: 28px; font-weight: 700; color: #111827; }
-          .stat-label { font-size: 12px; color: #6b7280; text-transform: uppercase; margin-bottom: 4px; }
-          .table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
-          .table th, .table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #e5e7eb; font-size: 13px; }
-          .table th { background: #f9fafb; font-weight: 600; color: #374151; text-transform: uppercase; font-size: 11px; }
-          .timestamp { font-size: 11px; color: #9ca3af; text-align: right; margin-top: 32px; }
-          .logo { color: #154734; font-weight: 700; }
-          @media print { body { padding: 20px; } }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h1><span class="logo">Maptech</span> — Supervisor Reports</h1>
-          <p class="subtitle">Generated on ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} at ${new Date().toLocaleTimeString()}</p>
-        </div>
-        <div class="stat-grid">
-          <div class="stat-card"><div class="stat-label">Total Tickets</div><div class="stat-value">${totalTicketsVal}</div></div>
-          <div class="stat-card"><div class="stat-label">Resolved</div><div class="stat-value">${resolvedVal}</div></div>
-          <div class="stat-card"><div class="stat-label">Avg Resolution</div><div class="stat-value">${avgResVal}</div></div>
-          <div class="stat-card"><div class="stat-label">SLA Compliance</div><div class="stat-value">${slaComplianceVal}</div></div>
-        </div>
-        <h2>Monthly Ticket Volume</h2>
-        <table class="table">
-          <thead><tr><th>Month</th><th>Total Tickets</th><th>Resolved</th><th>Resolution Rate</th></tr></thead>
-          <tbody>
-            ${monthlyData.map((d) => `<tr><td>${d.name}</td><td>${d.tickets}</td><td>${d.resolved}</td><td>${d.tickets > 0 ? Math.round((d.resolved / d.tickets) * 100) : 0}%</td></tr>`).join('')}
-          </tbody>
-        </table>
-        <h2>SLA Compliance</h2>
-        <table class="table">
-          <thead><tr><th>Month</th><th>Within SLA (%)</th><th>Breached (%)</th></tr></thead>
-          <tbody>
-            ${slaData.map((d) => `<tr><td>${d.name}</td><td>${d.withinSla}%</td><td>${d.breached}%</td></tr>`).join('')}
-          </tbody>
-        </table>
-        <h2>Tickets by Category</h2>
-        <table class="table">
-          <thead><tr><th>Category</th><th>Count</th></tr></thead>
-          <tbody>
-            ${categoryData.map((d) => `<tr><td>${d.name}</td><td>${d.count}</td></tr>`).join('')}
-          </tbody>
-        </table>
-        <p class="timestamp">Maptech Information Solutions Inc. — Confidential Report</p>
-      </body>
-      </html>
-    `);
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => { printWindow.print(); printWindow.close(); }, 400);
+    const body = `
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">Total Tickets</div><div class="stat-value">${totalTicketsVal}</div></div>
+        <div class="stat-card"><div class="stat-label">Resolved</div><div class="stat-value">${resolvedVal}</div></div>
+        <div class="stat-card"><div class="stat-label">Avg Resolution</div><div class="stat-value">${avgResVal}</div></div>
+        <div class="stat-card"><div class="stat-label">SLA Compliance</div><div class="stat-value">${slaComplianceVal}</div></div>
+      </div>
+      <h2>Monthly Ticket Volume</h2>
+      <table>
+        <thead><tr><th>Month</th><th>Total Tickets</th><th>Resolved</th><th>Resolution Rate</th></tr></thead>
+        <tbody>
+          ${monthlyData.map((d) => `<tr><td>${d.name}</td><td>${d.tickets}</td><td>${d.resolved}</td><td>${d.tickets > 0 ? Math.round((d.resolved / d.tickets) * 100) : 0}%</td></tr>`).join('')}
+        </tbody>
+      </table>
+      <h2>SLA Compliance</h2>
+      <table>
+        <thead><tr><th>Month</th><th>Within SLA (%)</th><th>Breached (%)</th></tr></thead>
+        <tbody>
+          ${slaData.map((d) => `<tr><td>${d.name}</td><td>${d.withinSla}%</td><td>${d.breached}%</td></tr>`).join('')}
+        </tbody>
+      </table>
+      <h2>Tickets by Category</h2>
+      <table>
+        <thead><tr><th>Category</th><th>Count</th></tr></thead>
+        <tbody>
+          ${categoryData.map((d) => `<tr><td>${d.name}</td><td>${d.count}</td></tr>`).join('')}
+        </tbody>
+      </table>`;
+    const html = buildPdfDocument('Supervisor Reports - Maptech Ticketing System', 'Supervisor Reports', body, `${totalTicketsVal} total tickets`);
+    openPrintWindow(html);
   };
 
   // ── XLSX Export ──

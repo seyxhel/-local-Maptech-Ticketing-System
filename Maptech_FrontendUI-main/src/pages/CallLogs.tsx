@@ -23,6 +23,7 @@ import { toast } from 'sonner';
 import { fetchCallLogs, fetchRetentionPolicy, type CallLog, type RetentionPolicyData } from '../services/api';
 // @ts-ignore
 import XLSXStyle from 'xlsx-js-style';
+import { buildPdfDocument, openPrintWindow } from '../utils/pdfTemplate';
 
 const PAGE_SIZE = 15;
 
@@ -307,35 +308,7 @@ export function CallLogs() {
       toast.error('No records to export.');
       return;
     }
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-    const now = new Date();
-    const dateStrPdf = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-    const timeStrPdf = now.toLocaleTimeString();
-    printWindow.document.write(`<!DOCTYPE html><html><head>
-      <title>Call Logs Report - Maptech Ticketing System</title>
-      <style>
-        *{margin:0;padding:0;box-sizing:border-box}
-        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding:40px;color:#1f2937}
-        h1{font-size:24px;margin-bottom:8px}
-        h2{font-size:18px;margin:24px 0 12px;color:#374151}
-        .subtitle{font-size:14px;color:#6b7280;margin-bottom:24px}
-        .header{border-bottom:2px solid #154734;padding-bottom:16px;margin-bottom:24px}
-        .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:32px}
-        .stat-card{border:1px solid #e5e7eb;border-radius:8px;padding:16px}
-        .stat-value{font-size:28px;font-weight:700;color:#111827}
-        .stat-label{font-size:12px;color:#6b7280;text-transform:uppercase;margin-bottom:4px}
-        table{width:100%;border-collapse:collapse;margin-bottom:24px}
-        th,td{padding:8px 10px;text-align:left;border-bottom:1px solid #e5e7eb;font-size:11px}
-        th{background:#f9fafb;font-weight:600;color:#374151;text-transform:uppercase;font-size:10px}
-        .footer{font-size:11px;color:#9ca3af;text-align:center;margin-top:32px;padding-top:16px;border-top:1px solid #e5e7eb}
-        .logo{color:#154734;font-weight:700}
-        @media print{body{padding:20px}}
-      </style></head><body>
-      <div class="header">
-        <h1><span class="logo">Maptech</span> — Call Logs Report</h1>
-        <p class="subtitle">Generated on ${dateStrPdf} at ${timeStrPdf}</p>
-      </div>
+    const body = `
       <div class="stat-grid">
         <div class="stat-card"><div class="stat-label">Total Calls</div><div class="stat-value">${totalCalls}</div></div>
         <div class="stat-card"><div class="stat-label">Active / Ongoing</div><div class="stat-value">${activeCalls}</div></div>
@@ -351,12 +324,9 @@ export function CallLogs() {
             return `<tr><td>${i + 1}</td><td><strong>${status}</strong></td><td>${l.admin_name || '\u2014'}</td><td>${l.client_name || '\u2014'}</td><td>${l.phone_number || '\u2014'}</td><td>${l.call_start ? new Date(l.call_start).toLocaleString() : '\u2014'}</td><td>${l.call_end ? new Date(l.call_end).toLocaleString() : '\u2014'}</td><td>${l.duration_seconds != null ? formatDuration(l.duration_seconds) : '\u2014'}</td><td>${l.ticket != null ? l.ticket : ''}</td><td>${l.notes || ''}</td></tr>`;
           }).join('')}
         </tbody>
-      </table>
-      <p class="footer">End of Call Logs Report &bull; ${filtered.length} records &bull; Generated ${now.toISOString().slice(0, 10)} ${timeStrPdf}<br/>Maptech Information Solutions Inc. &mdash; Confidential Report</p>
-    </body></html>`);
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => { printWindow.print(); printWindow.close(); }, 400);
+      </table>`;
+    const html = buildPdfDocument('Call Logs Report - Maptech Ticketing System', 'Call Logs Report', body, `${filtered.length} records`);
+    openPrintWindow(html);
   };
 
   const clearFilters = () => {

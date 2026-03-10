@@ -26,6 +26,7 @@ import { SignaturePad } from '../components/ui/SignaturePad';
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 import XLSXStyle from 'xlsx-js-style';
+import { buildPdfDocument, openPrintWindow } from '../utils/pdfTemplate';
 
 const JOB_STATUSES = ['Completed', 'Under Warranty', 'For Quotation', 'Pending', 'Chargeable', 'Under Contract'];
 
@@ -1049,44 +1050,10 @@ export function TicketView() {
   const handleExportPDF = () => {
     setShowExportMenu(false);
     if (!btData) return;
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-    const now = new Date();
-    const dateStrPdf = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-    const timeStrPdf = now.toLocaleTimeString();
     const pd = ticket.productDetails;
     const escLogs = btData.escalation_logs || [];
     const atts = btData.attachments || [];
-    printWindow.document.write(`<!DOCTYPE html><html><head>
-      <title>Ticket ${ticket.id} - Maptech Ticketing System</title>
-      <style>
-        *{margin:0;padding:0;box-sizing:border-box}
-        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding:40px;color:#1f2937}
-        h1{font-size:24px;margin-bottom:8px}
-        h2{font-size:16px;margin:20px 0 10px;color:#154734;border-bottom:1px solid #e5e7eb;padding-bottom:6px}
-        .subtitle{font-size:14px;color:#6b7280;margin-bottom:24px}
-        .header{border-bottom:2px solid #154734;padding-bottom:16px;margin-bottom:24px}
-        .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:32px}
-        .stat-card{border:1px solid #e5e7eb;border-radius:8px;padding:16px}
-        .stat-value{font-size:20px;font-weight:700;color:#111827}
-        .stat-label{font-size:12px;color:#6b7280;text-transform:uppercase;margin-bottom:4px}
-        table{width:100%;border-collapse:collapse;margin-bottom:16px}
-        th,td{padding:8px 10px;text-align:left;border-bottom:1px solid #e5e7eb;font-size:12px}
-        th{background:#f9fafb;font-weight:600;color:#374151;text-transform:uppercase;font-size:10px}
-        .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 32px;margin-bottom:16px}
-        .info-row{display:flex;gap:8px;padding:4px 0;font-size:13px}
-        .info-label{font-weight:600;color:#6b7280;min-width:130px}
-        .info-value{color:#1f2937}
-        .desc{padding:12px;background:#f9fafb;border-radius:8px;font-size:13px;line-height:1.6;margin-bottom:16px;white-space:pre-wrap}
-        .footer{font-size:11px;color:#9ca3af;text-align:center;margin-top:32px;padding-top:16px;border-top:1px solid #e5e7eb}
-        .logo{color:#154734;font-weight:700}
-        .badge{display:inline-block;padding:2px 10px;border-radius:4px;font-size:11px;font-weight:600}
-        @media print{body{padding:20px}}
-      </style></head><body>
-      <div class="header">
-        <h1><span class="logo">Maptech</span> — Ticket Detail Report</h1>
-        <p class="subtitle">Service Ticket ${ticket.id} &bull; Generated on ${dateStrPdf} at ${timeStrPdf}</p>
-      </div>
+    const body = `
       <div class="stat-grid">
         <div class="stat-card"><div class="stat-label">Status</div><div class="stat-value">${ticket.status}</div></div>
         <div class="stat-card"><div class="stat-label">Priority</div><div class="stat-value">${ticket.priority}</div></div>
@@ -1124,10 +1091,10 @@ export function TicketView() {
         <div class="info-row"><span class="info-label">Time In:</span><span class="info-value">${ticket.timeIn}</span></div>
         <div class="info-row"><span class="info-label">Time Out:</span><span class="info-value">${ticket.timeOut}</span></div>
       </div>
-      ${ticket.actionTaken ? `<div class="info-row" style="margin-bottom:8px"><span class="info-label">Action Taken:</span><span class="info-value">${ticket.actionTaken}</span></div>` : ''}
-      ${ticket.remarks ? `<div class="info-row" style="margin-bottom:8px"><span class="info-label">Remarks:</span><span class="info-value">${ticket.remarks}</span></div>` : ''}
-      ${ticket.observation ? `<div class="info-row" style="margin-bottom:8px"><span class="info-label">Observation:</span><span class="info-value">${ticket.observation}</span></div>` : ''}
-      ${ticket.signedByName ? `<div class="info-row" style="margin-bottom:8px"><span class="info-label">Signed By:</span><span class="info-value">${ticket.signedByName}</span></div>` : ''}` : ''}
+      ${ticket.actionTaken ? `<div class="info-row" style="margin:0 16px 8px"><span class="info-label">Action Taken:</span><span class="info-value">${ticket.actionTaken}</span></div>` : ''}
+      ${ticket.remarks ? `<div class="info-row" style="margin:0 16px 8px"><span class="info-label">Remarks:</span><span class="info-value">${ticket.remarks}</span></div>` : ''}
+      ${ticket.observation ? `<div class="info-row" style="margin:0 16px 8px"><span class="info-label">Observation:</span><span class="info-value">${ticket.observation}</span></div>` : ''}
+      ${ticket.signedByName ? `<div class="info-row" style="margin:0 16px 8px"><span class="info-label">Signed By:</span><span class="info-value">${ticket.signedByName}</span></div>` : ''}` : ''}
       ${escLogs.length > 0 ? `<h2>Escalation History</h2>
       <table><thead><tr><th>Date</th><th>From</th><th>To</th><th>Type</th><th>Notes</th></tr></thead>
       <tbody>${escLogs.map((esc: any) => `<tr><td>${esc.created_at ? new Date(esc.created_at).toLocaleString() : ''}</td><td>${esc.from_user_name || ''}</td><td>${esc.to_user_name || esc.external_escalated_to || ''}</td><td>${esc.cascade_type || ''}</td><td>${esc.notes || ''}</td></tr>`).join('')}</tbody></table>` : ''}
@@ -1138,12 +1105,9 @@ export function TicketView() {
       <div class="info-grid">
         <div class="info-row"><span class="info-label">Rating:</span><span class="info-value">${ticket.csatFeedback.rating} / 5</span></div>
         ${ticket.csatFeedback.comments ? `<div class="info-row"><span class="info-label">Comments:</span><span class="info-value">${ticket.csatFeedback.comments}</span></div>` : ''}
-      </div>` : ''}
-      <p class="footer">End of Ticket Report &bull; ${ticket.id} &bull; Generated ${now.toISOString().slice(0, 10)} ${timeStrPdf}<br/>Maptech Information Solutions Inc. &mdash; Confidential Report</p>
-    </body></html>`);
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => { printWindow.print(); printWindow.close(); }, 400);
+      </div>` : ''}`;
+    const html = buildPdfDocument(`Ticket ${ticket.id} - Maptech Ticketing System`, 'Ticket Detail Report', body, `Service Ticket ${ticket.id}`);
+    openPrintWindow(html);
   };
 
   const handleExportTicket = () => {
