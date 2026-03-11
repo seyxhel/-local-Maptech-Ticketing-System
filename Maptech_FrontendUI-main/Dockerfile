@@ -20,9 +20,14 @@ RUN rm /etc/nginx/conf.d/default.conf
 # Copy compiled assets
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Copy our nginx config
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copy our nginx config (template; will be processed at container start)
+COPY nginx.conf /etc/nginx/conf.d/default.conf.template
+
+# Copy entrypoint and install envsubst (gettext)
+COPY entrypoint.sh /entrypoint.sh
+RUN apk add --no-cache gettext && chmod +x /entrypoint.sh
 
 EXPOSE 80
 
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["nginx", "-g", "daemon off;"]
