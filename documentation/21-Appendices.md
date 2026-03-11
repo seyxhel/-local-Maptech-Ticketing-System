@@ -2,73 +2,58 @@
 
 ## Appendix A: System Architecture Diagram
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        CLIENTS (Browsers)                           │
-│  ┌───────────────────┐  ┌───────────────────┐  ┌────────────────┐  │
-│  │  SuperAdmin UI     │  │  Admin/Supervisor │  │  Employee UI   │  │
-│  │  (Dashboard,       │  │  (Ticket Mgmt,   │  │  (My Tickets,  │  │
-│  │   User Mgmt,       │  │   Assignment,     │  │   Chat,        │  │
-│  │   Reports)         │  │   Escalation)     │  │   Resolution)  │  │
-│  └─────────┬─────────┘  └─────────┬─────────┘  └──────┬─────────┘  │
-└────────────┼───────────────────────┼───────────────────┼────────────┘
-             │         HTTPS / WSS   │                   │
-             ▼                       ▼                   ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                     REVERSE PROXY (Nginx)                           │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌────────────────────┐ │
-│  │ /         │  │ /api/    │  │ /ws/     │  │ /media/ /static/   │ │
-│  │ SPA Files │  │ HTTP API │  │ WebSocket│  │ File Serving       │ │
-│  └──────────┘  └────┬─────┘  └────┬─────┘  └────────────────────┘ │
-└──────────────────────┼─────────────┼────────────────────────────────┘
-                       │             │
-                       ▼             ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                   APPLICATION SERVER (Daphne ASGI)                   │
-│                                                                      │
-│  ┌──────────────────────────────┐  ┌─────────────────────────────┐  │
-│  │     Django REST Framework     │  │    Django Channels           │  │
-│  │  ┌────────────────────────┐  │  │  ┌───────────────────────┐  │  │
-│  │  │ tickets/views/         │  │  │  │ NotificationConsumer  │  │  │
-│  │  │  - TicketViewSet       │  │  │  │ TicketChatConsumer    │  │  │
-│  │  │  - AuditLogViewSet     │  │  │  └───────────────────────┘  │  │
-│  │  │  - NotificationViewSet │  │  │                              │  │
-│  │  │  - AnnouncementViewSet │  │  │  WebSocket Routing:          │  │
-│  │  │  - CSATFeedbackViewSet │  │  │  ws/notifications/           │  │
-│  │  │  - CallLogViewSet      │  │  │  ws/chat/<ticket_id>/        │  │
-│  │  └────────────────────────┘  │  │       admin_employee/        │  │
-│  │  ┌────────────────────────┐  │  └─────────────────────────────┘  │
-│  │  │ users/views/           │  │                                    │
-│  │  │  - AuthViewSet         │  │  ┌─────────────────────────────┐  │
-│  │  │  - UserViewSet         │  │  │ Middleware & Signals         │  │
-│  │  └────────────────────────┘  │  │  - JWTAuthMiddleware (WS)   │  │
-│  │  ┌────────────────────────┐  │  │  - Signal Handlers (8)      │  │
-│  │  │ Authentication         │  │  │  - Permissions (6 classes)  │  │
-│  │  │  - SimpleJWT           │  │  └─────────────────────────────┘  │
-│  │  │  - Argon2 Hashing      │  │                                    │
-│  │  └────────────────────────┘  │                                    │
-│  └──────────────────────────────┘                                    │
-└────────────┬───────────────────────────────┬─────────────────────────┘
-             │                               │
-             ▼                               ▼
-┌────────────────────────┐    ┌─────────────────────────────┐
-│     DATABASE            │    │     REDIS (Production)       │
-│  ┌──────────────────┐  │    │  ┌───────────────────────┐  │
-│  │ SQLite (Dev)      │  │    │  │ Channel Layer          │  │
-│  │ PostgreSQL (Prod) │  │    │  │ (WebSocket messaging)  │  │
-│  └──────────────────┘  │    │  └───────────────────────┘  │
-│                         │    │                              │
-│  18 Models:             │    │  InMemoryChannelLayer (Dev)  │
-│  - User, Ticket         │    └─────────────────────────────┘
-│  - Message, AuditLog    │
-│  - Notification, etc.   │    ┌─────────────────────────────┐
-│                         │    │     FILE STORAGE             │
-└─────────────────────────┘    │  ┌───────────────────────┐  │
-                               │  │ media/                 │  │
-                               │  │  - profile_pictures/   │  │
-                               │  │  - ticket_attachments/ │  │
-                               │  └───────────────────────┘  │
-                               └─────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph Clients["CLIENTS (Browsers)"]
+        direction LR
+        SAU["SuperAdmin UI\n(Dashboard, User Mgmt,\nReports)"]
+        ADU["Admin/Supervisor\n(Ticket Mgmt,\nAssignment, Escalation)"]
+        EMU["Employee UI\n(My Tickets,\nChat, Resolution)"]
+    end
+
+    Clients ==>|"HTTPS / WSS"| Nginx
+
+    subgraph Nginx["REVERSE PROXY (Nginx)"]
+        direction LR
+        P1["/ SPA Files"]
+        P2["/api/ HTTP API"]
+        P3["/ws/ WebSocket"]
+        P4["/media/ /static/\nFile Serving"]
+    end
+
+    Nginx ==> AppServer
+
+    subgraph AppServer["APPLICATION SERVER (Daphne ASGI)"]
+        subgraph DRF["Django REST Framework"]
+            TV["tickets/views/\nTicketViewSet\nAuditLogViewSet\nNotificationViewSet\nAnnouncementViewSet\nCSATFeedbackViewSet\nCallLogViewSet"]
+            UV["users/views/\nAuthViewSet\nUserViewSet"]
+            AUTH["Authentication\nSimpleJWT\nArgon2 Hashing"]
+        end
+
+        subgraph CH["Django Channels"]
+            CON["NotificationConsumer\nTicketChatConsumer"]
+            WR["ws/notifications/\nws/chat/ticket_id/\nadmin_employee/"]
+        end
+
+        MW["Middleware & Signals\nJWTAuthMiddleware (WS)\nSignal Handlers (8)\nPermissions (6 classes)"]
+    end
+
+    AppServer --> DB
+    AppServer --> RD
+
+    subgraph DB["DATABASE"]
+        DBI["SQLite (Dev) / PostgreSQL (Prod)\n18 Models: User, Ticket, Message,\nAuditLog, Notification, etc."]
+    end
+
+    subgraph RD["REDIS (Production)"]
+        RDI["Channel Layer\n(WebSocket messaging)\nInMemoryChannelLayer (Dev)"]
+    end
+
+    subgraph FS["FILE STORAGE"]
+        FSI["media/\nprofile_pictures/\nticket_attachments/"]
+    end
+
+    AppServer --> FS
 ```
 
 ---
@@ -284,40 +269,34 @@ Client (1) ─────────── (N) Ticket
 
 ## Appendix F: Ticket Status Flow
 
-```
-                    ┌──────────┐
-                    │   OPEN   │ ◄─── Ticket Created
-                    └────┬─────┘
-                         │ assign
-                         ▼
-                ┌─────────────────┐
-                │   IN PROGRESS   │ ◄─── start_work
-                └────┬───────┬────┘
-                     │       │
-          escalate   │       │ request_closure
-                     ▼       ▼
-            ┌──────────┐  ┌─────────────────┐
-            │ ESCALATED│  │ PENDING CLOSURE  │
-            └──────┬───┘  └───────┬──────────┘
-                   │              │
-                   │         review│
-                   │     ┌────────┼──────────┐
-                   │     ▼        ▼          ▼
-                   │  ┌──────┐ ┌──────────┐ ┌──────────────────┐
-                   │  │CLOSED│ │BACK TO   │ │ FOR OBSERVATION  │
-                   │  └──────┘ │IN_PROGRESS└─┤  (monitoring)    │
-                   │           └──────────┘  └───────┬──────────┘
-                   │                                  │ confirm
-                   │                                  ▼
-                   │                           ┌──────────┐
-                   │                           │  CLOSED   │
-                   │                           └──────────┘
-                   │
-                   ├──────────── ESCALATED_EXTERNAL
-                   │               (third-party support)
-                   │
-                   └──────────── UNRESOLVED
-                                 (cannot be resolved)
+```mermaid
+stateDiagram-v2
+    [*] --> OPEN : Ticket Created
+
+    OPEN : OPEN
+    IN_PROGRESS : IN PROGRESS
+    ESCALATED : ESCALATED
+    ESCALATED_EXT : ESCALATED EXTERNAL
+    PENDING_CLOSURE : PENDING CLOSURE
+    FOR_OBSERVATION : FOR OBSERVATION
+    CLOSED : CLOSED
+    UNRESOLVED : UNRESOLVED
+
+    OPEN --> IN_PROGRESS : assign + start_work
+
+    IN_PROGRESS --> ESCALATED : escalate
+    IN_PROGRESS --> PENDING_CLOSURE : request_closure
+
+    ESCALATED --> IN_PROGRESS : re-assign
+    ESCALATED --> ESCALATED_EXT : external escalation
+
+    PENDING_CLOSURE --> CLOSED : review + close
+    PENDING_CLOSURE --> IN_PROGRESS : back to work
+    PENDING_CLOSURE --> FOR_OBSERVATION : monitoring
+
+    FOR_OBSERVATION --> CLOSED : confirm
+
+    IN_PROGRESS --> UNRESOLVED : cannot resolve
 ```
 
 **Status Definitions:**

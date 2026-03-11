@@ -197,12 +197,11 @@ pg_restore -h localhost -U maptech_user \
 
 ### Incident Response Process
 
-```
-┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│   Detect    │───►│  Triage &   │───►│  Resolve &  │───►│  Post-      │
-│  (Alert /   │    │  Assign     │    │  Restore    │    │  Mortem     │
-│   Report)   │    │  Severity   │    │  Service    │    │  Review     │
-└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
+```mermaid
+flowchart LR
+    A["Detect\n(Alert /\nReport)"] --> B["Triage &\nAssign\nSeverity"]
+    B --> C["Resolve &\nRestore\nService"]
+    C --> D["Post-\nMortem\nReview"]
 ```
 
 1. **Detection:** Alert received via monitoring tool, or user report through the ticketing system itself.

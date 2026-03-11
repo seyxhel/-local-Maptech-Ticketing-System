@@ -44,41 +44,44 @@ Password Change/Reset Flow:
 
 ### Frontend ↔ Backend Communication
 
-```
-┌──────────────────────┐          ┌──────────────────────┐
-│     React Frontend    │          │    Django Backend     │
-│                      │          │                      │
-│  Service Layer       │─── HTTP ─►│  DRF ViewSets        │
-│  (api.ts,            │◄── JSON ──│  Serializers         │
-│   ticketService.ts,  │          │  Permissions          │
-│   etc.)              │          │                      │
-│                      │          │                      │
-│  TicketChatSocket    │── WS ───►│  TicketChatConsumer   │
-│  NotificationSocket  │◄── JSON ──│  NotificationConsumer │
-│                      │          │                      │
-└──────────────────────┘          └──────────────────────┘
+```mermaid
+flowchart LR
+    subgraph FE["React Frontend"]
+        SL["Service Layer\n(api.ts, ticketService.ts, etc.)"]
+        WS["TicketChatSocket\nNotificationSocket"]
+    end
+
+    subgraph BE["Django Backend"]
+        DRF["DRF ViewSets\nSerializers\nPermissions"]
+        CON["TicketChatConsumer\nNotificationConsumer"]
+    end
+
+    SL -->|"HTTP"| DRF
+    DRF -->|"JSON"| SL
+    WS -->|"WebSocket"| CON
+    CON -->|"JSON"| WS
 ```
 
 ### Development Proxy Configuration
 
-```
-Vite Dev Server (port 3000)
-  ├── /api/*    → proxy to http://localhost:8000/api/*
-  ├── /media/*  → proxy to http://localhost:8000/media/*
-  └── /ws/*     → proxy to ws://localhost:8000/ws/*
+```mermaid
+flowchart LR
+    V["Vite Dev Server\n(port 3000)"] -->|"/api/*"| B1["http://localhost:8000/api/*"]
+    V -->|"/media/*"| B2["http://localhost:8000/media/*"]
+    V -->|"/ws/*"| B3["ws://localhost:8000/ws/*"]
 ```
 
 ### Signal-Based Internal Integration
 
 Django signals provide event-driven integration between system modules:
 
-```
-Model Event ──► Signal Handler ──► Side Effect
-                                      │
-                                      ├── AuditLog creation
-                                      ├── Notification dispatch
-                                      ├── WebSocket broadcast
-                                      └── Session management
+```mermaid
+flowchart LR
+    ME["Model Event"] --> SH["Signal Handler"] --> SE["Side Effect"]
+    SE --> AL["AuditLog creation"]
+    SE --> ND["Notification dispatch"]
+    SE --> WB["WebSocket broadcast"]
+    SE --> SM["Session management"]
 ```
 
 ---

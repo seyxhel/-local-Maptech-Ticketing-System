@@ -20,125 +20,250 @@ The Maptech Ticketing System uses a relational data model implemented through Dj
 
 ## 9.2 Entity Relationship Diagram (ERD)
 
-```
-┌──────────────────────────────────────────────────────────────────────────────────┐
-│                            ENTITY RELATIONSHIP DIAGRAM                           │
-└──────────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+erDiagram
+    User {
+        int id PK
+        string username UK
+        string email UK
+        string role
+        string first_name
+        string middle_name
+        string last_name
+        string suffix
+        string phone
+        string profile_picture
+        string recovery_key UK
+        boolean is_active
+    }
 
-                        ┌───────────────┐
-                        │     User      │
-                        │───────────────│
-                        │ PK id         │
-                        │ username      │
-                        │ email (unique)│
-                        │ role          │
-                        │ first_name    │
-                        │ middle_name   │
-                        │ last_name     │
-                        │ suffix        │
-                        │ phone         │
-                        │ profile_pic   │
-                        │ recovery_key  │
-                        │ is_active     │
-                        └──────┬────────┘
-                               │
-          ┌────────────────────┼─────────────────────┬──────────────────┐
-          │ created_by         │ assigned_to          │ actor            │
-          │                    │                      │                  │
-          ▼                    ▼                      ▼                  │
-┌─────────────────┐  ┌─────────────────┐   ┌────────────────┐          │
-│    Ticket       │  │ AssignmentSession │   │   AuditLog    │          │
-│─────────────────│  │─────────────────│   │────────────────│          │
-│ PK id           │  │ PK id           │   │ PK id          │          │
-│ FK created_by──►│  │ FK ticket ──────│   │ timestamp      │          │
-│ FK assigned_to─►│  │ FK employee ────│   │ entity         │          │
-│ FK type_of_svc  │  │ started_at      │   │ entity_id      │          │
-│ FK client_record│  │ ended_at        │   │ action         │          │
-│ FK product_rec  │  │ is_active       │   │ activity       │          │
-│ FK current_sess │  └────────┬────────┘   │ FK actor ──────┤          │
-│ stf_no (unique) │           │            │ actor_email    │          │
-│ status          │           │            │ ip_address     │          │
-│ priority        │           │            │ changes (JSON) │          │
-│ date            │           ▼            └────────────────┘          │
-│ time_in         │  ┌─────────────────┐                               │
-│ time_out        │  │    Message      │   ┌────────────────┐          │
-│ description_    │  │─────────────────│   │  Notification  │          │
-│   of_problem    │  │ PK id           │   │────────────────│          │
-│ action_taken    │  │ FK ticket ──────│   │ PK id          │          │
-│ remarks         │  │ FK assignment_  │   │ FK recipient──►│          │
-│ job_status      │  │    session      │   │ FK ticket      │          │
-│ observation     │  │ channel_type    │   │ type           │          │
-│ signature       │  │ FK sender ──────│   │ title          │          │
-│ signed_by_name  │  │ content         │   │ message        │          │
-│ confirmed_by_   │  │ FK reply_to     │   │ is_read        │          │
-│   admin         │  │ is_system_msg   │   │ created_at     │          │
-│ cascade_type    │  │ created_at      │   └────────────────┘          │
-│ linked_tickets  │  └────────┬────────┘                               │
-│   (M2M → self)  │           │            ┌────────────────┐          │
-│ external_esc_*  │    ┌──────┴───────┐    │  CallLog       │          │
-│ created_at      │    │              │    │────────────────│          │
-│ updated_at      │    ▼              ▼    │ PK id          │          │
-└───────┬─────────┘ ┌──────────┐ ┌──────┐ │ FK ticket      │          │
-        │           │ Message  │ │ Msg  │ │ FK admin ──────┤          │
-        │           │ Reaction │ │ Read │ │ client_name    │          │
-   ┌────┼────┐      │──────────│ │Rcpt  │ │ phone_number   │          │
-   │    │    │      │ FK msg   │ │──────│ │ call_start     │          │
-   │    │    │      │ FK user  │ │FK msg│ │ call_end       │          │
-   ▼    ▼    ▼      │ emoji    │ │FK usr│ │ notes          │          │
-┌────┐┌────┐┌────┐  └──────────┘ │read_ │ └────────────────┘          │
-│TA  ││TT  ││EL  │               │ at   │                             │
-│────││────││────│               └──────┘ ┌────────────────┐          │
-│att.││task││esc.│                        │ CSATFeedback   │          │
-│    ││    ││log │                        │────────────────│          │
-│FK  ││FK  ││    │                        │ PK id          │          │
-│tkt ││tkt ││FK  │                        │ FK ticket (1:1)│          │
-│FK  ││FK  ││tkt │                        │ FK employee────┤          │
-│upl ││asgn││FK  │                        │ FK admin ──────┤          │
-│file││desc││from│                        │ rating (1-5)   │          │
-│is_ ││stat││FK  │                        │ comments       │          │
-│pub ││    ││to  │                        └────────────────┘          │
-└────┘└────┘└────┘                                                     │
-                                                                       │
-┌────────────────────────── LOOKUP TABLES ─────────────────────────────┘
-│
-│  ┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐
-│  │ TypeOfService    │   │   Category      │   │    Client       │
-│  │─────────────────│   │─────────────────│   │─────────────────│
-│  │ PK id           │   │ PK id           │   │ PK id           │
-│  │ name            │   │ name            │   │ client_name     │
-│  │ description     │   │ description     │   │ contact_person  │
-│  │ is_active       │   │ is_active       │   │ landline        │
-│  │ estimated_      │   │ created_at      │   │ mobile_no       │
-│  │  resolution_days│   │ updated_at      │   │ designation     │
-│  └─────────────────┘   └────────┬────────┘   │ dept_org        │
-│                                 │             │ email_address   │
-│                         FK category           │ address         │
-│                                 │             │ is_active       │
-│                        ┌────────▼────────┐   └─────────────────┘
-│                        │    Product      │
-│                        │─────────────────│   ┌──────────────────┐
-│                        │ PK id           │   │ RetentionPolicy  │
-│                        │ FK category     │   │──────────────────│
-│                        │ device_equipment│   │ PK id (singleton)│
-│                        │ version_no      │   │ audit_log_days   │
-│                        │ date_purchased  │   │ call_log_days    │
-│                        │ serial_no       │   │ FK updated_by    │
-│                        │ has_warranty    │   │ updated_at       │
-│                        │ product_name    │   └──────────────────┘
-│                        │ brand           │
-│                        │ model_name      │   ┌──────────────────┐
-│                        │ sales_no        │   │  Announcement    │
-│                        │ is_active       │   │──────────────────│
-│                        └─────────────────┘   │ PK id            │
-│                                              │ title            │
-│                                              │ description      │
-│                                              │ type (info/warn) │
-│                                              │ visibility       │
-│                                              │ is_active        │
-│                                              │ start_date       │
-│                                              │ end_date         │
-│                                              │ FK created_by    │
-│                                              └──────────────────┘
+    Ticket {
+        int id PK
+        string stf_no UK
+        string status
+        string priority
+        int created_by FK
+        int assigned_to FK
+        int type_of_service FK
+        int client_record FK
+        int product_record FK
+        int current_session FK
+        date date
+        datetime time_in
+        datetime time_out
+        text description_of_problem
+        text action_taken
+        text remarks
+        string job_status
+        string cascade_type
+        text observation
+        text signature
+        string signed_by_name
+        boolean confirmed_by_admin
+    }
+
+    AssignmentSession {
+        int id PK
+        int ticket FK
+        int employee FK
+        datetime started_at
+        datetime ended_at
+        boolean is_active
+    }
+
+    Message {
+        int id PK
+        int ticket FK
+        int assignment_session FK
+        string channel_type
+        int sender FK
+        text content
+        int reply_to FK
+        boolean is_system_message
+        datetime created_at
+    }
+
+    MessageReaction {
+        int id PK
+        int message FK
+        int user FK
+        string emoji
+    }
+
+    MessageReadReceipt {
+        int id PK
+        int message FK
+        int user FK
+        datetime read_at
+    }
+
+    TicketAttachment {
+        int id PK
+        int ticket FK
+        string file
+        int uploaded_by FK
+        datetime uploaded_at
+        boolean is_resolution_proof
+        boolean is_published
+        string published_title
+        int published_by FK
+        boolean is_archived
+    }
+
+    TicketTask {
+        int id PK
+        int ticket FK
+        int assigned_to FK
+        string description
+        string status
+    }
+
+    EscalationLog {
+        int id PK
+        int ticket FK
+        int from_user FK
+        int to_user FK
+    }
+
+    AuditLog {
+        int id PK
+        datetime timestamp
+        string entity
+        int entity_id
+        string action
+        text activity
+        int actor FK
+        string actor_email
+        string ip_address
+        json changes
+    }
+
+    Notification {
+        int id PK
+        int recipient FK
+        int ticket FK
+        string type
+        string title
+        string message
+        boolean is_read
+        datetime created_at
+    }
+
+    CallLog {
+        int id PK
+        int ticket FK
+        int admin FK
+        string client_name
+        string phone_number
+        datetime call_start
+        datetime call_end
+        text notes
+    }
+
+    CSATFeedback {
+        int id PK
+        int ticket FK
+        int employee FK
+        int admin FK
+        int rating
+        text comments
+    }
+
+    TypeOfService {
+        int id PK
+        string name
+        text description
+        boolean is_active
+        int estimated_resolution_days
+    }
+
+    Category {
+        int id PK
+        string name
+        text description
+        boolean is_active
+    }
+
+    Product {
+        int id PK
+        int category FK
+        string device_equipment
+        string serial_no
+        boolean has_warranty
+        string product_name
+        string brand
+        string model_name
+        boolean is_active
+    }
+
+    Client {
+        int id PK
+        string client_name
+        string contact_person
+        string mobile_no
+        string designation
+        string dept_org
+        string email_address
+        text address
+        boolean is_active
+    }
+
+    RetentionPolicy {
+        int id PK
+        int audit_log_days
+        int call_log_days
+        int updated_by FK
+        datetime updated_at
+    }
+
+    Announcement {
+        int id PK
+        string title
+        text description
+        string type
+        string visibility
+        boolean is_active
+        date start_date
+        date end_date
+        int created_by FK
+    }
+
+    User ||--o{ Ticket : "created_by"
+    User ||--o{ Ticket : "assigned_to"
+    User ||--o{ AssignmentSession : "employee"
+    User ||--o{ AuditLog : "actor"
+    User ||--o{ Notification : "recipient"
+    User ||--o{ CallLog : "admin"
+    User ||--o{ Message : "sender"
+    User ||--o{ MessageReaction : "reacts"
+    User ||--o{ MessageReadReceipt : "reads"
+    User ||--o{ EscalationLog : "from_user"
+    User ||--o{ EscalationLog : "to_user"
+    User ||--o{ TicketAttachment : "uploaded_by"
+    User ||--o{ TicketTask : "assigned_to"
+    User ||--o{ CSATFeedback : "employee"
+    User ||--o{ CSATFeedback : "admin"
+    User ||--o{ Announcement : "created_by"
+    User ||--o{ RetentionPolicy : "updated_by"
+
+    Ticket ||--o{ AssignmentSession : "has"
+    Ticket ||--o{ Message : "has"
+    Ticket ||--o{ TicketAttachment : "has"
+    Ticket ||--o{ TicketTask : "has"
+    Ticket ||--o{ EscalationLog : "has"
+    Ticket ||--o{ Notification : "references"
+    Ticket ||--o{ CallLog : "references"
+    Ticket ||--|| CSATFeedback : "has"
+
+    AssignmentSession ||--o{ Message : "within"
+    Message ||--o{ MessageReaction : "has"
+    Message ||--o{ MessageReadReceipt : "has"
+    Message o|--o| Message : "reply_to"
+
+    TypeOfService ||--o{ Ticket : "service_type"
+    Client ||--o{ Ticket : "client_record"
+    Product ||--o{ Ticket : "product_record"
+    Category ||--o{ Product : "category"
 ```
 
 ---
@@ -288,85 +413,84 @@ Additional data dictionary entries for remaining tables (EscalationLog, Notifica
 
 ### Level 0 — Context Diagram
 
-```
-┌───────────────┐                                    ┌───────────────┐
-│               │     Support Requests               │               │
-│   Clients     │───────────────────────────────────►│   Maptech     │
-│   (External)  │◄───────────────────────────────────│   Ticketing   │
-│               │     Status Updates / Reports        │   System      │
-└───────────────┘                                    │               │
-                                                     │               │
-┌───────────────┐     Ticket Mgmt / Chat / Reports   │               │
-│  Supervisors  │◄──────────────────────────────────►│               │
-│  (Admin)      │                                    │               │
-└───────────────┘                                    │               │
-                                                     │               │
-┌───────────────┐     Assignments / Updates / Chat    │               │
-│  Technicians  │◄──────────────────────────────────►│               │
-│  (Employee)   │                                    │               │
-└───────────────┘                                    │               │
-                                                     │               │
-┌───────────────┐     User Mgmt / Config / Audit     │               │
-│  Superadmin   │◄──────────────────────────────────►│               │
-│               │                                    └───────────────┘
-└───────────────┘
+```mermaid
+flowchart LR
+    CL["Clients\n(External)"]
+    SU["Supervisors\n(Admin)"]
+    TE["Technicians\n(Employee)"]
+    SA["Superadmin"]
+
+    CL -->|"Support Requests"| MTS
+    MTS -->|"Status Updates / Reports"| CL
+    SU <-->|"Ticket Mgmt / Chat / Reports"| MTS
+    TE <-->|"Assignments / Updates / Chat"| MTS
+    SA <-->|"User Mgmt / Config / Audit"| MTS
+
+    MTS["Maptech\nTicketing\nSystem"]
 ```
 
 ### Level 1 — Major Processes
 
-```
-┌──────────┐    ┌──────────────┐    ┌────────────────┐    ┌───────────┐
-│   Auth   │    │   Ticket     │    │   Communication│    │ Knowledge │
-│  Process │    │  Lifecycle   │    │   Engine       │    │   Hub     │
-│          │    │  Management  │    │                │    │           │
-│ • Login  │    │ • Create     │    │ • Chat (WS)   │    │ • Publish │
-│ • JWT    │    │ • Assign     │    │ • Notifications│    │ • Search  │
-│ • Reset  │    │ • Escalate   │    │ • System Msgs  │    │ • Archive │
-│          │    │ • Resolve    │    │                │    │           │
-└─────┬────┘    │ • Close      │    └───────┬────────┘    └─────┬─────┘
-      │         └──────┬───────┘            │                   │
-      │                │                    │                   │
-      ▼                ▼                    ▼                   ▼
-┌──────────────────────────────────────────────────────────────────────┐
-│                        DATA STORE                                    │
-│                                                                      │
-│  Users │ Tickets │ Messages │ Attachments │ AuditLogs │ Notifications│
-└──────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph Processes[" "]
+        direction LR
+        AUTH["<b>Auth Process</b>\n• Login\n• JWT\n• Reset"]
+        TLM["<b>Ticket Lifecycle</b>\n<b>Management</b>\n• Create • Assign\n• Escalate\n• Resolve • Close"]
+        CE["<b>Communication</b>\n<b>Engine</b>\n• Chat (WS)\n• Notifications\n• System Msgs"]
+        KH["<b>Knowledge Hub</b>\n• Publish\n• Search\n• Archive"]
+    end
+
+    AUTH --> DS
+    TLM --> DS
+    CE --> DS
+    KH --> DS
+
+    subgraph DS["DATA STORE"]
+        direction LR
+        D1["Users"]
+        D2["Tickets"]
+        D3["Messages"]
+        D4["Attachments"]
+        D5["AuditLogs"]
+        D6["Notifications"]
+    end
 ```
 
 ### Level 2 — Ticket Lifecycle Data Flow
 
-```
-Admin Input ──► [Create Ticket] ──► Ticket DB
-                      │
-                      ├──► [Create Client Record] ──► Client DB
-                      ├──► [Create Product Record] ──► Product DB
-                      └──► [Create Assignment Session] ──► Session DB
-                                    │
-                                    ├──► [Send Notification] ──► Notification DB ──► WebSocket
-                                    └──► [Create Audit Log] ──► AuditLog DB
+```mermaid
+flowchart TB
+    AI["Admin Input"] --> CT["Create Ticket"]
+    CT --> TDB[(Ticket DB)]
+    CT --> CCR["Create Client Record"] --> CDB[(Client DB)]
+    CT --> CPR["Create Product Record"] --> PDB[(Product DB)]
+    CT --> CAS["Create Assignment Session"] --> SDB[(Session DB)]
+    CAS --> SN1["Send Notification"] --> NDB[(Notification DB)] --> WS1(("WebSocket"))
+    CAS --> CA1["Create Audit Log"] --> ADB1[(AuditLog DB)]
 
-Employee Input ──► [Start Work] ──► Ticket DB (time_in, status)
-                         │
-                         └──► [Create Audit Log]
+    EI1["Employee Input"] --> SW["Start Work"]
+    SW --> TDB2[(Ticket DB — time_in, status)]
+    SW --> CA2["Create Audit Log"]
 
-Employee Input ──► [Update Ticket] ──► Ticket DB (action, remarks, etc.)
-                         │
-                         └──► [Create Audit Log]
+    EI2["Employee Input"] --> UT["Update Ticket"]
+    UT --> TDB3[(Ticket DB — action, remarks)]
+    UT --> CA3["Create Audit Log"]
 
-Employee Input ──► [Upload Proof] ──► Attachment DB + File Storage
+    EI3["Employee Input"] --> UP["Upload Proof"]
+    UP --> ATDB[(Attachment DB + File Storage)]
 
-Employee Input ──► [Request Closure] ──► Ticket DB (status, time_out)
-                         │
-                         ├──► [Send Notification to Admin]
-                         └──► [Create Audit Log]
+    EI4["Employee Input"] --> RC["Request Closure"]
+    RC --> TDB4[(Ticket DB — status, time_out)]
+    RC --> SN2["Notify Admin"]
+    RC --> CA4["Create Audit Log"]
 
-Admin Input ──► [Close Ticket] ──► Ticket DB (status → closed)
-                     │
-                     ├──► [End Session] ──► Session DB
-                     ├──► [Create CSAT] ──► CSATFeedback DB
-                     ├──► [Send Notification to Employee]
-                     └──► [Create Audit Log]
+    ADI["Admin Input"] --> CLT["Close Ticket"]
+    CLT --> TDB5[(Ticket DB — status → closed)]
+    CLT --> ES["End Session"] --> SDB2[(Session DB)]
+    CLT --> CSAT["Create CSAT"] --> CSDB[(CSATFeedback DB)]
+    CLT --> SN3["Notify Employee"]
+    CLT --> CA5["Create Audit Log"]
 ```
 
 ---

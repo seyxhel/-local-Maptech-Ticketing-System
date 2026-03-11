@@ -16,26 +16,18 @@ The Maptech Ticketing System supports a multi-stage ticket lifecycle with branch
 
 Prior to the ticketing system, the support process operated as follows:
 
-```
-Client calls/emails          Supervisor receives request
-      │                              │
-      ▼                              ▼
-  Paper STF Form        Manually logs in spreadsheet
-  filled out                         │
-      │                              ▼
-      ▼                   Calls/messages technician
-  Faxed or emailed                   │
-  to office                          ▼
-      │                   Technician visits client
-      ▼                              │
-  Filed in cabinet                   ▼
-  (paper archive)        Technician calls back with update
-                                     │
-                                     ▼
-                         Supervisor manually updates spreadsheet
-                                     │
-                                     ▼
-                         Follow-up via phone/email
+```mermaid
+flowchart TB
+    A["Client calls/emails"] --> B["Paper STF Form\nfilled out"]
+    B --> C["Faxed or emailed\nto office"]
+    C --> D["Filed in cabinet\n(paper archive)"]
+
+    E["Supervisor receives request"] --> F["Manually logs in spreadsheet"]
+    F --> G["Calls/messages technician"]
+    G --> H["Technician visits client"]
+    H --> I["Technician calls back\nwith update"]
+    I --> J["Supervisor manually\nupdates spreadsheet"]
+    J --> K["Follow-up via\nphone/email"]
 ```
 
 ### As-Is Process Challenges
@@ -55,43 +47,22 @@ Client calls/emails          Supervisor receives request
 
 With the Maptech Ticketing System, the process operates as follows:
 
-```
-Client contacts Maptech ──► Supervisor logs into system
-                                     │
-                                     ▼
-                            Creates ticket (auto STF#)
-                            Enters client & product info
-                                     │
-                                     ▼
-                            Assigns to technician
-                            (system sends notification)
-                                     │
-                                     ▼
-                    Technician receives real-time notification
-                    Views ticket details in dashboard
-                                     │
-                                     ▼
-                    Starts work (time_in recorded)
-                    Communicates via live chat
-                                     │
-                            ┌────────┴────────┐
-                            │                 │
-                            ▼                 ▼
-                     Resolves Issue      Escalates
-                     Uploads proof       (Internal/External)
-                            │                 │
-                            ▼                 ▼
-                     Requests closure    Re-assigned or
-                     (time_out set)      sent to vendor
-                            │                 │
-                            ▼                 ▼
-                     Supervisor reviews  Process repeats
-                     Submits CSAT           │
-                     Closes ticket          │
-                            │                 │
-                            ▼                 ▼
-                     Knowledge Hub      Resolution captured
-                     (publish proof)    when eventually closed
+```mermaid
+flowchart TB
+    A["Client contacts Maptech"] --> B["Supervisor logs into system"]
+    B --> C["Creates ticket — auto STF#\nEnters client & product info"]
+    C --> D["Assigns to technician\n(system sends notification)"]
+    D --> E["Technician receives real-time notification\nViews ticket details in dashboard"]
+    E --> F["Starts work — time_in recorded\nCommunicates via live chat"]
+    F --> G{"Outcome?"}
+    G -->|"Resolves"| H["Resolves Issue\nUploads proof"]
+    G -->|"Escalates"| I["Escalates\n(Internal / External)"]
+    H --> J["Requests closure\n(time_out set)"]
+    I --> K["Re-assigned or\nsent to vendor"]
+    J --> L["Supervisor reviews\nSubmits CSAT\nCloses ticket"]
+    K --> M["Process repeats\nuntil resolved"]
+    L --> N["Knowledge Hub\n(publish proof)"]
+    M --> O["Resolution captured\nwhen eventually closed"]
 ```
 
 ### To-Be Process Benefits
@@ -112,50 +83,35 @@ Client contacts Maptech ──► Supervisor logs into system
 
 ### 6.4.1 Ticket Lifecycle State Diagram
 
-```
-                           ┌──────────┐
-                           │  OPEN    │ ◄── Ticket Created
-                           └─────┬────┘
-                                 │
-                          Assigned & Work Started
-                                 │
-                           ┌─────▼─────────┐
-                      ┌───►│ IN_PROGRESS    │◄───────────────────────┐
-                      │    └──┬──┬──┬───────┘                        │
-                      │       │  │  │                                │
-                      │       │  │  └──── Escalate Internally ──►┌───┴───────┐
-                      │       │  │                               │ ESCALATED │
-                      │       │  │        Escalate Externally──►│ (Internal)│
-                      │       │  │                               └───────────┘
-                      │       │  │
-                      │       │  └────── Escalate Externally ──►┌────────────────┐
-                      │       │                                 │ ESCALATED      │
-                      │       │                                 │ (External)     │
-                      │       │                                 └────────────────┘
-                      │       │
-                      │       ├──── Submit for Observation ──►┌─────────────────┐
-                      │       │                               │ FOR_OBSERVATION  │
-                      │       │                               └────────┬────────┘
-                      │       │                                        │
-                      │       │                            Admin reviews│
-                      │       │                                        ▼
-                      │       │                          (Returns to IN_PROGRESS
-                      │       │                           or proceeds to closure)
-                      │       │
-                      │       └──── Request Closure ──────►┌─────────────────┐
-                      │                                    │ PENDING_CLOSURE  │
-                      │                                    └────────┬────────┘
-                      │                                             │
-                      │                                   Admin reviews &
-                      │                                   closes ticket
-                      │                                             │
-                      │                                    ┌────────▼────────┐
-                      │                                    │    CLOSED       │
-                      │                                    └─────────────────┘
-                      │
-                      │         ┌──────────────┐
-                      └─────────│  UNRESOLVED  │ ◄── Admin marks unresolved
-                                └──────────────┘     (can be re-opened)
+```mermaid
+stateDiagram-v2
+    [*] --> open : Ticket Created
+
+    open : OPEN
+    in_progress : IN PROGRESS
+    escalated : ESCALATED (Internal)
+    escalated_ext : ESCALATED (External)
+    for_observation : FOR OBSERVATION
+    pending_closure : PENDING CLOSURE
+    closed : CLOSED
+    unresolved : UNRESOLVED
+
+    open --> in_progress : Assigned & Work Started
+
+    in_progress --> escalated : Escalate Internally
+    in_progress --> escalated_ext : Escalate Externally
+    in_progress --> for_observation : Submit for Observation
+    in_progress --> pending_closure : Request Closure
+    in_progress --> unresolved : Admin marks unresolved
+
+    escalated --> in_progress : Re-assigned
+
+    for_observation --> in_progress : Returns to In Progress
+    for_observation --> closed : Admin closes after observation
+
+    pending_closure --> closed : Admin reviews & closes
+
+    unresolved --> in_progress : Re-opened
 ```
 
 ### Ticket Status Definitions
@@ -173,101 +129,51 @@ Client contacts Maptech ──► Supervisor logs into system
 
 ### 6.4.2 Ticket Assignment Flow
 
-```
-Supervisor creates ticket
-         │
-         ▼
-Selects technician (views workload)
-         │
-         ▼
-System creates AssignmentSession
-Sends notification to technician
-         │
-         ▼
-Technician receives notification
-         │
-         ▼
-Technician starts work (time_in set)
-         │
-    ┌────┴─────────────────┐
-    │                      │
-    ▼                      ▼
- Resolves            Needs escalation
-    │                      │
-    ▼                      ▼
-Request closure      Pass or Escalate
-    │                      │
-    ▼                      ▼
-Admin closes         New AssignmentSession
-(old session ends)   (old session ends)
+```mermaid
+flowchart TB
+    A["Supervisor creates ticket"] --> B["Selects technician\n(views workload)"]
+    B --> C["System creates AssignmentSession\nSends notification to technician"]
+    C --> D["Technician receives notification"]
+    D --> E["Technician starts work\n(time_in set)"]
+    E --> F{"Outcome?"}
+    F -->|"Resolves"| G["Request closure"]
+    F -->|"Needs escalation"| H["Pass or Escalate"]
+    G --> I["Admin closes\n(old session ends)"]
+    H --> J["New AssignmentSession\n(old session ends)"]
 ```
 
 ### 6.4.3 Escalation Workflow
 
-```
-┌─────────────────────────────────────────────┐
-│            INTERNAL ESCALATION               │
-│                                             │
-│  Technician → Escalate (returns to admin)   │
-│       OR                                     │
-│  Technician → Pass (to another technician)  │
-│                                             │
-│  ┌─────────────────────────────────────┐    │
-│  │ 1. Current session ends             │    │
-│  │ 2. EscalationLog created            │    │
-│  │ 3. System message in chat           │    │
-│  │ 4. New assignment (if pass)         │    │
-│  │ 5. Notification sent                │    │
-│  └─────────────────────────────────────┘    │
-└─────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph internal["INTERNAL ESCALATION"]
+        direction TB
+        IA["Technician → Escalate (returns to admin)\nOR\nTechnician → Pass (to another technician)"]
+        IB["1. Current session ends\n2. EscalationLog created\n3. System message in chat\n4. New assignment (if pass)\n5. Notification sent"]
+        IA --> IB
+    end
 
-┌─────────────────────────────────────────────┐
-│            EXTERNAL ESCALATION               │
-│                                             │
-│  Admin/Employee → Escalate External         │
-│  (to distributor or principal)              │
-│                                             │
-│  ┌─────────────────────────────────────┐    │
-│  │ 1. EscalationLog (type: external)   │    │
-│  │ 2. Ticket status → escalated_ext    │    │
-│  │ 3. External entity name recorded    │    │
-│  │ 4. Escalation notes stored          │    │
-│  │ 5. Timestamp captured               │    │
-│  └─────────────────────────────────────┘    │
-└─────────────────────────────────────────────┘
+    subgraph external["EXTERNAL ESCALATION"]
+        direction TB
+        EA["Admin/Employee → Escalate External\n(to distributor or principal)"]
+        EB["1. EscalationLog (type: external)\n2. Ticket status → escalated_ext\n3. External entity name recorded\n4. Escalation notes stored\n5. Timestamp captured"]
+        EA --> EB
+    end
 ```
 
 ### 6.4.4 Resolution & Closure Flow
 
-```
-Technician completes work
-         │
-         ▼
-Uploads resolution proof (attachments)
-         │
-         ▼
-Updates action taken, remarks, job status
-         │
-         ▼
-Captures client signature (digital)
-         │
-         ▼
-Requests closure (status → pending_closure, time_out set)
-         │
-         ▼
-Supervisor receives notification
-         │
-         ▼
-Reviews resolution details & proof
-         │
-         ▼
-Submits CSAT feedback (1-5 rating)
-         │
-         ▼
-Closes ticket (status → closed)
-         │
-         ▼
-[Optional] Publishes resolution proof to Knowledge Hub
+```mermaid
+flowchart TB
+    A["Technician completes work"] --> B["Uploads resolution proof\n(attachments)"]
+    B --> C["Updates action taken,\nremarks, job status"]
+    C --> D["Captures client signature\n(digital)"]
+    D --> E["Requests closure\n(status → pending_closure, time_out set)"]
+    E --> F["Supervisor receives notification"]
+    F --> G["Reviews resolution\ndetails & proof"]
+    G --> H["Submits CSAT feedback\n(1-5 rating)"]
+    H --> I["Closes ticket\n(status → closed)"]
+    I --> J["Optional: Publishes resolution\nproof to Knowledge Hub"]
 ```
 
 ---

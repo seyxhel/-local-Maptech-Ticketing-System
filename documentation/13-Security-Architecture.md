@@ -23,20 +23,19 @@ The Maptech Ticketing System implements a defense-in-depth security model with t
 
 The system implements RBAC with three hierarchical roles:
 
-```
-┌─────────────────────────────────────────────────┐
-│                  SUPERADMIN                       │
-│  Full system access including user management,   │
-│  retention policies, and all admin capabilities  │
-├─────────────────────────────────────────────────┤
-│                    ADMIN                          │
-│  Ticket lifecycle management, catalog CRUD,      │
-│  knowledge hub, call logs, CSAT, audit logs      │
-├─────────────────────────────────────────────────┤
-│                   EMPLOYEE                        │
-│  View/work on assigned tickets only, escalate,   │
-│  submit for observation, request closure          │
-└─────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph SA["SUPERADMIN"]
+        SA_D["Full system access including user management,\nretention policies, and all admin capabilities"]
+    end
+    subgraph AD["ADMIN"]
+        AD_D["Ticket lifecycle management, catalog CRUD,\nknowledge hub, call logs, CSAT, audit logs"]
+    end
+    subgraph EM["EMPLOYEE"]
+        EM_D["View/work on assigned tickets only, escalate,\nsubmit for observation, request closure"]
+    end
+
+    SA --> AD --> EM
 ```
 
 ### Permission Classes

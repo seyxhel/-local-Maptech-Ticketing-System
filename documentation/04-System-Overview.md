@@ -22,39 +22,24 @@ The system operates as a client-server web application with a RESTful API backen
 
 The Maptech Ticketing System operates within the following context:
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    EXTERNAL ENTITIES                        │
-│                                                             │
-│  ┌──────────┐  ┌───────────────────────────┐                │
-│  │ External │  │  Administrator Browsers   │                │
-│  │ Vendors  │  │  (Chrome, Firefox, Edge)  │                │
-│  └────┬─────┘  └────────────┬──────────────┘                │
-│       │                      │                              │
-└───────┼──────────────────────┼──────────────────────────────┘
-        │                      │
-        ▼                      ▼
-┌─────────────────────────────────────────────────────────────┐
-│              MAPTECH TICKETING SYSTEM                        │
-│                                                             │
-│  ┌───────────────────────────────────────────────────────┐  │
-│  │          Frontend (React SPA)                         │  │
-│  │   • Admin Dashboard    • Employee Dashboard           │  │
-│  │   • Superadmin Panel                                  │  │
-│  └───────────────────────┬───────────────────────────────┘  │
-│                          │ HTTP/WebSocket                    │
-│  ┌───────────────────────▼───────────────────────────────┐  │
-│  │          Backend (Django + Channels)                   │  │
-│  │   • REST API          • WebSocket Consumers           │  │
-│  │   • Business Logic    • Authentication                │  │
-│  └───────────────────────┬───────────────────────────────┘  │
-│                          │                                  │
-│  ┌───────────────────────▼───────────────────────────────┐  │
-│  │          Data Layer                                   │  │
-│  │   • SQLite Database   • File Storage (Media)          │  │
-│  └───────────────────────────────────────────────────────┘  │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph External["EXTERNAL ENTITIES"]
+        EV["External\nVendors"]
+        BR["Administrator Browsers\n(Chrome, Firefox, Edge)"]
+    end
+
+    EV -->|"Escalation Info (Manual)"| MTS
+    BR -->|"HTTPS / WSS"| MTS
+
+    subgraph MTS["MAPTECH TICKETING SYSTEM"]
+        FE["<b>Frontend</b> — React SPA\n• Admin Dashboard\n• Employee Dashboard\n• Superadmin Panel"]
+        BE["<b>Backend</b> — Django + Channels\n• REST API • WebSocket Consumers\n• Business Logic • Authentication"]
+        DL["<b>Data Layer</b>\n• SQLite Database\n• File Storage (Media)"]
+
+        FE -->|"HTTP / WebSocket"| BE
+        BE --> DL
+    end
 ```
 
 ### External Entity Interactions
@@ -94,10 +79,13 @@ The system implements a role-based access control (RBAC) model with the followin
 
 ### Role Hierarchy
 
-```
-Superadmin (Full System Access)
-    └── Admin / Supervisor (Ticket & Catalog Management)
-            └── Employee / Technician (Assigned Ticket Operations)
+```mermaid
+flowchart TB
+    SA["<b>Superadmin</b>\nFull System Access"]
+    AD["<b>Admin / Supervisor</b>\nTicket & Catalog Management"]
+    EM["<b>Employee / Technician</b>\nAssigned Ticket Operations"]
+
+    SA --> AD --> EM
 ```
 
 ### Detailed Role Permissions

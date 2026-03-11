@@ -28,61 +28,31 @@ The system employs a combination of established architectural patterns:
 
 The system is organized into the following logical layers:
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                   PRESENTATION LAYER                         │
-│                                                             │
-│  React SPA (TypeScript)                                     │
-│  ├── Role-Based Layouts (Superadmin, Admin, Employee)       │
-│  ├── Pages & Components                                     │
-│  ├── Context Providers (Auth, Theme)                        │
-│  ├── Service Layer (API calls, WebSocket clients)           │
-│  └── Route Guards (ProtectedRoute)                          │
-│                                                             │
-├──────────────── HTTP / WebSocket ────────────────────────────┤
-│                                                             │
-│                   APPLICATION LAYER                          │
-│                                                             │
-│  Django REST Framework                                      │
-│  ├── URL Router & ViewSets                                  │
-│  ├── Serializers (input validation, output formatting)      │
-│  ├── Permission Classes (RBAC enforcement)                  │
-│  ├── JWT Authentication (SimpleJWT)                         │
-│  └── Swagger/OpenAPI Documentation (drf-yasg)               │
-│                                                             │
-│  Django Channels (ASGI)                                     │
-│  ├── WebSocket Consumers (Chat, Notifications)              │
-│  ├── Channel Layer (In-Memory / Redis)                      │
-│  └── JWT Middleware for WebSocket Auth                       │
-│                                                             │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│                   BUSINESS LOGIC LAYER                       │
-│                                                             │
-│  ├── Ticket Lifecycle Management                            │
-│  ├── Assignment & Escalation Engine                         │
-│  ├── SLA Calculation & Progress Tracking                    │
-│  ├── Knowledge Hub Publishing Workflow                      │
-│  ├── CSAT Feedback Collection                               │
-│  ├── Audit Logging Engine                                   │
-│  ├── Notification Dispatch System                           │
-│  └── Signal Handlers (Event-Driven Side Effects)            │
-│                                                             │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│                   DATA LAYER                                │
-│                                                             │
-│  Django ORM                                                 │
-│  ├── Models (18 database tables)                            │
-│  ├── Migrations (schema versioning)                         │
-│  └── QuerySets (data access)                                │
-│                                                             │
-│  Storage                                                    │
-│  ├── SQLite Database (db.sqlite3)                           │
-│  ├── Media Files (ticket attachments, profile pictures)     │
-│  └── Static Files (whitenoise-served)                       │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph PL["PRESENTATION LAYER"]
+        PL1["<b>React SPA (TypeScript)</b>\n• Role-Based Layouts (Superadmin, Admin, Employee)\n• Pages & Components\n• Context Providers (Auth, Theme)\n• Service Layer (API calls, WebSocket clients)\n• Route Guards (ProtectedRoute)"]
+    end
+
+    PL ==>|"HTTP / WebSocket"| AL
+
+    subgraph AL["APPLICATION LAYER"]
+        DRF["<b>Django REST Framework</b>\n• URL Router & ViewSets\n• Serializers (validation & formatting)\n• Permission Classes (RBAC)\n• JWT Authentication (SimpleJWT)\n• Swagger/OpenAPI (drf-yasg)"]
+        DC["<b>Django Channels (ASGI)</b>\n• WebSocket Consumers (Chat, Notifications)\n• Channel Layer (InMemory / Redis)\n• JWT Middleware for WebSocket Auth"]
+    end
+
+    AL ==> BL
+
+    subgraph BL["BUSINESS LOGIC LAYER"]
+        BL1["• Ticket Lifecycle Management\n• Assignment & Escalation Engine\n• SLA Calculation & Progress Tracking\n• Knowledge Hub Publishing Workflow\n• CSAT Feedback Collection\n• Audit Logging Engine\n• Notification Dispatch System\n• Signal Handlers (Event-Driven Side Effects)"]
+    end
+
+    BL ==> DAL
+
+    subgraph DAL["DATA LAYER"]
+        ORM["<b>Django ORM</b>\n• Models (18 database tables)\n• Migrations (schema versioning)\n• QuerySets (data access)"]
+        STR["<b>Storage</b>\n• SQLite Database (db.sqlite3)\n• Media Files (attachments, profile pics)\n• Static Files (Whitenoise-served)"]
+    end
 ```
 
 ### Layer Descriptions
@@ -100,56 +70,31 @@ The system is organized into the following logical layers:
 
 ### Development Environment
 
-```
-┌──────────────────────────────────────────────┐
-│             Developer Workstation             │
-│                                              │
-│  ┌────────────────┐  ┌────────────────────┐  │
-│  │ Vite Dev Server │  │ Daphne ASGI Server │  │
-│  │ (Port 3000)     │  │ (Port 8000)        │  │
-│  │                 │  │                    │  │
-│  │ React SPA       │  │ Django + Channels  │  │
-│  │ (Hot Reload)    │  │ (Auto Reload)      │  │
-│  └───────┬─────────┘  └────────┬───────────┘  │
-│          │ Proxy               │              │
-│          └─────────────────────┤              │
-│                                │              │
-│  ┌─────────────────────────────▼────────────┐ │
-│  │        SQLite + File Storage              │ │
-│  │        (db.sqlite3 + media/)              │ │
-│  └───────────────────────────────────────────┘ │
-│                                              │
-└──────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph DW["Developer Workstation"]
+        VS["<b>Vite Dev Server</b>\n(Port 3000)\nReact SPA — Hot Reload"]
+        DA["<b>Daphne ASGI Server</b>\n(Port 8000)\nDjango + Channels — Auto Reload"]
+        DB["<b>SQLite + File Storage</b>\n(db.sqlite3 + media/)"]
+
+        VS -->|"Proxy"| DA
+        DA --> DB
+    end
 ```
 
 ### Production Environment (Recommended)
 
-```
-┌─────────────┐     HTTPS/WSS     ┌──────────────────┐
-│   Browser    │◄────────────────►│  Reverse Proxy    │
-│  (End User)  │                  │  (Nginx/Caddy)    │
-└─────────────┘                   └────────┬─────────┘
-                                           │
-                              ┌────────────┴────────────┐
-                              │                         │
-                    ┌─────────▼──────┐       ┌──────────▼────────┐
-                    │  Static Files   │       │   Daphne / Uvicorn│
-                    │  (Whitenoise    │       │   ASGI Server     │
-                    │   or CDN)       │       │   (Django +       │
-                    └─────────────────┘       │    Channels)      │
-                                             └─────────┬─────────┘
-                                                       │
-                                          ┌────────────┴────────────┐
-                                          │                         │
-                                ┌─────────▼──────┐       ┌─────────▼──────┐
-                                │  PostgreSQL     │       │  Redis         │
-                                │  Database       │       │  Channel Layer │
-                                └─────────────────┘       └────────────────┘
-                                          │
-                                ┌─────────▼──────┐
-                                │  File Storage   │
-                                │  (Local / S3)   │
-                                └─────────────────┘
+```mermaid
+flowchart TB
+    BR["Browser\n(End User)"] <-->|"HTTPS / WSS"| RP["Reverse Proxy\n(Nginx / Caddy)"]
+
+    RP --> SF["Static Files\n(Whitenoise or CDN)"]
+    RP --> AS["Daphne / Uvicorn\nASGI Server\n(Django + Channels)"]
+
+    AS --> PG["PostgreSQL\nDatabase"]
+    AS --> RD["Redis\nChannel Layer"]
+
+    PG ~~~ FS["File Storage\n(Local / S3)"]
 ```
 
 ---
