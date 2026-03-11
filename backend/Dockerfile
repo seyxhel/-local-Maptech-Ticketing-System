@@ -29,16 +29,27 @@ WORKDIR /app
 
 # Runtime-only system libs
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        libjpeg62-turbo \
-        zlib1g \
+    libjpeg62-turbo \
+    zlib1g \
+    netcat \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy installed packages from builder
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Copy project source
-COPY . .
+# Copy project source into a temporary location so this Dockerfile works when the
+# build context is either the repo root or the `backend/` folder.
+COPY . /src_tmp
+
+# Move the correct project subtree into /app depending on build context.
+RUN if [ -f /src_tmp/manage.py ]; then \
+            cp -a /src_tmp/. /app; \
+        elif [ -f /src_tmp/backend/manage.py ]; then \
+            cp -a /src_tmp/backend/. /app; \
+        else \
+            echo "Error: manage.py not found in build context" >&2; exit 1; \
+        fi
 
 # Create directories that need to persist
 RUN mkdir -p /app/media /app/staticfiles
@@ -47,8 +58,14 @@ RUN mkdir -p /app/media /app/staticfiles
 # (WhiteNoise will serve them; no DB access needed for collectstatic)
 RUN SECRET_KEY=build-time-dummy-key python manage.py collectstatic --noinput
 
-COPY backend/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+# Expose entrypoint from the copied app directory to a predictable location
+RUN if [ -f /app/entrypoint.sh ]; then \
+            cp /app/entrypoint.sh /entrypoint.sh && chmod +x /entrypoint.sh; \
+        elif [ -f /app/backend/entrypoint.sh ]; then \
+            cp /app/backend/entrypoint.sh /entrypoint.sh && chmod +x /entrypoint.sh; \
+        else \
+            echo "Warning: entrypoint.sh not found in app, continuing"; \
+        fi
 
 EXPOSE 8000
 
