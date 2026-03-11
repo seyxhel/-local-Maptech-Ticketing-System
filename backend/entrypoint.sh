@@ -37,13 +37,13 @@ echo "==> Running database migrations..."
 python manage.py migrate --noinput
 
 # Optional: run project seeders when AUTO_SEED is enabled (set AUTO_SEED=1 in env)
-if [ "${AUTO_SEED}" = "1" ] || [ "${AUTO_SEED}" = "true" ] || [ "${AUTO_SEED}" = "TRUE" ]; then
+if [ "${AUTO_SEED}" = "1" ] || [ "${AUTO_SEED}" = "true" ] || [ "${AUTO_SEED}" = "True" ] || [ "${AUTO_SEED}" = "TRUE" ]; then
     echo "==> AUTO_SEED enabled — running seed management commands"
-    # run seeders; commands are idempotent and errors should not stop the container
-    python manage.py seed_users || true
-    python manage.py seed_services || true
-    python manage.py seed_categories || true
-    python manage.py seed_tickets || true
+    # run seeders; commands are idempotent — log errors but do not stop the container
+    python manage.py seed_users   2>&1 || echo "[WARN] seed_users failed"
+    python manage.py seed_services  2>&1 || echo "[WARN] seed_services failed"
+    python manage.py seed_categories 2>&1 || echo "[WARN] seed_categories failed"
+    python manage.py seed_tickets  2>&1 || echo "[WARN] seed_tickets failed"
     echo "==> Seeder tasks finished"
 fi
 
