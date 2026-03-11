@@ -15,7 +15,15 @@ fi
 
 export BACKEND_TARGET
 
-# Substitute BACKEND_TARGET into nginx config template
-envsubst '${BACKEND_TARGET}' < /etc/nginx/conf.d/default.conf.template > /etc/nginx/conf.d/default.conf
+# Log computed targets for debugging
+echo "==> FRONTEND: computed BACKEND_TARGET=${BACKEND_TARGET}" 1>&2 || true
+echo "==> FRONTEND: PORT=${PORT:-<unset>}" 1>&2 || true
+
+# Substitute BACKEND_TARGET and PORT into nginx config template
+# envsubst will replace the listed variables; if you omit the list it replaces all env vars.
+envsubst '${BACKEND_TARGET} ${PORT}' < /etc/nginx/conf.d/default.conf.template > /etc/nginx/conf.d/default.conf
+
+# Print top of final nginx config for logs (helps diagnose 502/upstream issues)
+sed -n '1,120p' /etc/nginx/conf.d/default.conf 1>&2 || true
 
 exec "$@"
