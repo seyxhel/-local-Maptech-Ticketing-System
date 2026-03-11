@@ -52,6 +52,34 @@ services:
       # In production (Railway), set BACKEND_URL to your backend's public URL (no trailing slash).
       BACKEND_URL: ${BACKEND_URL:-http://backend:8000}
 
+  # ── One-shot seed runner ─────────────────────────────────────────────────
+  # Use this to populate the database with initial data. It runs migrations
+  # then the project's management seed commands and exits. Run with:
+  #   docker-compose run --rm seed
+  seed:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: "no"
+    environment:
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production-use-a-long-random-string}
+      DEBUG: ${DEBUG:-False}
+      DATABASE_URL: ${DATABASE_URL:-}
+      DB_PATH: /app/data/db.sqlite3
+      WAIT_FOR_DB_SECONDS: ${WAIT_FOR_DB_SECONDS:-30}
+    volumes:
+      - backend_db:/app/data
+      - backend_media:/app/media
+    depends_on:
+      backend:
+        condition: service_healthy
+    command: >
+      sh -c "python manage.py migrate --noinput && \
+      python manage.py seed_users || true && \
+      python manage.py seed_services || true && \
+      python manage.py seed_categories || true && \
+      python manage.py seed_tickets || true"
+
 # ── Named volumes ────────────────────────────────────────────────────────────
 volumes:
   # SQLite database directory — survives container rebuilds
