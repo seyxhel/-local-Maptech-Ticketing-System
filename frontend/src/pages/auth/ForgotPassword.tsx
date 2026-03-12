@@ -32,7 +32,7 @@ export function ForgotPassword() {
       await resetPasswordByKey(recoveryKey.trim(), newPassword, email.trim());
       setSuccess(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Wrong email or recovery key.');
+      setError(err instanceof Error ? err.message : 'Invalid credentials.');
     } finally {
       setLoading(false);
     }

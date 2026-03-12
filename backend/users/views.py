@@ -172,7 +172,7 @@ class AuthViewSet(viewsets.GenericViewSet):
                 {'detail': 'Email, recovery key, and new password are required.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        _WRONG = 'Wrong email or recovery key.'
+        _WRONG = 'Invalid Credentials'
         try:
             user = User.objects.get(recovery_key=recovery_key)
         except User.DoesNotExist:
