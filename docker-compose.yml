@@ -40,7 +40,7 @@ services:
   # ── React / Nginx frontend ──────────────────────────────────────────────────
   frontend:
     build:
-      context: ./Maptech_FrontendUI-main
+      context: ./frontend
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
