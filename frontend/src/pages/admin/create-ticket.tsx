@@ -87,6 +87,21 @@ const CONTACT_FIELDS = [
 /* Flow: form → stf-details (with Call Client + Priority) → ongoing → stf-details (priority enabled) → assign employee → redirect */
 type ModalStep = 'none' | 'stf-details' | 'ongoing' | 'assign';
 
+function formatPriorityLabel(priority?: string | null): string {
+  if (!priority) return 'Unknown';
+  const normalized = String(priority).replace(/_/g, ' ').toLowerCase();
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function priorityBadgeClass(priority?: string | null): string {
+  const key = String(priority || '').toLowerCase();
+  if (key === 'critical') return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
+  if (key === 'high') return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400';
+  if (key === 'medium') return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400';
+  if (key === 'low') return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
+  return 'bg-gray-100 text-gray-600 dark:bg-gray-600 dark:text-gray-300';
+}
+
 export default function AdminCreateTicket() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -147,6 +162,9 @@ export default function AdminCreateTicket() {
 
   // Employee working tickets (for expanded assign modal)
   const [employeeTickets, setEmployeeTickets] = useState<Record<number, BackendTicket[]>>({});
+
+  // After call completion + priority selection, external assignment is no longer shown.
+  const canAssignExternal = !(callCompleted && !!priorityLevel);
 
   // Fetch employees, service types, clients, and products from backend
   useEffect(() => {
@@ -949,6 +967,9 @@ export default function AdminCreateTicket() {
                                     <div className="text-xs font-semibold text-gray-800 dark:text-gray-200 truncate">{t.stf_no}</div>
                                     <div className="text-[11px] text-gray-500 dark:text-gray-400 truncate">{t.type_of_service_detail?.name || 'N/A'}</div>
                                   </div>
+                                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${priorityBadgeClass(t.priority)}`}>
+                                    {formatPriorityLabel(t.priority)}
+                                  </span>
                                   <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase shrink-0 ${t.status === 'in_progress' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : t.status === 'pending' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-600 dark:text-gray-300'}`}>
                                     {(t.status || '').replace(/_/g, ' ')}
                                   </span>
@@ -975,14 +996,18 @@ export default function AdminCreateTicket() {
                   <button onClick={handleAssign} disabled={!selectedEmployee || isAssigning} className="w-full px-4 py-2.5 rounded-lg bg-[#3BC25B] hover:bg-[#2ea34a] text-white text-sm font-bold transition-colors flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed">
                     {isAssigning ? <><Loader2 className="w-4 h-4 animate-spin" /> Assigning…</> : <><UserCheck className="w-4 h-4" /> Assign Ticket</>}
                   </button>
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
-                    <span className="text-xs text-gray-400 dark:text-gray-500 font-medium">or</span>
-                    <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
-                  </div>
-                  <button onClick={handleAssignExternal} disabled={isAssigning} className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 text-sm font-bold transition-colors flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed">
-                    {isAssigning ? <><Loader2 className="w-4 h-4 animate-spin" /> Processing…</> : <><ExternalLink className="w-4 h-4" /> Assign to External</>}
-                  </button>
+                  {canAssignExternal && (
+                    <>
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+                        <span className="text-xs text-gray-400 dark:text-gray-500 font-medium">or</span>
+                        <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+                      </div>
+                      <button onClick={handleAssignExternal} disabled={isAssigning} className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 text-sm font-bold transition-colors flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed">
+                        {isAssigning ? <><Loader2 className="w-4 h-4 animate-spin" /> Processing…</> : <><ExternalLink className="w-4 h-4" /> Assign to External</>}
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
