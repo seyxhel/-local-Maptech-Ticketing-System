@@ -11,6 +11,7 @@ import {
   ChevronDown,
   FileSpreadsheet,
 } from 'lucide-react';
+import { toast } from 'sonner';
 // @ts-ignore
 import XLSXStyle from 'xlsx-js-style';
 import { buildPdfDocument, openPrintWindow } from '../../utils/pdfTemplate';
@@ -54,6 +55,7 @@ export function Reports() {
     setShowExportMenu(false);
     const printContents = reportRef.current;
     if (!printContents) return;
+    const dateTag = new Date().toISOString().slice(0, 10);
     const body = `
       <div class="stat-grid">
         <div class="stat-card"><div class="stat-label">Total Tickets</div><div class="stat-value">${totalTicketsVal}</div></div>
@@ -83,7 +85,12 @@ export function Reports() {
         </tbody>
       </table>`;
     const html = buildPdfDocument('Supervisor Reports - Maptech Ticketing System', 'Supervisor Reports', body, `${totalTicketsVal} total tickets`);
-    openPrintWindow(html);
+    void openPrintWindow(html, `supervisor_reports_${dateTag}.pdf`)
+      .then(() => toast.success('PDF downloaded.'))
+      .catch((err) => {
+        console.error('PDF export failed:', err);
+        toast.error('PDF export failed.');
+      });
   };
 
   // ── XLSX Export ──

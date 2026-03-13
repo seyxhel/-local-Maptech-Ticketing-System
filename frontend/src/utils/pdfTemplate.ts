@@ -1,4 +1,6 @@
 import { MAPTECH_LOGO_BASE64 } from './pdfLogo';
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
 
 /**
  * Shared PDF template system for professional Maptech-branded exports.
@@ -193,12 +195,191 @@ export function buildPdfDocument(
   </body></html>`;
 }
 
-/** Open a print window with the given HTML and trigger print */
-export function openPrintWindow(html: string): void {
-  const printWindow = window.open('', '_blank');
-  if (!printWindow) return;
-  printWindow.document.write(html);
-  printWindow.document.close();
-  printWindow.focus();
-  setTimeout(() => { printWindow.print(); printWindow.close(); }, 500);
+function sanitizeFileName(fileName: string): string {
+  const trimmed = fileName.trim() || 'maptech-report';
+  const safe = trimmed.replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, '_');
+  return safe.toLowerCase().endsWith('.pdf') ? safe : `${safe}.pdf`;
+}
+
+/**
+ * Generate and automatically download a PDF file from branded report HTML.
+ * Keeps the existing function name for backward compatibility across pages.
+ */
+export async function openPrintWindow(html: string, fileName = 'maptech-report.pdf'): Promise<void> {
+  const safeFileName = sanitizeFileName(fileName);
+
+  const iframe = document.createElement('iframe');
+  iframe.setAttribute('aria-hidden', 'true');
+  iframe.style.position = 'fixed';
+  iframe.style.visibility = 'hidden';
+  iframe.style.right = '-10000px';
+  iframe.style.bottom = '-10000px';
+  iframe.style.width = '794px';
+  iframe.style.height = '1123px';
+  iframe.style.border = '0';
+  document.body.appendChild(iframe);
+
+  const cleanup = () => {
+    if (iframe.parentNode) {
+      iframe.parentNode.removeChild(iframe);
+    }
+  };
+
+  const exportTask = async () => {
+    const frameDoc = iframe.contentDocument;
+    if (!frameDoc) throw new Error('Unable to initialize PDF document frame.');
+
+    frameDoc.open();
+    frameDoc.write(html);
+    frameDoc.close();
+
+    await new Promise<void>((resolve) => {
+      if (frameDoc.readyState === 'complete') {
+        resolve();
+        return;
+      }
+      iframe.onload = () => resolve();
+      setTimeout(resolve, 400);
+    });
+
+    try {
+      await frameDoc.fonts.ready;
+    } catch {
+      // continue even if fonts API is unavailable
+    }
+
+    const body = frameDoc.body;
+
+    // Move footer from fixed positioning into normal document flow so we can
+    // measure the true full-document height and capture it separately.
+    const footerEl = frameDoc.querySelector<HTMLElement>('.footer-wrap');
+    if (footerEl) {
+      footerEl.style.position = 'static';
+      footerEl.style.width = '100%';
+    }
+
+    // Reflow + expand iframe height.
+    await new Promise<void>((r) => setTimeout(r, 80));
+    iframe.style.height = `${body.scrollHeight}px`;
+    await new Promise<void>((r) => setTimeout(r, 80));
+
+    // Capture footer as its own canvas, then hide it from the body capture.
+    let footerCanvas: HTMLCanvasElement | null = null;
+    if (footerEl) {
+      footerCanvas = await html2canvas(footerEl, {
+        useCORS: true,
+        backgroundColor: null,   // let the element's own CSS supply the background
+        scale: 2,
+        windowWidth: 794,
+      });
+      footerEl.style.display = 'none';
+    }
+
+    // Allow layout to recalculate without the footer.
+    await new Promise<void>((r) => setTimeout(r, 30));
+    const contentScrollH = body.scrollHeight;
+
+    // Capture body content (footer already hidden).
+    const contentCanvas = await html2canvas(body, {
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      scale: 2,
+      windowWidth: 794,
+      windowHeight: contentScrollH,
+    });
+
+    // PDF setup.
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+    const pageW = pdf.internal.pageSize.getWidth();   // 595.28 pt
+    const pageH = pdf.internal.pageSize.getHeight();  // 841.89 pt
+
+    // pt per canvas-pixel conversion (content canvas is 794×scale wide → pageW pt wide).
+    const ptPerPx = pageW / contentCanvas.width;
+
+    // Footer height in PDF points.
+    let footerH_pt = 0;
+    let footerImgData = '';
+    if (footerCanvas && footerCanvas.width > 0) {
+      footerImgData = footerCanvas.toDataURL('image/png');
+      footerH_pt = footerCanvas.height * ptPerPx;
+    }
+
+    // Usable content height per page (above the footer).
+    const contentAreaH_pt = pageH - footerH_pt;
+    // Equivalent in canvas pixels — use Math.floor to guarantee no overrun.
+    const maxSliceH_px = Math.floor(contentAreaH_pt / ptPerPx);
+
+    // Collect every table-row's bottom edge (in canvas pixels) so we can find
+    // page-break positions that fall between rows rather than through them.
+    function rowBottomPx(row: HTMLElement): number {
+      let top = 0;
+      let el: HTMLElement | null = row;
+      while (el && el !== body) {
+        top += el.offsetTop;
+        el = el.offsetParent as HTMLElement | null;
+      }
+      // ×2 because html2canvas was captured at scale 2.
+      return Math.round((top + row.offsetHeight) * 2);
+    }
+
+    const rowEnds = Array.from(frameDoc.querySelectorAll<HTMLElement>('tr'))
+      .map(rowBottomPx)
+      .filter((y) => y > 0)
+      .sort((a, b) => a - b);
+
+    // Determine each page's start position in canvas pixels, snapping breaks
+    // to the nearest row boundary so rows are never split mid-height.
+    const sliceStarts: number[] = [];
+    let cursor = 0;
+
+    while (cursor < contentCanvas.height) {
+      sliceStarts.push(cursor);
+      const rawEnd = cursor + maxSliceH_px;
+      if (rawEnd >= contentCanvas.height) break;
+
+      // Best break = last row that ends at or before the raw cut point.
+      const snapped = [...rowEnds].filter((y) => y > cursor && y <= rawEnd).pop();
+      cursor = snapped ?? rawEnd;
+    }
+
+    // Render each page.
+    for (let i = 0; i < sliceStarts.length; i++) {
+      const top = sliceStarts[i];
+      const bot =
+        i + 1 < sliceStarts.length ? sliceStarts[i + 1] : contentCanvas.height;
+      const sliceH_px = bot - top;
+      const sliceH_pt = sliceH_px * ptPerPx; // always ≤ contentAreaH_pt
+
+      if (i > 0) pdf.addPage();
+
+      // Crop exactly this page's content slice from the full content canvas.
+      const slice = document.createElement('canvas');
+      slice.width = contentCanvas.width;
+      slice.height = sliceH_px;
+      const ctx = slice.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(
+          contentCanvas,
+          0, top, contentCanvas.width, sliceH_px,
+          0, 0,   contentCanvas.width, sliceH_px,
+        );
+      }
+
+      // Place the content slice at the top of the page.
+      pdf.addImage(slice.toDataURL('image/png'), 'PNG', 0, 0, pageW, sliceH_pt);
+
+      // Pin footer flush to the bottom of every page.
+      if (footerImgData && footerH_pt > 0) {
+        pdf.addImage(footerImgData, 'PNG', 0, contentAreaH_pt, pageW, footerH_pt);
+      }
+    }
+
+    pdf.save(safeFileName);
+  };
+
+  try {
+    await exportTask();
+  } finally {
+    cleanup();
+  }
 }

@@ -308,6 +308,7 @@ export default function CallLogs() {
       toast.error('No records to export.');
       return;
     }
+    const dateTag = new Date().toISOString().slice(0, 10);
     const body = `
       <div class="stat-grid">
         <div class="stat-card"><div class="stat-label">Total Calls</div><div class="stat-value">${totalCalls}</div></div>
@@ -326,7 +327,12 @@ export default function CallLogs() {
         </tbody>
       </table>`;
     const html = buildPdfDocument('Call Logs Report - Maptech Ticketing System', 'Call Logs Report', body, `${filtered.length} records`);
-    openPrintWindow(html);
+    void openPrintWindow(html, `call_logs_${dateTag}.pdf`)
+      .then(() => toast.success('PDF downloaded.'))
+      .catch((err) => {
+        console.error('PDF export failed:', err);
+        toast.error('PDF export failed.');
+      });
   };
 
   const clearFilters = () => {
