@@ -325,10 +325,13 @@ class AuthViewSet(viewsets.GenericViewSet):
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     def post(self, request, *args, **kwargs):
-        remember = bool(request.data.get('remember_me'))
+        incoming = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
+        remember = bool(incoming.pop('remember_me', False))
         # First, try the normal username-based token obtain
         try:
-            resp = super().post(request, *args, **kwargs)
+            serializer = self.get_serializer(data=incoming)
+            serializer.is_valid(raise_exception=True)
+            resp = Response(serializer.validated_data, status=status.HTTP_200_OK)
         except Exception:
             resp = None
 
