@@ -482,6 +482,7 @@ export function AuditLogs() {
   const handleExportPDF = () => {
     setShowExportMenu(false);
     if (!logs.length) { toast.error('No logs to export.'); return; }
+    const dateTag = new Date().toISOString().slice(0, 10);
     const body = `
       <div class="stat-grid">
         <div class="stat-card"><div class="stat-label">Total Logs</div><div class="stat-value">${summary?.total ?? logs.length}</div></div>
@@ -499,7 +500,12 @@ export function AuditLogs() {
         </tbody>
       </table>`;
     const html = buildPdfDocument('Audit Logs Report - Maptech Ticketing System', 'Audit Log Report', body, `${logs.length} records`);
-    openPrintWindow(html);
+    void openPrintWindow(html, `audit_logs_${dateTag}.pdf`)
+      .then(() => toast.success('PDF downloaded.'))
+      .catch((err) => {
+        console.error('PDF export failed:', err);
+        toast.error('PDF export failed.');
+      });
   };
 
   const clearFilters = () => {

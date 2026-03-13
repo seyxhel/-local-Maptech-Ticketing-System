@@ -1055,6 +1055,7 @@ export function TicketView() {
   const handleExportPDF = () => {
     setShowExportMenu(false);
     if (!btData) return;
+    const dateTag = new Date().toISOString().slice(0, 10);
     const pd = ticket.productDetails;
     const escLogs = btData.escalation_logs || [];
     const atts = btData.attachments || [];
@@ -1113,7 +1114,12 @@ export function TicketView() {
         ${ticket.csatFeedback.comments ? `<div class="info-row"><span class="info-label">Comments:</span><span class="info-value">${ticket.csatFeedback.comments}</span></div>` : ''}
       </div>` : ''}`;
     const html = buildPdfDocument(`Ticket ${ticket.id} - Maptech Ticketing System`, 'Ticket Detail Report', body, `Service Ticket ${ticket.id}`);
-    openPrintWindow(html);
+    void openPrintWindow(html, `ticket_${ticket.id}_${dateTag}.pdf`)
+      .then(() => toast.success('PDF downloaded.'))
+      .catch((err) => {
+        console.error('PDF export failed:', err);
+        toast.error('PDF export failed.');
+      });
   };
 
   const handleExportTicket = () => {
