@@ -9,8 +9,7 @@ from .views import (
     NotificationViewSet, CategoryViewSet, RetentionPolicyViewSet,
     AnnouncementViewSet,
 )
-from users.views import AuthViewSet, CustomTokenObtainPairView, UserViewSet
-from rest_framework_simplejwt.views import TokenRefreshView
+from users.views import AuthViewSet, CustomTokenObtainPairView, CustomTokenRefreshView, UserViewSet
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenRefreshSerializer
 
 # Tag the JWT views under "Auth"
@@ -20,7 +19,7 @@ decorated_login_view = swagger_auto_schema(
 
 decorated_refresh_view = swagger_auto_schema(
     method='post', tags=['Auth'], request_body=TokenRefreshSerializer
-)(TokenRefreshView.as_view())
+)(CustomTokenRefreshView.as_view())
 
 router = routers.DefaultRouter()
 router.register(r'tickets', TicketViewSet, basename='ticket')

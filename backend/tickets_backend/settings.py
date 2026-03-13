@@ -132,6 +132,11 @@ CORS_ALLOW_ALL_ORIGINS = os.environ.get('CORS_ALLOW_ALL_ORIGINS', 'False').lower
 _cors_origins = os.environ.get('CORS_ALLOWED_ORIGINS', '')
 if _cors_origins:
     CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_origins.split(',')]
+CORS_ALLOW_CREDENTIALS = os.environ.get('CORS_ALLOW_CREDENTIALS', 'True').lower() in ('true', '1', 'yes')
+
+_csrf_trusted_origins = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
+if _csrf_trusted_origins:
+    CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_trusted_origins.split(',')]
 
 # Prefer Argon2 for password hashing (stronger than PBKDF2), keep fallbacks for existing hashes
 PASSWORD_HASHERS = [
@@ -147,7 +152,7 @@ AUTH_USER_MODEL = 'users.User'
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'users.authentication.CookieJWTAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
@@ -183,3 +188,12 @@ SIMPLE_JWT = {
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': False,
 }
+
+# JWT cookie settings (HttpOnly auth cookies)
+JWT_ACCESS_COOKIE_NAME = os.environ.get('JWT_ACCESS_COOKIE_NAME', 'maptech_access')
+JWT_REFRESH_COOKIE_NAME = os.environ.get('JWT_REFRESH_COOKIE_NAME', 'maptech_refresh')
+JWT_COOKIE_SECURE = os.environ.get('JWT_COOKIE_SECURE', 'True').lower() in ('true', '1', 'yes')
+JWT_COOKIE_HTTPONLY = os.environ.get('JWT_COOKIE_HTTPONLY', 'True').lower() in ('true', '1', 'yes')
+JWT_COOKIE_SAMESITE = os.environ.get('JWT_COOKIE_SAMESITE', 'Lax')
+JWT_COOKIE_DOMAIN = os.environ.get('JWT_COOKIE_DOMAIN', None)
+JWT_COOKIE_PATH = os.environ.get('JWT_COOKIE_PATH', '/')

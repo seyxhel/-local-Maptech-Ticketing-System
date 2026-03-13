@@ -1,14 +1,11 @@
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
-const TOKEN_KEY = 'maptech_access';
 
-function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY) || null;
+function authFetch(input: RequestInfo | URL, init: RequestInit = {}) {
+  return fetch(input, { ...init, credentials: 'include' });
 }
 
 function authHeaders(): Record<string, string> {
-  const token = getToken();
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
   return headers;
 }
 
@@ -39,12 +36,13 @@ export interface LoginResponse {
 }
 
 export async function loginWithCredentials(creds: LoginCredentials): Promise<LoginResponse> {
-  const res = await fetch(`${API_BASE}/auth/login/`, {
+  const res = await authFetch(`${API_BASE}/auth/login/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       username: creds.email,
       password: creds.password,
+      remember_me: creds.remember_me ?? false,
     }),
   });
   const data = await res.json().catch(() => ({}));
@@ -54,12 +52,9 @@ export async function loginWithCredentials(creds: LoginCredentials): Promise<Log
   return data as LoginResponse;
 }
 
-export async function fetchCurrentUser(accessToken: string): Promise<LoginResponse['user']> {
-  const res = await fetch(`${API_BASE}/auth/me/`, {
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${accessToken}`,
-    },
+export async function fetchCurrentUser(): Promise<LoginResponse['user']> {
+  const res = await authFetch(`${API_BASE}/auth/me/`, {
+    headers: authHeaders(),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -68,11 +63,11 @@ export async function fetchCurrentUser(accessToken: string): Promise<LoginRespon
   return data as LoginResponse['user'];
 }
 
-export async function refreshAccessToken(refreshToken: string): Promise<{ access: string }> {
-  const res = await fetch(`${API_BASE}/auth/token/refresh/`, {
+export async function refreshAccessToken(): Promise<{ access: string }> {
+  const res = await authFetch(`${API_BASE}/auth/token/refresh/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refresh: refreshToken }),
+    body: JSON.stringify({}),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -83,7 +78,7 @@ export async function refreshAccessToken(refreshToken: string): Promise<{ access
 
 /** Send a password reset email. */
 export async function forgotPassword(email: string): Promise<{ detail: string }> {
-  const res = await fetch(`${API_BASE}/auth/password-reset/`, {
+  const res = await authFetch(`${API_BASE}/auth/password-reset/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email }),
@@ -97,7 +92,7 @@ export async function forgotPassword(email: string): Promise<{ detail: string }>
 
 /** Confirm password reset with uid and token. */
 export async function resetPasswordConfirm(uid: string, token: string, newPassword: string): Promise<{ detail: string }> {
-  const res = await fetch(`${API_BASE}/auth/password-reset-confirm/`, {
+  const res = await authFetch(`${API_BASE}/auth/password-reset-confirm/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ uid, token, new_password: newPassword }),
@@ -111,7 +106,7 @@ export async function resetPasswordConfirm(uid: string, token: string, newPasswo
 
 /** Reset password using the unique recovery key. */
 export async function resetPasswordByKey(recoveryKey: string, newPassword: string, email: string): Promise<{ detail: string }> {
-  const res = await fetch(`${API_BASE}/auth/password-reset-by-key/`, {
+  const res = await authFetch(`${API_BASE}/auth/password-reset-by-key/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ recovery_key: recoveryKey, new_password: newPassword, email }),
@@ -125,7 +120,7 @@ export async function resetPasswordByKey(recoveryKey: string, newPassword: strin
 
 /** Change password (authenticated user). */
 export async function changePassword(oldPassword: string, newPassword: string): Promise<{ detail: string }> {
-  const res = await fetch(`${API_BASE}/auth/change_password/`, {
+  const res = await authFetch(`${API_BASE}/auth/change_password/`, {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ current_password: oldPassword, new_password: newPassword }),
@@ -139,7 +134,7 @@ export async function changePassword(oldPassword: string, newPassword: string): 
 
 /** Update user profile (authenticated user). */
 export async function updateProfile(data: Record<string, unknown>): Promise<LoginResponse['user']> {
-  const res = await fetch(`${API_BASE}/auth/update_profile/`, {
+  const res = await authFetch(`${API_BASE}/auth/update_profile/`, {
     method: 'PATCH',
     headers: authHeaders(),
     body: JSON.stringify(data),
@@ -153,14 +148,10 @@ export async function updateProfile(data: Record<string, unknown>): Promise<Logi
 
 /** Upload profile picture (authenticated user). */
 export async function uploadAvatar(file: File): Promise<LoginResponse['user']> {
-  const token = getToken();
   const formData = new FormData();
   formData.append('profile_picture', file);
-  const headers: Record<string, string> = {};
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  const res = await fetch(`${API_BASE}/auth/upload_avatar/`, {
+  const res = await authFetch(`${API_BASE}/auth/upload_avatar/`, {
     method: 'POST',
-    headers,
     body: formData,
   });
   const result = await res.json().catch(() => ({}));
@@ -172,7 +163,7 @@ export async function uploadAvatar(file: File): Promise<LoginResponse['user']> {
 
 /** Remove profile picture (authenticated user). */
 export async function removeAvatar(): Promise<LoginResponse['user']> {
-  const res = await fetch(`${API_BASE}/auth/remove_avatar/`, {
+  const res = await authFetch(`${API_BASE}/auth/remove_avatar/`, {
     method: 'DELETE',
     headers: authHeaders(),
   });
@@ -181,4 +172,11 @@ export async function removeAvatar(): Promise<LoginResponse['user']> {
     throw new Error(result.detail || 'Failed to remove avatar.');
   }
   return result as LoginResponse['user'];
+}
+
+export async function logoutRequest(): Promise<void> {
+  await authFetch(`${API_BASE}/auth/logout/`, {
+    method: 'POST',
+    headers: authHeaders(),
+  }).catch(() => undefined);
 }

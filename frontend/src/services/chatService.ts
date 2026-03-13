@@ -2,10 +2,11 @@
  * chatService.ts – WebSocket-based chat for Admin ↔ Employee ticket messaging.
  *
  * Connects to the Django Channels backend at:
- *   ws://<host>:<port>/ws/chat/<ticketId>/admin_employee/?token=<jwt>
+ *   ws://<host>:<port>/ws/chat/<ticketId>/admin_employee/
  *
  * Automatically reconnects with exponential back-off when the connection drops.
  */
+
 
 // ── Types ──────────────────────────────────────────────
 
@@ -69,12 +70,6 @@ type ChatCallbacks = {
 
 // ── Helpers ────────────────────────────────────────────
 
-/** Read the JWT access token stored by AuthContext. */
-function getAccessToken(): string | null {
-  const TOKEN_KEY = 'maptech_access';
-  return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY) || null;
-}
-
 // ── Socket class ───────────────────────────────────────
 
 export class TicketChatSocket {
@@ -98,17 +93,10 @@ export class TicketChatSocket {
   }
 
   private connect() {
-    const token = getAccessToken();
-    if (!token) {
-      console.warn('[TicketChatSocket] No access token found – cannot connect.');
-      this.callbacks.onError?.(new Event('no_token'));
-      return;
-    }
-
     const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
     const host = window.location.hostname;
     const port = import.meta.env.VITE_WS_PORT || '8000';
-    const url = `${protocol}://${host}:${port}/ws/chat/${this.ticketId}/${this.channelType}/?token=${token}`;
+    const url = `${protocol}://${host}:${port}/ws/chat/${this.ticketId}/${this.channelType}/`;
 
     this.ws = new WebSocket(url);
 

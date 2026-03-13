@@ -8,7 +8,9 @@ from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from rest_framework_simplejwt.exceptions import TokenError, InvalidToken
 from django.contrib.auth import get_user_model
+from django.conf import settings
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
@@ -37,6 +39,56 @@ def _is_password_pwned(password: str) -> bool:
     return False
 
 User = get_user_model()
+
+
+def _cookie_names() -> tuple[str, str]:
+    return (
+        getattr(settings, 'JWT_ACCESS_COOKIE_NAME', 'maptech_access'),
+        getattr(settings, 'JWT_REFRESH_COOKIE_NAME', 'maptech_refresh'),
+    )
+
+
+def _cookie_kwargs(max_age: int | None = None) -> dict:
+    kwargs = {
+        'httponly': getattr(settings, 'JWT_COOKIE_HTTPONLY', True),
+        'secure': getattr(settings, 'JWT_COOKIE_SECURE', not settings.DEBUG),
+        'samesite': getattr(settings, 'JWT_COOKIE_SAMESITE', 'Lax'),
+        'path': getattr(settings, 'JWT_COOKIE_PATH', '/'),
+    }
+    domain = getattr(settings, 'JWT_COOKIE_DOMAIN', None)
+    if domain:
+        kwargs['domain'] = domain
+    if max_age is not None:
+        kwargs['max_age'] = max_age
+    return kwargs
+
+
+def _set_auth_cookies(response: Response, access: str | None = None, refresh: str | None = None, remember: bool = False):
+    access_cookie, refresh_cookie = _cookie_names()
+    access_lifetime = int(settings.SIMPLE_JWT['ACCESS_TOKEN_LIFETIME'].total_seconds())
+    refresh_lifetime = int(settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'].total_seconds())
+
+    if access:
+        response.set_cookie(
+            access_cookie,
+            access,
+            **_cookie_kwargs(max_age=access_lifetime if remember else None),
+        )
+    if refresh:
+        response.set_cookie(
+            refresh_cookie,
+            refresh,
+            **_cookie_kwargs(max_age=refresh_lifetime if remember else None),
+        )
+
+
+def _clear_auth_cookies(response: Response):
+    access_cookie, refresh_cookie = _cookie_names()
+    cookie_kwargs = _cookie_kwargs()
+    path = cookie_kwargs.get('path', '/')
+    domain = cookie_kwargs.get('domain')
+    response.delete_cookie(access_cookie, path=path, domain=domain)
+    response.delete_cookie(refresh_cookie, path=path, domain=domain)
 
 
 class AuthViewSet(viewsets.GenericViewSet):
@@ -138,7 +190,34 @@ class AuthViewSet(viewsets.GenericViewSet):
         }
         if breach_warning:
             response_data['warning'] = breach_warning
-        return Response(response_data)
+        response = Response(response_data)
+        _set_auth_cookies(
+            response,
+            access=response_data['access'],
+            refresh=response_data['refresh'],
+            remember=True,
+        )
+        return response
+
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated], url_path='logout')
+    def logout(self, request):
+        response = Response({'detail': 'Logged out successfully.'}, status=status.HTTP_200_OK)
+        _clear_auth_cookies(response)
+        try:
+            from tickets.models import AuditLog
+            x_forwarded = request.META.get('HTTP_X_FORWARDED_FOR')
+            ip = x_forwarded.split(',')[0].strip() if x_forwarded else request.META.get('REMOTE_ADDR')
+            AuditLog.log(
+                entity=AuditLog.ENTITY_USER,
+                entity_id=request.user.id,
+                action=AuditLog.ACTION_LOGOUT,
+                activity=f"{request.user.email} logged out",
+                actor=request.user,
+                ip_address=ip,
+            )
+        except Exception:
+            pass
+        return response
 
     # ── Password reset (public) ──────────────────────────────────────────
     @action(detail=False, methods=['post'], permission_classes=[], url_path='password-reset')
@@ -227,6 +306,7 @@ class AuthViewSet(viewsets.GenericViewSet):
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     def post(self, request, *args, **kwargs):
+        remember = bool(request.data.get('remember_me'))
         # First, try the normal username-based token obtain
         try:
             resp = super().post(request, *args, **kwargs)
@@ -261,7 +341,9 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             data = {**resp.data}
             if user:
                 data['user'] = UserSerializer(user, context={'request': request}).data
-            return Response(data)
+            response = Response(data)
+            _set_auth_cookies(response, access=data.get('access'), refresh=data.get('refresh'), remember=remember)
+            return response
 
         # If auth failed, allow login by email: check whether the provided "username" looks like an email
         provided = request.data.get('username') or request.data.get('email')
@@ -295,12 +377,40 @@ class CustomTokenObtainPairView(TokenObtainPairView):
                         'refresh': str(refresh),
                         'user': UserSerializer(user, context={'request': request}).data,
                     }
-                    return Response(data)
+                    response = Response(data)
+                    _set_auth_cookies(response, access=data.get('access'), refresh=data.get('refresh'), remember=remember)
+                    return response
             except User.DoesNotExist:
                 pass
 
         # otherwise return 401
         return Response({'detail': 'Invalid credentials.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+
+class CustomTokenRefreshView(TokenRefreshView):
+    def post(self, request, *args, **kwargs):
+        refresh_cookie_name = getattr(settings, 'JWT_REFRESH_COOKIE_NAME', 'maptech_refresh')
+        refresh_from_cookie = request.COOKIES.get(refresh_cookie_name)
+
+        incoming = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
+        if not incoming.get('refresh') and refresh_from_cookie:
+            incoming['refresh'] = refresh_from_cookie
+
+        serializer = self.get_serializer(data=incoming)
+        try:
+            serializer.is_valid(raise_exception=True)
+        except TokenError as exc:
+            raise InvalidToken(exc.args[0])
+
+        data = serializer.validated_data
+        response = Response(data, status=status.HTTP_200_OK)
+        _set_auth_cookies(
+            response,
+            access=data.get('access'),
+            refresh=data.get('refresh'),
+            remember=True,
+        )
+        return response
 
 class UserViewSet(viewsets.GenericViewSet):
     serializer_class = UserSerializer

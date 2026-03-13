@@ -1,9 +1,13 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 import {
   loginWithCredentials as apiLogin,
   fetchCurrentUser,
+  logoutRequest,
   refreshAccessToken,
 } from '../services/authService';
+import {
+  clearLegacyAuthStorage,
+} from '../utils/authStorage';
 
 export type Role = 'superadmin' | 'admin' | 'employee' | 'client' | null;
 
@@ -38,10 +42,6 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-const STORAGE_KEY = 'maptech_user';
-const TOKEN_KEY = 'maptech_access';
-const REFRESH_KEY = 'maptech_refresh';
-
 function normalizeRole(role: string): Role {
   const r = (role || '').toLowerCase();
   if (r === 'superadmin' || r === 'super_admin') return 'superadmin';
@@ -60,27 +60,6 @@ function roleToPath(role: Role): string {
     case null:
     default: return '/login';
   }
-}
-
-/** Read a value from localStorage first, then sessionStorage. */
-function readStorage(key: string): string | null {
-  return localStorage.getItem(key) ?? sessionStorage.getItem(key);
-}
-
-/** Write to the chosen storage and clear the other. */
-function writeStorage(key: string, value: string, persist: boolean) {
-  if (persist) {
-    localStorage.setItem(key, value);
-    sessionStorage.removeItem(key);
-  } else {
-    sessionStorage.setItem(key, value);
-    localStorage.removeItem(key);
-  }
-}
-
-function clearStorage(key: string) {
-  localStorage.removeItem(key);
-  sessionStorage.removeItem(key);
 }
 
 function buildAuthUser(apiUser: Record<string, unknown>): AuthUser | null {
@@ -111,79 +90,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
 
     async function restore() {
-      const storedAccess = readStorage(TOKEN_KEY);
-      const storedRefresh = readStorage(REFRESH_KEY);
+      clearLegacyAuthStorage();
 
-      if (!storedAccess) {
-        setLoading(false);
-        return;
-      }
-
-      // ── Step 1: hydrate from cache instantly so the navbar shows name/photo now ──
-      const cachedUser = readStorage(STORAGE_KEY);
-      if (cachedUser) {
-        try {
-          const parsed = JSON.parse(cachedUser) as AuthUser;
-          if (!cancelled && parsed?.role) {
-            setAccessToken(storedAccess);
-            setUser(parsed);
-            setLoading(false); // render the app now; Step 2 will silently update
-          }
-        } catch { /* ignore corrupt cache */ }
-      }
-
-      // ── Step 2: fetch fresh user from API and update (refreshes photo URL, name, role) ──
+      // Try current access cookie.
       try {
-        // Try fetching current user with the stored access token
-        const apiUser = await fetchCurrentUser(storedAccess);
+        const apiUser = await fetchCurrentUser();
         if (!cancelled) {
           const authUser = buildAuthUser(apiUser as unknown as Record<string, unknown>);
           if (authUser) {
-            setAccessToken(storedAccess);
+            setAccessToken(null);
             setUser(authUser);
-            // Keep cache in sync with fresh server data
-            const persist = !!localStorage.getItem(TOKEN_KEY);
-            writeStorage(STORAGE_KEY, JSON.stringify(authUser), persist);
           } else {
-            // Unknown role — clear tokens and deny access
-            clearStorage(TOKEN_KEY);
-            clearStorage(REFRESH_KEY);
-            clearStorage(STORAGE_KEY);
+            clearLegacyAuthStorage();
           }
         }
       } catch {
-        // Access token expired – try refreshing
-        if (storedRefresh) {
-          try {
-            const { access: newAccess } = await refreshAccessToken(storedRefresh);
-            const apiUser = await fetchCurrentUser(newAccess);
-            if (!cancelled) {
-              const authUser = buildAuthUser(apiUser as unknown as Record<string, unknown>);
-              if (authUser) {
-                const persist = !!localStorage.getItem(TOKEN_KEY);
-                writeStorage(TOKEN_KEY, newAccess, persist);
-                writeStorage(STORAGE_KEY, JSON.stringify(authUser), persist);
-                setAccessToken(newAccess);
-                setUser(authUser);
-              } else {
-                clearStorage(TOKEN_KEY);
-                clearStorage(REFRESH_KEY);
-                clearStorage(STORAGE_KEY);
-              }
+        // Access may be expired; try refresh cookie.
+        try {
+          await refreshAccessToken();
+          const apiUser = await fetchCurrentUser();
+          if (!cancelled) {
+            const authUser = buildAuthUser(apiUser as unknown as Record<string, unknown>);
+            if (authUser) {
+              setAccessToken(null);
+              setUser(authUser);
+            } else {
+              clearLegacyAuthStorage();
             }
-          } catch {
-            // Refresh also failed – clear everything
-            clearStorage(TOKEN_KEY);
-            clearStorage(REFRESH_KEY);
-            clearStorage(STORAGE_KEY);
           }
-        } else {
-          clearStorage(TOKEN_KEY);
-          clearStorage(STORAGE_KEY);
+        } catch {
+          clearLegacyAuthStorage();
         }
       }
 
-      if (!cancelled) setLoading(false); // no-op if cache already cleared it
+      if (!cancelled) setLoading(false);
     }
 
     restore();
@@ -193,25 +133,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginWithCredentials = useCallback(
     async (email: string, password: string, rememberMe?: boolean): Promise<string> => {
       const trimmedEmail = email.trim().toLowerCase();
-      const data = await apiLogin({ email: trimmedEmail, password });
+      const data = await apiLogin({ email: trimmedEmail, password, remember_me: !!rememberMe });
 
       const token = data.access;
-      const refresh = data.refresh;
-      const persist = !!rememberMe;
-
-      // Store tokens
-      writeStorage(TOKEN_KEY, token, persist);
-      if (refresh) writeStorage(REFRESH_KEY, refresh, persist);
+      clearLegacyAuthStorage();
 
       // Build user from response
       const authUser = buildAuthUser(data.user as unknown as Record<string, unknown>);
       if (!authUser) {
-        // Unknown role — clear tokens and deny access
-        clearStorage(TOKEN_KEY);
-        clearStorage(REFRESH_KEY);
+        clearLegacyAuthStorage();
         throw new Error('Your account role is not authorized to access this system.');
       }
-      writeStorage(STORAGE_KEY, JSON.stringify(authUser), persist);
 
       setAccessToken(token);
       setUser(authUser);
@@ -225,23 +157,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser((prev) => {
       if (!prev) return prev;
       const next = { ...prev, ...partial, name: [partial.first_name ?? prev.first_name, partial.last_name ?? prev.last_name].filter(Boolean).join(' ') || prev.username || '' };
-      // Don't persist blob: URLs — they're transient and die on refresh
-      const toStore = { ...next };
-      if (typeof toStore.profile_picture_url === 'string' && toStore.profile_picture_url.startsWith('blob:')) {
-        toStore.profile_picture_url = prev.profile_picture_url ?? null;
-      }
-      const persist = !!localStorage.getItem(TOKEN_KEY);
-      writeStorage(STORAGE_KEY, JSON.stringify(toStore), persist);
       return next;
     });
   }, []);
 
   const logout = useCallback(() => {
+    void logoutRequest();
     setUser(null);
     setAccessToken(null);
-    clearStorage(STORAGE_KEY);
-    clearStorage(TOKEN_KEY);
-    clearStorage(REFRESH_KEY);
+    clearLegacyAuthStorage();
   }, []);
 
   const getRedirectPath = useCallback((role: Role) => roleToPath(role), []);

@@ -2,10 +2,11 @@
  * notificationService.ts – WebSocket-based real-time notifications.
  *
  * Connects to the Django Channels backend at:
- *   ws://<host>:<port>/ws/notifications/?token=<jwt>
+ *   ws://<host>:<port>/ws/notifications/
  *
  * Automatically reconnects with exponential back-off when the connection drops.
  */
+
 
 // ── Types ──────────────────────────────────────────────
 
@@ -33,11 +34,6 @@ type NotificationCallbacks = {
 
 // ── Helpers ────────────────────────────────────────────
 
-function getAccessToken(): string | null {
-  const TOKEN_KEY = 'maptech_access';
-  return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY) || null;
-}
-
 // ── Socket class ───────────────────────────────────────
 
 export class NotificationSocket {
@@ -53,16 +49,10 @@ export class NotificationSocket {
   }
 
   private connect() {
-    const token = getAccessToken();
-    if (!token) {
-      console.warn('[NotificationSocket] No access token – cannot connect.');
-      return;
-    }
-
     const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
     const host = window.location.hostname;
     const port = import.meta.env.VITE_WS_PORT || '8000';
-    const url = `${protocol}://${host}:${port}/ws/notifications/?token=${token}`;
+    const url = `${protocol}://${host}:${port}/ws/notifications/`;
 
     this.ws = new WebSocket(url);
 
