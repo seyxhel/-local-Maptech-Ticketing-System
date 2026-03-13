@@ -37,7 +37,7 @@ export function StatusBadge({ status }: StatusBadgeProps) {
     'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600';
   return (
     <span
-      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${style}`}
+      className={`inline-flex items-center justify-center text-center whitespace-nowrap px-2.5 py-0.5 rounded-full text-xs font-medium border ${style}`}
     >
       {formatStatus(status)}
     </span>

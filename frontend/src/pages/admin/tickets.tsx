@@ -173,7 +173,7 @@ export default function AdminTickets() {
                 <th className="px-6 py-4 font-semibold">Priority</th>
                 <th className="px-6 py-4 font-semibold">Status</th>
                 <th className="px-6 py-4 font-semibold">SLA Timer</th>
-                <th className="px-6 py-4 font-semibold">Assignee</th>
+                <th className="px-6 py-4 font-semibold min-w-[180px]">Assignee</th>
                 <th className="px-6 py-4 font-semibold">Created</th>
                 <th className="px-6 py-4 font-semibold text-right">Actions</th>
               </tr>
@@ -200,11 +200,11 @@ export default function AdminTickets() {
                       <SLATimer hoursRemaining={ticket.sla} totalHours={ticket.totalSla} status={ticket.status} />
                     )}
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4 min-w-[180px]">
                     {ticket.assignee ? (
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center text-xs text-gray-700 dark:text-gray-300">{ticket.assignee.charAt(0)}</div>
-                        <span className="text-gray-600 dark:text-gray-400">{ticket.assignee}</span>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-6 h-6 aspect-square shrink-0 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center text-xs text-gray-700 dark:text-gray-300">{ticket.assignee.charAt(0)}</div>
+                        <span className="text-gray-600 dark:text-gray-400 whitespace-nowrap">{ticket.assignee}</span>
                       </div>
                     ) : (
                       <span className="text-xs text-gray-400 italic">Unassigned</span>
