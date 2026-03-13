@@ -53,9 +53,7 @@ export function getAssigneeName(ticket: BackendTicket): string | null {
   if (!ticket.assigned_to) return null;
   const { first_name, last_name, username } = ticket.assigned_to;
   if (first_name || last_name) {
-    const fn = first_name || '';
-    const ln = last_name ? `${last_name.charAt(0)}.` : '';
-    return `${fn} ${ln}`.trim();
+    return `${first_name || ''} ${last_name || ''}`.trim();
   }
   return username;
 }
