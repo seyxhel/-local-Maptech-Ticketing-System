@@ -49,13 +49,32 @@ def _cookie_names() -> tuple[str, str]:
 
 
 def _cookie_kwargs(max_age: int | None = None) -> dict:
+    raw_samesite = str(getattr(settings, 'JWT_COOKIE_SAMESITE', 'Lax') or 'Lax').strip()
+    samesite_norm = raw_samesite.lower()
+    if samesite_norm == 'none':
+        samesite = 'None'
+    elif samesite_norm == 'strict':
+        samesite = 'Strict'
+    else:
+        samesite = 'Lax'
+
+    secure = bool(getattr(settings, 'JWT_COOKIE_SECURE', not settings.DEBUG))
+    # Browsers require Secure when SameSite=None.
+    if samesite == 'None':
+        secure = True
+
     kwargs = {
         'httponly': getattr(settings, 'JWT_COOKIE_HTTPONLY', True),
-        'secure': getattr(settings, 'JWT_COOKIE_SECURE', not settings.DEBUG),
-        'samesite': getattr(settings, 'JWT_COOKIE_SAMESITE', 'Lax'),
+        'secure': secure,
+        'samesite': samesite,
         'path': getattr(settings, 'JWT_COOKIE_PATH', '/'),
     }
     domain = getattr(settings, 'JWT_COOKIE_DOMAIN', None)
+    if isinstance(domain, str):
+        domain = domain.strip()
+        if domain.startswith('http://') or domain.startswith('https://'):
+            domain = domain.split('://', 1)[1]
+        domain = domain.split('/', 1)[0].strip()
     if domain:
         kwargs['domain'] = domain
     if max_age is not None:
