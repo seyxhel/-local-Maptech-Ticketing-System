@@ -1,4 +1,5 @@
 ﻿import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { GreenButton } from '../../components/ui/GreenButton';
 import {
@@ -11,6 +12,7 @@ import {
   RefreshCw,
   Users,
   FileText,
+  Eye,
   ArrowLeft,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -42,6 +44,7 @@ const EMPTY_FORM = {
 };
 
 export default function Clients() {
+  const navigate = useNavigate();
   const [clients, setClients] = useState<ClientRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -291,6 +294,7 @@ export default function Clients() {
                     <th className="pb-3 font-medium">Status</th>
                     <th className="pb-3 font-medium">Created</th>
                     <th className="pb-3 font-medium">Progress</th>
+                    <th className="pb-3 font-medium text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
@@ -308,6 +312,16 @@ export default function Clients() {
                           </div>
                           <span className="text-xs text-gray-500">{t.progress_percentage ?? 0}%</span>
                         </div>
+                      </td>
+                      <td className="py-3 text-right">
+                        <button
+                          onClick={() => navigate(`/admin/ticket-details?stf=${encodeURIComponent(t.stf_no)}`)}
+                          className="inline-flex items-center justify-center p-1.5 rounded-lg text-gray-400 hover:text-[#0E8F79] hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
+                          title="View full ticket"
+                          aria-label={`View ${t.stf_no}`}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
                       </td>
                     </tr>
                   ))}
