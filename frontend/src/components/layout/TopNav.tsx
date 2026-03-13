@@ -141,6 +141,11 @@ export function TopNav({
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
   const badgeLabel = unreadCount > 99 ? '99+' : unreadCount > 0 ? String(unreadCount) : null;
+  const goToSettings = () => {
+    const rolePathMap: Record<string, string> = { 'Technical Staff': 'employee', SuperAdmin: 'superadmin', Admin: 'admin', Employee: 'employee', Client: 'client' };
+    const segment = rolePathMap[role] || role.toLowerCase();
+    onNavigate?.(`/${segment}/settings`);
+  };
 
   return (
     <>
@@ -207,11 +212,13 @@ export function TopNav({
             </p>
           </div>
           <div className="flex items-center gap-1 sm:gap-1.5">
-            <div className="w-9 h-9 rounded-full overflow-hidden bg-gradient-to-br from-[#63D44A] to-[#0E8F79] flex items-center justify-center text-white text-xs font-bold flex-shrink-0 relative">
-              {/* Initials always rendered as fallback */}
+            <button
+              onClick={goToSettings}
+              className="w-9 h-9 rounded-full overflow-hidden bg-gradient-to-br from-[#63D44A] to-[#0E8F79] flex items-center justify-center text-white text-xs font-bold flex-shrink-0 relative hover:opacity-90"
+              title="Profile settings"
+              aria-label="Profile settings"
+            >
               {getInitials(authUser, role)}
-              {/* Photo overlaid on top; hides itself on error revealing initials.
-                  key forces remount when URL changes, so a previous onError display:none is cleared. */}
               {authUser?.profile_picture_url && (
                 <img
                   key={authUser.profile_picture_url}
@@ -221,14 +228,10 @@ export function TopNav({
                   onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                 />
               )}
-            </div>
+            </button>
             <button
-              onClick={() => {
-                const rolePathMap: Record<string, string> = { 'Technical Staff': 'employee', SuperAdmin: 'superadmin', Admin: 'admin', Employee: 'employee', Client: 'client' };
-                const segment = rolePathMap[role] || role.toLowerCase();
-                onNavigate?.(`/${segment}/settings`);
-              }}
-              className="hidden sm:inline-flex p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              onClick={goToSettings}
+              className="inline-flex p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
               title="Settings"
             >
               <Settings className="w-4 h-4" />
