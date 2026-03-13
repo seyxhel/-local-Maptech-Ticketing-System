@@ -922,7 +922,6 @@ export default function AdminCreateTicket() {
                   </div>
                 </div>
 
-                <p className="text-xs text-gray-400 dark:text-gray-500 mb-2 italic">Sorted by fewest active tickets</p>
 
                 {/* Employee list */}
                 <div className="space-y-3 max-h-[26rem] overflow-y-auto pr-1">

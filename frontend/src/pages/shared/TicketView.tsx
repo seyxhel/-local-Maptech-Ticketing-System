@@ -16,7 +16,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { TicketChatSocket } from '../../services/chatService';
 import type { ChatMessage, ChatEvent, ChatAttachment } from '../../services/chatService';
-import { fetchTicketByStf, fetchTicketById, uploadResolutionProof, deleteAttachment, closeTicket, updateEmployeeFields, saveProductDetails, escalateTicket, escalateExternal, startWork, createCSATFeedback, updateTicket, deleteTicket as apiDeleteTicket, fetchProducts, submitForObservation, assignTicket, fetchEmployees } from '../../services/api';
+import { fetchTicketByStf, fetchTicketById, uploadResolutionProof, deleteAttachment, closeTicket, updateEmployeeFields, saveProductDetails, escalateTicket, escalateExternal, startWork, createCSATFeedback, updateTicket, deleteTicket as apiDeleteTicket, fetchProducts, submitForObservation, assignTicket, fetchEmployees, fetchTickets } from '../../services/api';
 import type { Product } from '../../services/api';
 import { toast } from 'sonner';
 import type { BackendTicket } from '../../services/api';
@@ -126,6 +126,21 @@ function stepLabelClass(key: string, state: TrackerStepState): string {
     return 'text-[#0E8F79] dark:text-teal-400 font-bold';
   }
   return 'text-gray-400 dark:text-gray-500';
+}
+
+function formatPriorityLabel(priority?: string | null): string {
+  if (!priority) return 'Unknown';
+  const normalized = String(priority).replace(/_/g, ' ').toLowerCase();
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function priorityBadgeClass(priority?: string | null): string {
+  const key = String(priority || '').toLowerCase();
+  if (key === 'critical') return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
+  if (key === 'high') return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400';
+  if (key === 'medium') return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400';
+  if (key === 'low') return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
+  return 'bg-gray-100 text-gray-600 dark:bg-gray-600 dark:text-gray-300';
 }
 
 function renderTrackerIcon(key: string, state: TrackerStepState): React.ReactElement {
@@ -652,6 +667,7 @@ export function TicketView() {
   const [employees, setEmployees] = useState<{ id: number; first_name: string; last_name: string; username: string; active_ticket_count: number }[]>([]);
   const [reassignEmployeeId, setReassignEmployeeId] = useState('');
   const [reassigning, setReassigning] = useState(false);
+  const [employeeTickets, setEmployeeTickets] = useState<Record<number, BackendTicket[]>>({});
 
   // Show reassign when: ticket is Escalated (admin handles escalation),
   // OR the admin themselves is currently assigned (admin started work and wants to hand off).
@@ -662,9 +678,36 @@ export function TicketView() {
     );
 
   useEffect(() => {
-    if (canAdminReassign) {
-      fetchEmployees().then(setEmployees).catch(() => {});
-    }
+    if (!canAdminReassign) return;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const [employeeData, allTickets] = await Promise.all([fetchEmployees(), fetchTickets()]);
+        if (cancelled) return;
+        setEmployees(employeeData);
+
+        const activeByEmployee: Record<number, BackendTicket[]> = {};
+        for (const t of allTickets) {
+          const assigneeId = t.assigned_to?.id;
+          if (!assigneeId) continue;
+          const status = String(t.status || '').toLowerCase();
+          if (['resolved', 'closed', 'unresolved'].includes(status)) continue;
+          if (!activeByEmployee[assigneeId]) activeByEmployee[assigneeId] = [];
+          activeByEmployee[assigneeId].push(t);
+        }
+        setEmployeeTickets(activeByEmployee);
+      } catch {
+        if (!cancelled) {
+          setEmployees([]);
+          setEmployeeTickets({});
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [canAdminReassign]);
 
   // ── Escalation modal state ──
@@ -751,6 +794,17 @@ export function TicketView() {
   /** Admin or assigned employee who is actively processing this ticket */
   const canProcessTicket = isAssignedEmployee || isAdminProcessingEscalated;
   const canEdit = (canProcessTicket) && ticket.status !== 'Resolved' && ticket.status !== 'Closed';
+  const hasActionTaken = actionTaken.trim().length > 0;
+  const hasRemarks = remarksText.trim().length > 0;
+  const hasJobStatus = jobStatus.trim().length > 0;
+  const hasRequiredAttachment = uploadedAttachments.length > 0;
+  const canResolveTicket = hasActionTaken && hasRemarks && hasJobStatus && hasRequiredAttachment;
+  const missingResolveFields = [
+    !hasActionTaken ? 'Action Taken' : '',
+    !hasRemarks ? 'Remarks' : '',
+    !hasRequiredAttachment ? 'Required Attachment' : '',
+    !hasJobStatus ? 'Status of Job' : '',
+  ].filter(Boolean);
 
   const [savingProductDetails, setSavingProductDetails] = useState(false);
   const [submittingObservation, setSubmittingObservation] = useState(false);
@@ -785,6 +839,10 @@ export function TicketView() {
   /** Employee saves action taken, remarks, job status and resolves */
   const handleSaveFields = async () => {
     if (!backendTicketId) return;
+    if (!canResolveTicket) {
+      toast.error(`Please complete required fields: ${missingResolveFields.join(', ')}.`);
+      return;
+    }
     setSavingFields(true);
     try {
       const updated = await updateEmployeeFields(backendTicketId, {
@@ -1790,7 +1848,7 @@ export function TicketView() {
           {(!isAssignedEmployee || !!btData?.time_in || isAdminProcessingEscalated) && <>
           <Card>
             <h3 className="text-xs font-bold uppercase tracking-wider text-[#0E8F79] mb-3 flex items-center gap-2">
-              <FileText className="w-4 h-4" /> Action Taken
+              <FileText className="w-4 h-4" /> Action Taken <span className="text-red-500">*</span>
             </h3>
             <textarea
               value={actionTaken}
@@ -1808,7 +1866,7 @@ export function TicketView() {
           {/* Remarks */}
           <Card>
             <h3 className="text-xs font-bold uppercase tracking-wider text-[#0E8F79] mb-3 flex items-center gap-2">
-              <FileText className="w-4 h-4" /> Remarks
+              <FileText className="w-4 h-4" /> Remarks <span className="text-red-500">*</span>
             </h3>
             <textarea
               value={remarksText}
@@ -1826,7 +1884,7 @@ export function TicketView() {
           {/* Required Attachment */}
           <Card>
             <h3 className="text-xs font-bold uppercase tracking-wider text-[#0E8F79] mb-3 flex items-center gap-2">
-              <Paperclip className="w-4 h-4" /> Required Attachment
+              <Paperclip className="w-4 h-4" /> Required Attachment <span className="text-red-500">*</span>
             </h3>
 
             {/* Hidden file inputs */}
@@ -2002,7 +2060,7 @@ export function TicketView() {
           {/* Status of Job */}
           <Card>
             <h3 className="text-xs font-bold uppercase tracking-wider text-[#0E8F79] mb-3 flex items-center gap-2">
-              <ClipboardList className="w-4 h-4" /> Status of Job
+              <ClipboardList className="w-4 h-4" /> Status of Job <span className="text-red-500">*</span>
             </h3>
             <div className="flex flex-wrap gap-2">
               {JOB_STATUSES.map((s) => (
@@ -2087,18 +2145,62 @@ export function TicketView() {
               {canAdminReassign && (
                 <div className="space-y-2 pb-1">
                   <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Reassign to Employee</label>
-                  <select
-                    value={reassignEmployeeId}
-                    onChange={(e) => setReassignEmployeeId(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-400"
-                  >
-                    <option value="">Select an employee...</option>
-                    {employees.map((emp) => (
-                      <option key={emp.id} value={emp.id}>
-                        {`${emp.first_name} ${emp.last_name}`.trim() || emp.username} ({emp.active_ticket_count} active)
-                      </option>
-                    ))}
-                  </select>
+
+
+                  <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
+                    {employees.length === 0 ? (
+                      <p className="text-sm text-gray-400 py-2">No technicals found.</p>
+                    ) : (
+                      [...employees]
+                        .sort((a, b) => a.active_ticket_count - b.active_ticket_count)
+                        .map((emp) => {
+                          const tickets = employeeTickets[emp.id] || [];
+                          const isSelected = reassignEmployeeId === String(emp.id);
+                          const name = `${emp.first_name} ${emp.last_name}`.trim() || emp.username;
+                          return (
+                            <button
+                              type="button"
+                              key={emp.id}
+                              onClick={() => setReassignEmployeeId(isSelected ? '' : String(emp.id))}
+                              className={`w-full text-left rounded-xl border p-3 transition-colors ${isSelected ? 'border-[#3BC25B] bg-[#f0fdf4] dark:bg-green-900/20 ring-1 ring-[#3BC25B]' : 'border-gray-200 dark:border-gray-700 hover:border-[#3BC25B]/60 hover:bg-gray-50 dark:hover:bg-gray-800/60'}`}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="min-w-0">
+                                  <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">{name}</div>
+                                  <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{emp.username}</div>
+                                </div>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${emp.active_ticket_count === 0 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : emp.active_ticket_count <= 3 ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
+                                  {emp.active_ticket_count} active
+                                </span>
+                              </div>
+
+                              {tickets.length > 0 && (
+                                <div className="mt-2.5">
+                                  <p className="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">Current Working Tickets</p>
+                                  <div className="space-y-1.5">
+                                    {tickets.slice(0, 3).map((t) => (
+                                      <div key={t.id} className="flex items-center gap-2 bg-white dark:bg-gray-700 rounded-lg px-2.5 py-1.5 border border-gray-100 dark:border-gray-600">
+                                        <div className="flex-1 min-w-0">
+                                          <div className="text-[11px] font-semibold text-gray-800 dark:text-gray-200 truncate">{t.stf_no}</div>
+                                          <div className="text-[10px] text-gray-500 dark:text-gray-400 truncate">{t.type_of_service_detail?.name || 'N/A'}</div>
+                                        </div>
+                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${priorityBadgeClass(t.priority)}`}>
+                                          {formatPriorityLabel(t.priority)}
+                                        </span>
+                                      </div>
+                                    ))}
+                                    {tickets.length > 3 && (
+                                      <p className="text-[10px] text-gray-400 dark:text-gray-500">+{tickets.length - 3} more active tickets</p>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </button>
+                          );
+                        })
+                    )}
+                  </div>
+
                   <button
                     type="button"
                     disabled={!reassignEmployeeId || reassigning}
@@ -2162,7 +2264,7 @@ export function TicketView() {
               ) && (
                 <button
                   type="button"
-                  disabled={savingFields}
+                  disabled={savingFields || !canResolveTicket}
                   onClick={() => setShowResolveConfirm(true)}
                   className="w-full py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-[#0E8F79] to-[#0b7a67] hover:shadow-lg hover:shadow-[#0E8F79]/20 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all text-sm"
                 >
@@ -2937,12 +3039,15 @@ export function TicketView() {
             </div>
             <div className="px-6 py-5">
               <p className="text-sm text-gray-600 dark:text-gray-300">Are you sure you want to mark this ticket as resolved? Make sure all required fields and attachments are completed before proceeding.</p>
+              {!canResolveTicket && (
+                <p className="mt-2 text-xs text-red-500">Missing: {missingResolveFields.join(', ')}</p>
+              )}
             </div>
             <div className="flex items-center gap-3 px-6 pb-6">
               <button type="button" onClick={() => setShowResolveConfirm(false)} className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-white/10 text-gray-500 dark:text-white/60 hover:text-gray-700 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-white/5 text-sm font-medium transition-all">Cancel</button>
               <button
                 type="button"
-                disabled={savingFields}
+                disabled={savingFields || !canResolveTicket}
                 onClick={() => { setShowResolveConfirm(false); handleSaveFields(); }}
                 className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-[#0E8F79] to-[#0b7a67] text-white text-sm font-semibold hover:shadow-lg hover:shadow-[#0E8F79]/20 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all"
               >
