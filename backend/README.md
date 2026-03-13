@@ -38,3 +38,11 @@ API
 
 - List/create: `GET/POST /api/tickets/`
 - Retrieve/update/delete: `/api/tickets/{id}/`
+
+Railway Media Uploads
+
+- Profile pictures and other uploaded files are served from Django `MEDIA_URL` and stored in `MEDIA_ROOT`.
+- In Railway, attach a persistent volume to the backend service and set:
+	- `MEDIA_ROOT=/data/media` (or your mounted volume path)
+	- Optional: `MEDIA_URL=/media/` (default already)
+- This is required so uploaded files are not lost on restart/redeploy.

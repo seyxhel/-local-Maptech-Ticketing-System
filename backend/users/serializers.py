@@ -24,8 +24,11 @@ class UserSerializer(serializers.ModelSerializer):
     def get_profile_picture_url(self, obj):
         if not obj.profile_picture:
             return None
-        # Return the relative path so the frontend proxy handles serving it
-        return obj.profile_picture.url
+        url = obj.profile_picture.url
+        request = self.context.get('request')
+        if request:
+            return request.build_absolute_uri(url)
+        return url
 
 class AdminUserCreateSerializer(serializers.Serializer):
     first_name = serializers.CharField(max_length=150)
