@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo } from 'react';
+﻿import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { StatCard } from '../../components/ui/StatCard';
@@ -55,8 +55,11 @@ function startOfDay(date: Date) {
   return next;
 }
 
-function dateOnlyIso(value: string) {
-  return new Date(value).toISOString().slice(0, 10);
+function localDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function buildWeekData(tickets: BackendTicket[]) {
@@ -66,13 +69,14 @@ function buildWeekData(tickets: BackendTicket[]) {
   for (const ticket of tickets) {
     const createdAt = new Date(ticket.created_at);
     if (Number.isNaN(createdAt.getTime())) continue;
-    counts[dateOnlyIso(createdAt.toISOString())] = (counts[dateOnlyIso(createdAt.toISOString())] || 0) + 1;
+    const key = localDateKey(createdAt);
+    counts[key] = (counts[key] || 0) + 1;
   }
 
   return Array.from({ length: 7 }, (_, index) => {
     const date = new Date(today);
     date.setDate(today.getDate() - (6 - index));
-    const key = date.toISOString().slice(0, 10);
+    const key = localDateKey(date);
     return {
       name: date.toLocaleDateString('en-US', { weekday: 'short' }),
       tickets: counts[key] || 0,
