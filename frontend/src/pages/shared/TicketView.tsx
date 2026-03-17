@@ -855,6 +855,19 @@ export function TicketView() {
   /** Admin or assigned employee who is actively processing this ticket */
   const canProcessTicket = isAssignedEmployee || isAdminProcessingEscalated;
   const canEdit = (canProcessTicket) && ticket.status !== 'Resolved' && ticket.status !== 'Closed';
+  const canStartWorkAction = canProcessTicket && !btData?.time_in && (
+    ticket.status === 'Assigned' || ticket.status === 'New' || ticket.status === 'Escalated'
+  );
+  const canSubmitObservationAction = canProcessTicket && !btData?.was_for_observation && !!btData?.time_in && (
+    ticket.status === 'In Progress' || ticket.status === 'Assigned' ||
+    (isAdminProcessingEscalated && ticket.status === 'Escalated')
+  );
+  const canResolveAction = canProcessTicket && (
+    ticket.status === 'For Observation' ||
+    (isAdminProcessingEscalated && ticket.status === 'Escalated' && !!btData?.was_for_observation) ||
+    (isAssignedEmployee && !!btData?.was_for_observation && (ticket.status === 'In Progress' || ticket.status === 'Assigned'))
+  );
+  const showHandleYourselfDivider = canStartWorkAction || canSubmitObservationAction || canResolveAction;
   const hasLinkedRegisteredProduct = Boolean(btData?.product_record);
   const needsManualProductEntry = !hasLinkedRegisteredProduct;
   const hasManualProductDetails = Boolean(
@@ -2271,18 +2284,17 @@ export function TicketView() {
                   >
                     <UserCheck className="w-4 h-4" /> Reassign to Employee
                   </button>
-                  <div className="flex items-center gap-2 pt-1">
-                    <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
-                    <span className="text-xs text-gray-400">or handle yourself</span>
-                    <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
-                  </div>
+                  {showHandleYourselfDivider && (
+                    <div className="flex items-center gap-2 pt-1">
+                      <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+                      <span className="text-xs text-gray-400">or handle yourself</span>
+                      <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+                    </div>
+                  )}
                 </>
               )}
               {/* Start Work — only shown when no time_in yet (work has not begun) */}
-              {canProcessTicket && !btData?.time_in && (
-                ticket.status === 'Assigned' || ticket.status === 'New' ||
-                ticket.status === 'Escalated'
-              ) && (
+              {canStartWorkAction && (
                 <button
                   type="button"
                   disabled={startingWork}
@@ -2297,10 +2309,7 @@ export function TicketView() {
                 </button>
               )}
               {/* Submit for Observation — work started (time_in set), not yet observed */}
-              {canProcessTicket && !btData?.was_for_observation && !!btData?.time_in && (
-                ticket.status === 'In Progress' || ticket.status === 'Assigned' ||
-                (isAdminProcessingEscalated && ticket.status === 'Escalated')
-              ) && (
+              {canSubmitObservationAction && (
                 <button
                   type="button"
                   disabled={submittingObservation}
@@ -2315,11 +2324,7 @@ export function TicketView() {
                 </button>
               )}
               {/* Resolve Ticket — observation already submitted; shown at For Observation, or after reassignment with time_in preserved */}
-              {canProcessTicket && (
-                ticket.status === 'For Observation' ||
-                (isAdminProcessingEscalated && ticket.status === 'Escalated' && !!btData?.was_for_observation) ||
-                (isAssignedEmployee && !!btData?.was_for_observation && (ticket.status === 'In Progress' || ticket.status === 'Assigned'))
-              ) && (
+              {canResolveAction && (
                 <button
                   type="button"
                   disabled={savingFields || !canResolveTicket}
