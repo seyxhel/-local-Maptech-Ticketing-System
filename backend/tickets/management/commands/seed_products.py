@@ -201,19 +201,39 @@ class Command(BaseCommand):
                     )
                 )
 
-            # Skip duplicates by serial_no (if provided)
+            # Use serial_no for idempotent creation/update when available
             serial_no = data.get('serial_no', '')
-            if serial_no and Product.objects.filter(serial_no=serial_no).exists():
-                self.stdout.write(
-                    self.style.NOTICE(f'  Skipped (already exists): {data.get("product_name")} [{serial_no}]')
-                )
+            product_obj = None
+            try:
+                if serial_no:
+                    defaults = {**data}
+                    # Ensure category included in defaults
+                    defaults['category'] = category
+                    product_obj, created = Product.objects.update_or_create(
+                        serial_no=serial_no,
+                        defaults=defaults,
+                    )
+                    if created:
+                        self.stdout.write(self.style.SUCCESS(f'  Created: {data.get("product_name")} [{serial_no}]'))
+                        created_count += 1
+                    else:
+                        self.stdout.write(self.style.NOTICE(f'  Updated (existing): {data.get("product_name")} [{serial_no}]'))
+                else:
+                    # No serial: create a new product if an exact match doesn't already exist
+                    exists = Product.objects.filter(
+                        product_name=data.get('product_name'),
+                        model_name=data.get('model_name'),
+                    ).exists()
+                    if exists:
+                        self.stdout.write(self.style.NOTICE(f'  Skipped (already exists): {data.get("product_name")}'))
+                        skipped_count += 1
+                    else:
+                        product_obj = Product.objects.create(category=category, **data)
+                        self.stdout.write(self.style.SUCCESS(f'  Created: {data.get("product_name")}'))
+                        created_count += 1
+            except Exception as e:
+                self.stdout.write(self.style.ERROR(f'  ERROR creating product "{data.get("product_name")}": {e}'))
                 skipped_count += 1
-                continue
-
-            self.stdout.write(
-                self.style.SUCCESS(f'  Created: {data.get("product_name")} [{serial_no}]')
-            )
-            created_count += 1
 
         self.stdout.write(
             self.style.SUCCESS(
