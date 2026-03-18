@@ -44,6 +44,7 @@ if [ "${AUTO_SEED}" = "1" ] || [ "${AUTO_SEED}" = "true" ] || [ "${AUTO_SEED}" =
     python manage.py seed_services  2>&1 || echo "[WARN] seed_services failed"
     python manage.py seed_categories 2>&1 || echo "[WARN] seed_categories failed"
     python manage.py seed_tickets  2>&1 || echo "[WARN] seed_tickets failed"
+    python manage.py seed_products  2>&1 || echo "[WARN] seed_products failed"
     echo "==> Seeder tasks finished"
 fi
 

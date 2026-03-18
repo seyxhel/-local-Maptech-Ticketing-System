@@ -14,7 +14,7 @@ SEED_PRODUCTS = [
         'serial_no': 'FG60F-SN-100001',
         'sales_no': 'SO-2025-001',
         'has_warranty': True,
-        'date_purchased': '2024-06-15',
+        
     },
     {
         'category_name': 'Cyber Security',
@@ -26,7 +26,7 @@ SEED_PRODUCTS = [
         'serial_no': 'CISCO-ASA-200002',
         'sales_no': 'SO-2025-002',
         'has_warranty': True,
-        'date_purchased': '2024-07-20',
+        
     },
     # Wireless Access Points & Switches
     {
@@ -39,7 +39,7 @@ SEED_PRODUCTS = [
         'serial_no': 'UAP-PRO-300003',
         'sales_no': 'SO-2025-003',
         'has_warranty': True,
-        'date_purchased': '2024-08-10',
+        
     },
     {
         'category_name': 'Wireless Access Points & Switches',
@@ -51,7 +51,7 @@ SEED_PRODUCTS = [
         'serial_no': 'CSCO-9300-400004',
         'sales_no': 'SO-2025-004',
         'has_warranty': True,
-        'date_purchased': '2024-09-01',
+        
     },
     # CCTV
     {
@@ -64,7 +64,7 @@ SEED_PRODUCTS = [
         'serial_no': 'HVS-CAM-500005',
         'sales_no': 'SO-2025-005',
         'has_warranty': True,
-        'date_purchased': '2024-10-05',
+        
     },
     {
         'category_name': 'Closed-Circuit Television (CCTV)',
@@ -76,7 +76,7 @@ SEED_PRODUCTS = [
         'serial_no': 'HVS-NVR-600006',
         'sales_no': 'SO-2025-006',
         'has_warranty': True,
-        'date_purchased': '2024-10-05',
+        
     },
     # Computer | Desktop | Laptop | Monitor
     {
@@ -89,7 +89,7 @@ SEED_PRODUCTS = [
         'serial_no': 'LNV-X1C-700007',
         'sales_no': 'SO-2025-007',
         'has_warranty': True,
-        'date_purchased': '2025-01-15',
+        
     },
     {
         'category_name': 'Computer | Desktop | Laptop | Monitor',
@@ -101,7 +101,7 @@ SEED_PRODUCTS = [
         'serial_no': 'DELL-OP7-800008',
         'sales_no': 'SO-2025-008',
         'has_warranty': False,
-        'date_purchased': '2023-03-20',
+        
     },
     # UPS
     {
@@ -114,7 +114,7 @@ SEED_PRODUCTS = [
         'serial_no': 'APC-SMT-900009',
         'sales_no': 'SO-2025-009',
         'has_warranty': True,
-        'date_purchased': '2024-11-12',
+        
     },
     # Storage and Servers
     {
@@ -127,7 +127,7 @@ SEED_PRODUCTS = [
         'serial_no': 'HPE-DL380-101010',
         'sales_no': 'SO-2025-010',
         'has_warranty': True,
-        'date_purchased': '2024-04-30',
+        
     },
     # Biometrics
     {
@@ -140,7 +140,7 @@ SEED_PRODUCTS = [
         'serial_no': 'ZKT-K40-111111',
         'sales_no': 'SO-2025-011',
         'has_warranty': True,
-        'date_purchased': '2024-05-18',
+        
     },
     # Door Access
     {
@@ -153,7 +153,7 @@ SEED_PRODUCTS = [
         'serial_no': 'YALE-YDM-121212',
         'sales_no': 'SO-2025-012',
         'has_warranty': False,
-        'date_purchased': '2023-09-25',
+        
     },
     # Printing Devices
     {
@@ -166,7 +166,7 @@ SEED_PRODUCTS = [
         'serial_no': 'HP-M404-131313',
         'sales_no': 'SO-2025-013',
         'has_warranty': True,
-        'date_purchased': '2025-02-10',
+        
     },
     # Telephony Solution
     {
@@ -179,7 +179,6 @@ SEED_PRODUCTS = [
         'serial_no': 'CSCO-IP88-141414',
         'sales_no': 'SO-2025-014',
         'has_warranty': True,
-        'date_purchased': '2024-12-01',
     },
     # Video Conferencing
     {
@@ -192,7 +191,6 @@ SEED_PRODUCTS = [
         'serial_no': 'LOGI-RLY-151515',
         'sales_no': 'SO-2025-015',
         'has_warranty': True,
-        'date_purchased': '2025-01-05',
     },
 ]
 
@@ -219,13 +217,12 @@ class Command(BaseCommand):
             category_name = data.pop('category_name')
             date_purchased = data.pop('date_purchased', None)
 
-            # Resolve category (soft-fail: leave null if not found)
-            category = Category.objects.filter(name=category_name).first()
-            if not category:
+            # Resolve category: create it if it doesn't exist (make seeding idempotent on deployments)
+            category, cat_created = Category.objects.get_or_create(name=category_name)
+            if cat_created:
                 self.stdout.write(
                     self.style.WARNING(
-                        f'  Category "{category_name}" not found — '
-                        f'product "{data.get("product_name")}" will have no category.'
+                        f'  Category "{category_name}" not found — created new Category.'
                     )
                 )
 
