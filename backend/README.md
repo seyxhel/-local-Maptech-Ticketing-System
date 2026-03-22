@@ -32,6 +32,7 @@ python manage.py runserver
 python manage.py seed_users
 python manage.py seed_services
 python manage.py seed_categories
+python manage.py seed_products
 ```
 
 API

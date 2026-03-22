@@ -4,6 +4,10 @@ from tickets.models import Category
 
 CATEGORIES = [
     {
+        "name": "Cyber Security",
+        "description": "Solutions that protect systems, networks, and data from digital attacks, including firewalls, endpoint security, and threat management.",
+    },
+    {
         "name": "Wireless Access Points & Switches",
         "description": "Networking hardware that enables wireless connectivity and manages data traffic between devices within a local area network.",
     },

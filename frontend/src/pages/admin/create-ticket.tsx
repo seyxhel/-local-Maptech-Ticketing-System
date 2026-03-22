@@ -143,11 +143,19 @@ export default function AdminCreateTicket() {
   const [isExistingClient, setIsExistingClient] = useState(false);
   const [existingClients, setExistingClients] = useState<ClientRecord[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
+  const [clientPickerOpen, setClientPickerOpen] = useState(false);
+  const [clientSearch, setClientSearch] = useState('');
+  const [clientPage, setClientPage] = useState(1);
+  const CLIENT_PAGE_SIZE = 8;
 
   // Product picker
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
   const [salesNo, setSalesNo] = useState('');
+  const [productPickerOpen, setProductPickerOpen] = useState(false);
+  const [productSearch, setProductSearch] = useState('');
+  const [productPage, setProductPage] = useState(1);
+  const PRODUCT_PAGE_SIZE = 8;
 
   // New/existing product toggle
   const [isExistingProduct, setIsExistingProduct] = useState(false);
@@ -181,6 +189,7 @@ export default function AdminCreateTicket() {
   // After call completion + priority selection, external assignment is no longer shown.
   const canAssignExternal = !(callCompleted && !!priorityLevel);
   const selectedProduct = selectedProductId ? products.find((p) => p.id === selectedProductId) ?? null : null;
+  const selectedClient = selectedClientId ? existingClients.find((c) => c.id === selectedClientId) ?? null : null;
 
   // Fetch employees, service types, clients, and products from backend
   useEffect(() => {
@@ -298,6 +307,14 @@ export default function AdminCreateTicket() {
       setAddress(client.address || '');
     }
   };
+
+  useEffect(() => {
+    setClientPage(1);
+  }, [clientSearch]);
+
+  useEffect(() => {
+    setProductPage(1);
+  }, [productSearch]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -661,16 +678,33 @@ export default function AdminCreateTicket() {
           {isExistingClient && (
             <div className="mb-6">
               <label className={labelCls}>Select Existing Client <span className="text-red-500 ml-1">*</span></label>
-              <select
-                value={selectedClientId || ''}
-                onChange={(e) => handleClientSelect(Number(e.target.value))}
-                className={`${inputCls}`}
-              >
-                <option value="">— Select a client —</option>
-                {existingClients.filter((c) => c.is_active).map((c) => (
-                  <option key={c.id} value={c.id}>{c.client_name} {c.contact_person ? `(${c.contact_person})` : ''}</option>
-                ))}
-              </select>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setClientPickerOpen(true)}
+                  className={`${inputCls} text-left`}
+                >
+                  {selectedClient
+                    ? `${selectedClient.client_name}${selectedClient.contact_person ? ` (${selectedClient.contact_person})` : ''}`
+                    : 'Select a client'}
+                </button>
+                {selectedClientId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedClientId(null);
+                      setContactValues({
+                        client: '', contactPerson: '', landline: '', mobile: '', designation: '', department: '',
+                      });
+                      setEmail('');
+                      setAddress('');
+                    }}
+                    className="px-3 py-2 rounded-lg text-sm border bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-600"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
@@ -743,6 +777,113 @@ export default function AdminCreateTicket() {
                           <div className="flex items-center gap-2">
                             <button type="button" onClick={() => setDevicePage((p) => Math.max(1, p - 1))} disabled={devicePage === 1} className={`px-2 py-1 rounded border ${devicePage === 1 ? 'opacity-50 cursor-not-allowed' : 'bg-white dark:bg-gray-700'}`}>Prev</button>
                             <button type="button" onClick={() => setDevicePage((p) => Math.min(Math.max(1, Math.ceil(total / DEVICE_PAGE_SIZE)), p + 1))} disabled={devicePage >= Math.ceil(total / DEVICE_PAGE_SIZE)} className={`px-2 py-1 rounded border ${devicePage >= Math.ceil(total / DEVICE_PAGE_SIZE) ? 'opacity-50 cursor-not-allowed' : 'bg-white dark:bg-gray-700'}`}>Next</button>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {clientPickerOpen && (
+          <div className="fixed inset-0 z-50 flex items-start justify-center p-4">
+            <div className="absolute inset-0 bg-black/40" onClick={() => setClientPickerOpen(false)} />
+            <div className="relative bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-2xl max-h-[80vh] overflow-auto p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-lg font-semibold text-gray-900 dark:text-white">Select Existing Client</h4>
+                <button type="button" onClick={() => setClientPickerOpen(false)} className="px-3 py-1 rounded bg-[#0E8F79] text-white text-sm">Close</button>
+              </div>
+              <div className="mb-3">
+                <input
+                  value={clientSearch}
+                  onChange={(e) => setClientSearch(e.target.value)}
+                  placeholder="Search by client, contact person, email, or mobile..."
+                  className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm"
+                />
+              </div>
+              <div className="space-y-2">
+                {(() => {
+                  const query = clientSearch.trim().toLowerCase();
+                  const filtered = existingClients
+                    .filter((c) => c.is_active)
+                    .filter((c) => {
+                      if (!query) return true;
+                      const haystack = [
+                        c.client_name,
+                        c.contact_person,
+                        c.email_address,
+                        c.mobile_no,
+                        c.landline,
+                        c.department_organization,
+                      ]
+                        .filter(Boolean)
+                        .join(' ')
+                        .toLowerCase();
+                      return haystack.includes(query);
+                    });
+                  const total = filtered.length;
+                  const totalPages = Math.max(1, Math.ceil(total / CLIENT_PAGE_SIZE));
+                  const currentPage = Math.min(clientPage, totalPages);
+                  const start = (currentPage - 1) * CLIENT_PAGE_SIZE;
+                  const pageItems = filtered.slice(start, start + CLIENT_PAGE_SIZE);
+
+                  return (
+                    <>
+                      {pageItems.map((c) => {
+                        const isSelected = selectedClientId === c.id;
+                        return (
+                          <div key={c.id} className="flex items-center justify-between p-3 rounded hover:bg-gray-100 dark:hover:bg-gray-700">
+                            <div className="min-w-0">
+                              <div className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">{c.client_name}</div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                {c.contact_person || 'No contact person'}
+                                {c.mobile_no ? ` • ${c.mobile_no}` : ''}
+                                {c.email_address ? ` • ${c.email_address}` : ''}
+                              </div>
+                            </div>
+                            {isSelected ? (
+                              <button type="button" className="px-3 py-1 rounded bg-blue-600 text-white text-sm">Selected</button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleClientSelect(c.id);
+                                  setClientPickerOpen(false);
+                                }}
+                                className="px-3 py-1 rounded bg-[#0E8F79] text-white text-sm"
+                              >
+                                Select
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                      {total === 0 && (
+                        <div className="text-sm text-gray-500">No clients found.</div>
+                      )}
+                      {total > CLIENT_PAGE_SIZE && (
+                        <div className="mt-3 flex items-center justify-between">
+                          <div className="text-sm text-gray-500">Page {currentPage} of {totalPages}</div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setClientPage((p) => Math.max(1, p - 1))}
+                              disabled={currentPage === 1}
+                              className={`px-2 py-1 rounded border ${currentPage === 1 ? 'opacity-50 cursor-not-allowed' : 'bg-white dark:bg-gray-700'}`}
+                            >
+                              Prev
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setClientPage((p) => Math.min(totalPages, p + 1))}
+                              disabled={currentPage >= totalPages}
+                              className={`px-2 py-1 rounded border ${currentPage >= totalPages ? 'opacity-50 cursor-not-allowed' : 'bg-white dark:bg-gray-700'}`}
+                            >
+                              Next
+                            </button>
                           </div>
                         </div>
                       )}
@@ -836,21 +977,26 @@ export default function AdminCreateTicket() {
               <>
                 <div className="md:col-span-2">
                   <label className={labelCls}>Select Product (optional)</label>
-                  <select
-                    value={selectedProductId || ''}
-                    onChange={(e) => setSelectedProductId(e.target.value ? Number(e.target.value) : null)}
-                    className={inputCls}
-                  >
-                    <option value="">— Select a product —</option>
-                    {products.filter((p) => p.is_active).map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.product_name || p.device_equipment || '—'}
-                        {p.brand ? ` | ${p.brand}` : ''}
-                        {p.model_name ? ` | ${p.model_name}` : ''}
-                        {p.serial_no ? ` | S/N: ${p.serial_no}` : ''}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setProductPickerOpen(true)}
+                      className={`${inputCls} text-left`}
+                    >
+                      {selectedProduct
+                        ? `${selectedProduct.product_name || selectedProduct.device_equipment || 'Unnamed'}${selectedProduct.brand ? ` | ${selectedProduct.brand}` : ''}${selectedProduct.model_name ? ` | ${selectedProduct.model_name}` : ''}${selectedProduct.serial_no ? ` | S/N: ${selectedProduct.serial_no}` : ''}`
+                        : 'Select a product'}
+                    </button>
+                    {selectedProductId && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedProductId(null)}
+                        className="px-3 py-2 rounded-lg text-sm border bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-600"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
                 </div>
                 {selectedProduct && (
                   <>
@@ -921,6 +1067,128 @@ export default function AdminCreateTicket() {
             )}
           </div>
         </Card>
+
+        {productPickerOpen && (
+          <div className="fixed inset-0 z-50 flex items-start justify-center p-4">
+            <div className="absolute inset-0 bg-black/40" onClick={() => setProductPickerOpen(false)} />
+            <div className="relative bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-3xl max-h-[80vh] overflow-auto p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-lg font-semibold text-gray-900 dark:text-white">Select Product (optional)</h4>
+                <button type="button" onClick={() => setProductPickerOpen(false)} className="px-3 py-1 rounded bg-[#0E8F79] text-white text-sm">Close</button>
+              </div>
+              <div className="mb-3 flex items-center gap-2">
+                <input
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                  placeholder="Search by product, device, brand, model, or serial number..."
+                  className="flex-1 px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm"
+                />
+                {selectedProductId && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedProductId(null)}
+                    className="px-3 py-2 rounded border bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-600 text-sm"
+                  >
+                    Use none
+                  </button>
+                )}
+              </div>
+              <div className="space-y-2">
+                {(() => {
+                  const query = productSearch.trim().toLowerCase();
+                  const filtered = products
+                    .filter((p) => p.is_active)
+                    .filter((p) => {
+                      if (!query) return true;
+                      const haystack = [
+                        p.product_name,
+                        p.device_equipment,
+                        p.brand,
+                        p.model_name,
+                        p.serial_no,
+                        p.sales_no,
+                      ]
+                        .filter(Boolean)
+                        .join(' ')
+                        .toLowerCase();
+                      return haystack.includes(query);
+                    });
+
+                  const total = filtered.length;
+                  const totalPages = Math.max(1, Math.ceil(total / PRODUCT_PAGE_SIZE));
+                  const currentPage = Math.min(productPage, totalPages);
+                  const start = (currentPage - 1) * PRODUCT_PAGE_SIZE;
+                  const pageItems = filtered.slice(start, start + PRODUCT_PAGE_SIZE);
+
+                  return (
+                    <>
+                      {pageItems.map((p) => {
+                        const isSelected = selectedProductId === p.id;
+                        return (
+                          <div key={p.id} className="flex items-center justify-between p-3 rounded hover:bg-gray-100 dark:hover:bg-gray-700">
+                            <div className="min-w-0">
+                              <div className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
+                                {p.product_name || p.device_equipment || 'Unnamed product'}
+                              </div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                {p.device_equipment || 'No equipment'}
+                                {p.brand ? ` • ${p.brand}` : ''}
+                                {p.model_name ? ` • ${p.model_name}` : ''}
+                                {p.serial_no ? ` • S/N: ${p.serial_no}` : ''}
+                              </div>
+                            </div>
+                            {isSelected ? (
+                              <button type="button" className="px-3 py-1 rounded bg-blue-600 text-white text-sm">Selected</button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedProductId(p.id);
+                                  setProductPickerOpen(false);
+                                }}
+                                className="px-3 py-1 rounded bg-[#0E8F79] text-white text-sm"
+                              >
+                                Select
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+
+                      {total === 0 && (
+                        <div className="text-sm text-gray-500">No products found.</div>
+                      )}
+
+                      {total > PRODUCT_PAGE_SIZE && (
+                        <div className="mt-3 flex items-center justify-between">
+                          <div className="text-sm text-gray-500">Page {currentPage} of {totalPages}</div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setProductPage((p) => Math.max(1, p - 1))}
+                              disabled={currentPage === 1}
+                              className={`px-2 py-1 rounded border ${currentPage === 1 ? 'opacity-50 cursor-not-allowed' : 'bg-white dark:bg-gray-700'}`}
+                            >
+                              Prev
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setProductPage((p) => Math.min(totalPages, p + 1))}
+                              disabled={currentPage >= totalPages}
+                              className={`px-2 py-1 rounded border ${currentPage >= totalPages ? 'opacity-50 cursor-not-allowed' : 'bg-white dark:bg-gray-700'}`}
+                            >
+                              Next
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Section 3: Type of Service */}
         <Card className="border-l-4 border-l-[#3BC25B]">

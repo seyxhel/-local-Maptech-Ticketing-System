@@ -217,7 +217,7 @@ class Command(BaseCommand):
 
         for data in SEED_PRODUCTS:
             category_name = data.pop('category_name')
-            date_purchased = data.pop('date_purchased', None)
+            data.pop('date_purchased', None)
 
             # Resolve category (soft-fail: leave null if not found)
             category = Category.objects.filter(name=category_name).first()
@@ -228,17 +228,6 @@ class Command(BaseCommand):
                         f'product "{data.get("product_name")}" will have no category.'
                     )
                 )
-
-            # Parse date
-            from datetime import date
-            parsed_date = None
-            if date_purchased:
-                try:
-                    parsed_date = date.fromisoformat(date_purchased)
-                except ValueError:
-                    self.stdout.write(
-                        self.style.WARNING(f'  Invalid date "{date_purchased}" — skipping date.')
-                    )
 
             # Skip duplicates by serial_no (if provided)
             serial_no = data.get('serial_no', '')
@@ -251,7 +240,6 @@ class Command(BaseCommand):
 
             Product.objects.create(
                 category=category,
-                date_purchased=parsed_date,
                 **data,
             )
             self.stdout.write(
