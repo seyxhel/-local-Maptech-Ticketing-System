@@ -238,12 +238,16 @@ class TicketViewSet(viewsets.ModelViewSet):
         ticket = self.get_object()
 
         # Block reassignment if the employee has already clicked Start Work,
-        # unless the ticket is escalated (admin must be able to reassign after escalation).
+        # unless the ticket is escalated (admin must be able to reassign after escalation),
+        # or the current assignee is an admin (admins can reassign even after time_in).
         if ticket.time_in is not None and ticket.status != Ticket.STATUS_ESCALATED:
-            return Response(
-                {'detail': 'Cannot reassign after the employee has already started working.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            current_assignee = ticket.assigned_to
+            # Allow reassignment if the current assignee exists and is an admin
+            if not (current_assignee and getattr(current_assignee, 'role', None) == User.ROLE_ADMIN):
+                return Response(
+                    {'detail': 'Cannot reassign after the employee has already started working.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
         terminal_statuses = [
             Ticket.STATUS_CLOSED,
             Ticket.STATUS_PENDING_CLOSURE,
