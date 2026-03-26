@@ -29,6 +29,7 @@ import {
   Pause,
   Play,
   UserCheck,
+  Plus,
   CheckCircle2,
   Loader2,
   X,
@@ -90,6 +91,38 @@ const CONTACT_FIELDS = [
 /* Flow: form → stf-details (with Call Client + Priority) → ongoing → stf-details (priority enabled) → assign employee → redirect */
 type ModalStep = 'none' | 'stf-details' | 'ongoing' | 'assign';
 
+type AdminCreateTicketDraft = {
+  currentStep: number;
+  contactValues: Record<string, string>;
+  email: string;
+  address: string;
+  serviceType: string;
+  serviceOthersText: string;
+  supportType: string;
+  description: string;
+  selectedSalesRep: string;
+  additionalSalesReps: string[];
+  isExistingClient: boolean;
+  selectedClientId: number | null;
+  salesNo: string;
+  projectTitle: string;
+  isExistingProduct: boolean;
+  selectedProductId: number | null;
+  newProductInfo: {
+    device_equipment: string;
+    product_name: string;
+    brand: string;
+    model_name: string;
+    serial_no: string;
+    version_no: string;
+    date_purchased: string;
+    has_warranty: boolean;
+  };
+  estimatedDaysOverride: number | '';
+};
+
+let adminCreateTicketDraft: AdminCreateTicketDraft | null = null;
+
 function formatPriorityLabel(priority?: string | null): string {
   if (!priority) return 'Unknown';
   const normalized = String(priority).replace(/_/g, ' ').toLowerCase();
@@ -138,6 +171,11 @@ export default function AdminCreateTicket() {
   // Data from backend
   const [employees, setEmployees] = useState<{ id: number; name: string; role: string; avatar: string; available: boolean; activeTickets: number }[]>([]);
   const [selectedSalesRep, setSelectedSalesRep] = useState<string>('');
+  const [additionalSalesReps, setAdditionalSalesReps] = useState<string[]>([]);
+  const [salesRepModalOpen, setSalesRepModalOpen] = useState(false);
+  const [salesRepPage, setSalesRepPage] = useState(1);
+  const [newAdditionalSalesRep, setNewAdditionalSalesRep] = useState('');
+  const SALES_REP_PAGE_SIZE = 6;
   const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([]);
 
   // New/existing client toggle
@@ -193,6 +231,7 @@ export default function AdminCreateTicket() {
   const canAssignExternal = !(callCompleted && !!priorityLevel);
   const selectedProduct = selectedProductId ? products.find((p) => p.id === selectedProductId) ?? null : null;
   const selectedClient = selectedClientId ? existingClients.find((c) => c.id === selectedClientId) ?? null : null;
+  const combinedSalesReps = [selectedSalesRep.trim(), ...additionalSalesReps.map((r) => r.trim()).filter(Boolean)].filter(Boolean).join(', ');
 
   // Fetch employees, service types, clients, and products from backend
   useEffect(() => {
@@ -231,6 +270,75 @@ export default function AdminCreateTicket() {
 
   const lastStep = steps.length - 1;
 
+  useEffect(() => {
+    if (!adminCreateTicketDraft) return;
+    const draft = adminCreateTicketDraft;
+
+    setCurrentStep(Math.min(Math.max(draft.currentStep, 0), lastStep));
+    setContactValues(draft.contactValues || { client: '', contactPerson: '', landline: '', mobile: '', designation: '', department: '' });
+    setEmail(draft.email || '');
+    setAddress(draft.address || '');
+    setServiceType(draft.serviceType || '');
+    setServiceOthersText(draft.serviceOthersText || '');
+    setSupportType(draft.supportType || '');
+    setDescription(draft.description || '');
+    setSelectedSalesRep(draft.selectedSalesRep || '');
+    setAdditionalSalesReps(Array.isArray(draft.additionalSalesReps) ? draft.additionalSalesReps : []);
+    setIsExistingClient(!!draft.isExistingClient);
+    setSelectedClientId(draft.selectedClientId ?? null);
+    setSalesNo(draft.salesNo || '');
+    setProjectTitle(draft.projectTitle || '');
+    setIsExistingProduct(!!draft.isExistingProduct);
+    setSelectedProductId(draft.selectedProductId ?? null);
+    setNewProductInfo(
+      draft.newProductInfo ||
+      { device_equipment: '', product_name: '', brand: '', model_name: '', serial_no: '', version_no: '', date_purchased: '', has_warranty: false }
+    );
+    setEstimatedDaysOverride(draft.estimatedDaysOverride ?? '');
+  }, [lastStep]);
+
+  useEffect(() => {
+    adminCreateTicketDraft = {
+      currentStep,
+      contactValues,
+      email,
+      address,
+      serviceType,
+      serviceOthersText,
+      supportType,
+      description,
+      selectedSalesRep,
+      additionalSalesReps,
+      isExistingClient,
+      selectedClientId,
+      salesNo,
+      projectTitle,
+      isExistingProduct,
+      selectedProductId,
+      newProductInfo,
+      estimatedDaysOverride,
+    };
+  }, [
+    currentStep,
+    contactValues,
+    email,
+    address,
+    serviceType,
+    serviceOthersText,
+    supportType,
+    description,
+    selectedSalesRep,
+    additionalSalesReps,
+    isExistingClient,
+    selectedClientId,
+    salesNo,
+    projectTitle,
+    isExistingProduct,
+    selectedProductId,
+    newProductInfo,
+    estimatedDaysOverride,
+  ]);
+
   const validateStep = (step: number): boolean => {
     const newErrors: Record<string, boolean> = {};
     const msgs: Record<string, string> = {};
@@ -255,6 +363,7 @@ export default function AdminCreateTicket() {
       }
       const addrErr = validateAddress(address);
       if (addrErr) { newErrors['address'] = true; msgs['address'] = addrErr; }
+      if (!selectedSalesRep.trim()) { newErrors['salesRepresentative'] = true; msgs['salesRepresentative'] = 'Sales Representative is required.'; }
     }
     if (step === 1) {
       if (!projectTitle.trim()) { newErrors['projectTitle'] = true; msgs['projectTitle'] = 'Project Title is required.'; }
@@ -372,6 +481,24 @@ export default function AdminCreateTicket() {
     if (value.trim()) setErrors((prev) => ({ ...prev, [name]: false }));
   };
 
+  const formatSalesRepInput = (value: string) => {
+    if (!value) return value;
+    return value.replace(/(^|\s)([a-zA-Z])/g, (_, prefix: string, ch: string) => `${prefix}${ch.toUpperCase()}`);
+  };
+
+  const addAdditionalSalesRep = () => {
+    const value = newAdditionalSalesRep.trim();
+    if (!value) return;
+    setAdditionalSalesReps((prev) => {
+      const updated = [...prev, value];
+      setSalesRepPage(Math.max(1, Math.ceil(updated.length / SALES_REP_PAGE_SIZE)));
+      return updated;
+    });
+    setNewAdditionalSalesRep('');
+    setErrors((prev) => ({ ...prev, salesRepresentative: false }));
+    setErrorMsgs((prev) => ({ ...prev, salesRepresentative: '' }));
+  };
+
   // When selecting an existing client, auto-fill contact fields
   const handleClientSelect = (clientId: number) => {
     setSelectedClientId(clientId);
@@ -387,11 +514,10 @@ export default function AdminCreateTicket() {
       });
       setEmail(client.email_address || '');
       setAddress(client.address || '');
-      // Populate sales representative text and any additional sales reps into a single string
-      const reps: string[] = [];
-      if ((client as any).sales_representative) reps.push((client as any).sales_representative);
-      if (Array.isArray((client as any).additional_sales_reps)) reps.push(...(client as any).additional_sales_reps.filter(Boolean));
-      setSelectedSalesRep(reps.join(', '));
+      setSelectedSalesRep(((client as any).sales_representative || '').trim());
+      setAdditionalSalesReps(Array.isArray((client as any).additional_sales_reps) ? (client as any).additional_sales_reps.filter(Boolean).map((rep: string) => String(rep).trim()) : []);
+      setErrors((prev) => ({ ...prev, salesRepresentative: false }));
+      setErrorMsgs((prev) => ({ ...prev, salesRepresentative: '' }));
     }
   };
 
@@ -431,6 +557,11 @@ export default function AdminCreateTicket() {
 
     const addrErr = validateAddress(address);
     if (addrErr) { newErrors['address'] = true; msgs['address'] = addrErr; }
+
+    if (!selectedSalesRep.trim()) {
+      newErrors['salesRepresentative'] = true;
+      msgs['salesRepresentative'] = 'Sales Representative is required.';
+    }
 
     if (!serviceType) newErrors['serviceType'] = true;
     if (serviceType === 'Others' && !serviceOthersText.trim()) newErrors['serviceOthersText'] = true;
@@ -563,8 +694,8 @@ export default function AdminCreateTicket() {
         priority: priorityLevel.toLowerCase(),
       };
 
-      if (selectedSalesRep) {
-        ticketData.sales_representative = selectedSalesRep;
+      if (combinedSalesReps) {
+        ticketData.sales_representative = combinedSalesReps;
       }
 
       if (matchedService) {
@@ -609,6 +740,7 @@ export default function AdminCreateTicket() {
       }
 
       setModalStep('none');
+      adminCreateTicketDraft = null;
       toast.success(`Ticket ${created.stf_no} assigned to ${emp?.name}`, {
         description: linkedStf
           ? `Linked to ${linkedStf} | Priority: ${priorityLevel} | Service: ${serviceType}`
@@ -651,8 +783,8 @@ export default function AdminCreateTicket() {
         priority: priorityLevel.toLowerCase(),
       };
 
-      if (selectedSalesRep) {
-        ticketData.sales_representative = selectedSalesRep;
+      if (combinedSalesReps) {
+        ticketData.sales_representative = combinedSalesReps;
       }
 
       if (matchedService) {
@@ -695,6 +827,7 @@ export default function AdminCreateTicket() {
       }
 
       setModalStep('none');
+      adminCreateTicketDraft = null;
       toast.success(`Ticket ${created.stf_no} created for external assignment`, {
         description: linkedStf
           ? `Linked to ${linkedStf} | Priority: ${priorityLevel} | Service: ${serviceType}`
@@ -817,6 +950,8 @@ export default function AdminCreateTicket() {
                       });
                       setEmail('');
                       setAddress('');
+                      setSelectedSalesRep('');
+                      setAdditionalSalesReps([]);
                     }}
                     className="px-3 py-2 rounded-lg text-sm border bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-600"
                   >
@@ -830,21 +965,47 @@ export default function AdminCreateTicket() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {CONTACT_FIELDS.map((f) => (
               <div key={f.name}>
-                <label className={labelCls}>{f.label} {f.required && <span className="text-red-500 ml-1">*</span>}</label>
+                <label className={labelCls}>
+                  {f.label} {f.required && <span className="text-red-500 ml-1">*</span>}
+                  {f.name === 'landline' && <span className="text-gray-400 text-xs font-normal">(optional)</span>}
+                </label>
                 <input type="text" placeholder={f.placeholder} value={contactValues[f.name]} onChange={(e) => { const val = e.target.value; if (f.name === 'mobile' && val !== '' && !/^\d*$/.test(val)) return; if (f.name === 'landline' && val !== '' && !/^[\d()\-\s]*$/.test(val)) return; setContactField(f.name, val); }} maxLength={f.name === 'mobile' ? 11 : f.name === 'landline' ? MAX_PHONE : MAX_FIELD} className={`${inputCls} ${errors[f.name] ? errorRing : ''}`} />
                 {errors[f.name] && <p className="text-red-500 text-xs mt-1">{errorMsgs[f.name] || 'This field is required'}</p>}
               </div>
             ))}
             <div>
-              <label className={labelCls}>Sales Representative</label>
-              <input
-                type="text"
-                placeholder="Primary sales representative"
-                value={selectedSalesRep}
-                onChange={(e) => { setSelectedSalesRep(e.target.value); setErrors((p) => ({ ...p, salesRepresentative: false })); }}
-                className={`${inputCls}`}
-              />
-              {/* combined main and additional reps shown in single editable field */}
+              <label className={labelCls}>Sales Representative <span className="text-red-500 ml-1">*</span></label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="Primary sales representative"
+                  value={selectedSalesRep}
+                  onChange={(e) => {
+                    setSelectedSalesRep(formatSalesRepInput(e.target.value));
+                    setErrors((p) => ({ ...p, salesRepresentative: false }));
+                    setErrorMsgs((p) => ({ ...p, salesRepresentative: '' }));
+                  }}
+                  className={`${inputCls} ${errors['salesRepresentative'] ? errorRing : ''}`}
+                />
+                <button
+                  type="button"
+                  onClick={() => { setSalesRepPage(1); setSalesRepModalOpen(true); }}
+                  disabled={!selectedSalesRep.trim()}
+                  className={`h-[42px] w-[42px] inline-flex items-center justify-center rounded-lg border transition-colors ${
+                    selectedSalesRep.trim()
+                      ? 'border-[#0E8F79] bg-[#0E8F79] text-white hover:bg-[#0B7A68]'
+                      : 'border-gray-200 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                  }`}
+                  aria-label="Add additional sales representative"
+                  title="Add additional sales representative"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+              {errors['salesRepresentative'] && <p className="text-red-500 text-xs mt-1">{errorMsgs['salesRepresentative'] || 'This field is required'}</p>}
+              {additionalSalesReps.length > 0 && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Other representative(s): {additionalSalesReps.join(', ')}</p>
+              )}
             </div>
             <div>
               <label className={labelCls}>Email Address <span className="text-gray-400 text-xs font-normal">(optional)</span></label>
@@ -863,7 +1024,7 @@ export default function AdminCreateTicket() {
         {/* Navigation controls for step 0 */}
         {currentStep === 0 && (
           <div className="flex justify-end gap-3">
-            <GreenButton type="button" variant="outline" onClick={() => { setContactValues({ client: '', contactPerson: '', landline: '', mobile: '', designation: '', department: '' }); setEmail(''); setAddress(''); }}>Clear</GreenButton>
+            <GreenButton type="button" variant="outline" onClick={() => { setContactValues({ client: '', contactPerson: '', landline: '', mobile: '', designation: '', department: '' }); setEmail(''); setAddress(''); setSelectedSalesRep(''); setAdditionalSalesReps([]); }}>Clear</GreenButton>
             <GreenButton type="button" onClick={goNext}>Next</GreenButton>
           </div>
         )}
@@ -919,6 +1080,108 @@ export default function AdminCreateTicket() {
                           </div>
                         </div>
                       )}
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {salesRepModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-start justify-center p-4">
+            <div className="absolute inset-0 bg-black/40" />
+            <div className="relative bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-xl max-h-[80vh] overflow-auto p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-lg font-semibold text-gray-900 dark:text-white">Additional Sales Representatives</h4>
+                <button type="button" onClick={() => setSalesRepModalOpen(false)} className="px-3 py-1 rounded bg-[#0E8F79] text-white text-sm">Done</button>
+              </div>
+
+              <div className="mb-3 p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700/50">
+                <p className="text-xs font-semibold uppercase tracking-wide text-green-700 dark:text-green-300">Primary Sales Representative</p>
+                <p className="text-sm text-gray-900 dark:text-gray-100 mt-1">{selectedSalesRep.trim() || 'Not set'}</p>
+              </div>
+
+              <div className="flex items-center gap-2 mb-3">
+                <input
+                  type="text"
+                  value={newAdditionalSalesRep}
+                  onChange={(e) => setNewAdditionalSalesRep(formatSalesRepInput(e.target.value))}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      addAdditionalSalesRep();
+                    }
+                  }}
+                  placeholder="Type additional sales representative"
+                  className={inputCls}
+                />
+                <button
+                  type="button"
+                  onClick={addAdditionalSalesRep}
+                  className="px-3 py-2 rounded-lg bg-[#0E8F79] text-white text-sm font-medium"
+                >
+                  Add
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                {(() => {
+                  const total = additionalSalesReps.length;
+                  const totalPages = Math.max(1, Math.ceil(total / SALES_REP_PAGE_SIZE));
+                  const currentPage = Math.min(salesRepPage, totalPages);
+                  const start = (currentPage - 1) * SALES_REP_PAGE_SIZE;
+                  const pageItems = additionalSalesReps.slice(start, start + SALES_REP_PAGE_SIZE);
+
+                  return (
+                    <>
+                {pageItems.map((rep, index) => {
+                  const actualIndex = start + index;
+                  return (
+                  <div key={`${rep}-${index}`} className="flex items-center justify-between p-2 rounded bg-gray-50 dark:bg-gray-700">
+                    <span className="text-sm text-gray-800 dark:text-gray-100">{rep}</span>
+                    <button
+                      type="button"
+                      onClick={() => setAdditionalSalesReps((prev) => {
+                        const updated = prev.filter((_, i) => i !== actualIndex);
+                        setSalesRepPage((p) => Math.min(p, Math.max(1, Math.ceil(updated.length / SALES_REP_PAGE_SIZE))));
+                        return updated;
+                      })}
+                      className="inline-flex items-center justify-center w-8 h-8 rounded bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400"
+                      aria-label={`Remove ${rep}`}
+                      title={`Remove ${rep}`}
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  );
+                })}
+                {additionalSalesReps.length === 0 && (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">No additional sales representatives yet.</p>
+                )}
+                {total > SALES_REP_PAGE_SIZE && (
+                  <div className="mt-3 flex items-center justify-between">
+                    <div className="text-sm text-gray-500">Page {currentPage} of {totalPages}</div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSalesRepPage((p) => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                        className={`px-2 py-1 rounded border ${currentPage === 1 ? 'opacity-50 cursor-not-allowed' : 'bg-white dark:bg-gray-700'}`}
+                      >
+                        Prev
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSalesRepPage((p) => Math.min(totalPages, p + 1))}
+                        disabled={currentPage >= totalPages}
+                        className={`px-2 py-1 rounded border ${currentPage >= totalPages ? 'opacity-50 cursor-not-allowed' : 'bg-white dark:bg-gray-700'}`}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
                     </>
                   );
                 })()}
