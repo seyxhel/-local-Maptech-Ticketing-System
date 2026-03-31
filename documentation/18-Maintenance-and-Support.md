@@ -131,7 +131,7 @@ Semantic Versioning (SemVer): `MAJOR.MINOR.PATCH`
 **User Account Issues:**
 1. Navigate to Django Admin (`/admin/`) → Users
 2. Reset password or update user profile
-3. Verify role assignment (superadmin / admin / employee)
+3. Verify role assignment (superadmin / admin / sales / employee)
 
 **Ticket Data Issues:**
 1. Use Django Admin or the `AuditLog` to trace changes

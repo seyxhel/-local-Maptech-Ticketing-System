@@ -306,7 +306,7 @@ erDiagram
 | username | CharField(150) | Unique, Required | Login username (auto-generated from initials) |
 | email | EmailField | Unique, Required | User email address |
 | password | CharField(128) | Required | Hashed password (Argon2) |
-| role | CharField(12) | Choices: employee/admin/superadmin | User role determining access level |
+| role | CharField(12) | Choices: employee/sales/admin/superadmin | User role determining access level |
 | first_name | CharField(150) | Optional | User's first name |
 | middle_name | CharField(150) | Optional | User's middle name |
 | last_name | CharField(150) | Optional | User's last name |

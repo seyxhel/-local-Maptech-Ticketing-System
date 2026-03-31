@@ -6,7 +6,7 @@ The Maptech Ticketing System frontend follows these design principles:
 
 | Principle | Implementation |
 |-----------|---------------|
-| **Role-Based Layouts** | Each user role (Superadmin, Admin, Employee) has a dedicated layout with role-appropriate navigation and features |
+| **Role-Based Layouts** | Each user role (Superadmin, Admin, Sales, Employee) has a dedicated layout with role-appropriate navigation and features |
 | **Responsive Design** | Tailwind CSS utility classes ensure the interface adapts across desktop, tablet, and mobile viewports |
 | **Dark/Light Theme** | User-selectable theme with persistence (ThemeContext + localStorage + Tailwind dark mode) |
 | **Consistent Navigation** | Left sidebar navigation with icon + label for all primary sections; top header with notifications and profile |
@@ -58,6 +58,18 @@ The Maptech Ticketing System frontend follows these design principles:
 ⚙️ Settings
 ```
 
+### Sales Navigation
+
+```
+📊 Dashboard
+🎫 Tickets (View Only)
+📦 Products
+👤 Clients
+📚 Knowledge Hub
+📋 Audit Logs
+⚙️ Settings
+```
+
 ### Global Header Components
 
 ```
@@ -102,6 +114,18 @@ The Maptech Ticketing System frontend follows these design principles:
 | **Clients** | CRUD table for client organizations with contact details. View client ticket history |
 | **Audit Logs** | Same as superadmin but scoped to employee-level actions |
 | **Reports** | Ticket analytics, resolution time trends, technician performance metrics |
+| **Settings** | Profile editing (name, phone, avatar), password change, announcement viewing |
+
+### Sales Pages
+
+| Screen | Description |
+|--------|-------------|
+| **Dashboard** | Overview with ticket statistics and activity feed (read-only ticket access) |
+| **Tickets** | View-only list of all tickets with filters. Cannot create, assign, or close tickets |
+| **Products** | CRUD table for products with category, brand, model, serial, warranty filters |
+| **Clients** | CRUD table for client organizations with contact details. View client ticket history |
+| **Knowledge Hub** | Three-tab view: Uploaded (resolution proofs), Published (articles), Archived. Publish, unpublish, archive actions |
+| **Audit Logs** | Same as admin but scoped to employee-level actions |
 | **Settings** | Profile editing (name, phone, avatar), password change, announcement viewing |
 
 ### Employee (Technician) Pages

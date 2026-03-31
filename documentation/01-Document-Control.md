@@ -24,7 +24,7 @@
 | Version | Date | Author | Changes Made |
 |---------|------|--------|--------------|
 | 1.0 | March 11, 2026 | Cuadra, G., Pelagio, S., Quieta, K., Sulaiman, C., Vebayo, R. | Initial comprehensive documentation release covering all system modules, architecture, data models, API design, security architecture, and deployment specifications. |
-| | | | |
+| 1.1 | March 31, 2026 | System Update | Added **Sales** role to the RBAC model. Sales users have admin-level access for ticket management and catalog operations but are restricted from supervisor-specific actions (ticket closure, assignment, user management). Updated all role-related sections across documentation. |
 | | | | |
 
 ---

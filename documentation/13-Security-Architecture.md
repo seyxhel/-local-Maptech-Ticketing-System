@@ -21,7 +21,7 @@ The Maptech Ticketing System implements a defense-in-depth security model with t
 
 ### Role-Based Access Control (RBAC)
 
-The system implements RBAC with three hierarchical roles:
+The system implements RBAC with four hierarchical roles:
 
 ```mermaid
 flowchart TB
@@ -31,21 +31,27 @@ flowchart TB
     subgraph AD["ADMIN"]
         AD_D["Ticket lifecycle management, catalog CRUD,\nknowledge hub, call logs, CSAT, audit logs"]
     end
+    subgraph SL["SALES"]
+        SL_D["Ticket viewing, catalog management,\nknowledge hub access (no supervisor actions)"]
+    end
     subgraph EM["EMPLOYEE"]
         EM_D["View/work on assigned tickets only, escalate,\nsubmit for observation, request closure"]
     end
 
-    SA --> AD --> EM
+    SA --> AD
+    AD --> SL
+    AD --> EM
 ```
 
 ### Permission Classes
 
-The system uses six custom DRF permission classes, enforced at the API endpoint level:
+The system uses seven custom DRF permission classes, enforced at the API endpoint level:
 
 | Permission Class | Logic |
 |-----------------|-------|
 | **IsEmployee** | `user.is_authenticated AND user.role == 'employee'` |
-| **IsAdminLevel** | `user.is_authenticated AND user.role IN ('admin', 'superadmin')` |
+| **IsAdminLevel** | `user.is_authenticated AND user.role IN ('sales', 'admin', 'superadmin')` |
+| **IsSupervisorLevel** | `user.is_authenticated AND user.role IN ('admin', 'superadmin')` (excludes sales) |
 | **IsSuperAdmin** | `user.is_authenticated AND user.role == 'superadmin'` |
 | **IsAssignedEmployee** | `user.is_authenticated AND user.role == 'employee' AND ticket.assigned_to == user` |
 | **IsAdminOrAssignedEmployee** | `IsAdminLevel OR IsAssignedEmployee` |

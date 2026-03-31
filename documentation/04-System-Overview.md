@@ -75,6 +75,7 @@ The system implements a role-based access control (RBAC) model with the followin
 |------|-------------|-------------|
 | **Superadmin** | Highest-privilege system administrator. Full access to all features including user management, system configuration, audit logs, and retention policies. | Full system access |
 | **Admin (Supervisor)** | Manages day-to-day ticket operations. Creates tickets on behalf of clients, assigns technicians, reviews resolutions, manages products/clients/categories, and closes tickets. Can view audit logs scoped to employee actions. | Full ticket management, catalog management, knowledge hub management |
+| **Sales** | Sales representative with admin-level access for ticket viewing and catalog management. Can view all tickets, manage clients and products, and participate in ticket chat. Restricted from supervisor-specific actions like ticket assignment, closure, and user management. | Ticket viewing, catalog management, limited ticket actions |
 | **Employee (Technician)** | Field service technician assigned to tickets. Can view assigned tickets, start work, update findings, escalate internally, pass tickets, submit for observation, request closure, and upload resolution proofs. | Limited to assigned tickets and own profile |
 
 ### Role Hierarchy
@@ -83,46 +84,49 @@ The system implements a role-based access control (RBAC) model with the followin
 flowchart TB
     SA["<b>Superadmin</b>\nFull System Access"]
     AD["<b>Admin / Supervisor</b>\nTicket & Catalog Management"]
+    SL["<b>Sales</b>\nViewing & Catalog Access"]
     EM["<b>Employee / Technician</b>\nAssigned Ticket Operations"]
 
-    SA --> AD --> EM
+    SA --> AD
+    AD --> SL
+    AD --> EM
 ```
 
 ### Detailed Role Permissions
 
-| Feature | Superadmin | Admin (Supervisor) | Employee (Technician) |
-|---------|:----------:|:------------------:|:---------------------:|
-| View Dashboard & Stats | ✅ | ✅ | ✅ (own) |
-| Create Tickets | ✅ | ✅ | ❌ |
-| Assign Tickets | ✅ | ✅ | ❌ |
-| Start Work on Ticket | ✅ | ✅ | ✅ |
-| Update Ticket Fields | ✅ | ✅ | ✅ (limited) |
-| Escalate Internally | ❌ | ❌ | ✅ |
-| Pass Ticket | ❌ | ❌ | ✅ |
-| Escalate Externally | ✅ | ✅ | ✅ |
-| Request Closure | ❌ | ❌ | ✅ |
-| Close Ticket | ✅ | ✅ | ❌ |
-| Confirm Ticket | ✅ | ✅ | ❌ |
-| Review Ticket | ✅ | ✅ | ❌ |
-| Link Tickets | ✅ | ✅ | ❌ |
-| Manage Knowledge Hub | ✅ | ✅ | ❌ |
-| View Knowledge Hub | ✅ | ✅ | ✅ |
-| Manage Products | ✅ | ✅ | ❌ |
-| Manage Clients | ✅ | ✅ | ❌ |
-| Manage Categories | ✅ | ✅ | ❌ |
-| Manage Types of Service | ✅ | ✅ | ❌ |
-| Manage Call Logs | ✅ | ✅ | ❌ |
-| Submit CSAT Feedback | ✅ | ✅ | ❌ |
-| View Audit Logs | ✅ | ✅ (scoped) | ❌ |
-| Export Audit Logs | ✅ | ✅ | ❌ |
-| Manage Users | ✅ | ❌ | ❌ |
-| Manage Announcements | ✅ | ❌ | ❌ |
-| Manage Retention Policy | ✅ | ❌ | ❌ |
-| View Announcements | ✅ | ✅ | ✅ |
-| Chat (Admin ↔ Employee) | ✅ | ✅ | ✅ |
-| Receive Notifications | ✅ | ✅ | ✅ |
-| Update Profile | ✅ | ✅ | ✅ |
-| Change Password | ✅ | ✅ | ✅ |
+| Feature | Superadmin | Admin (Supervisor) | Sales | Employee (Technician) |
+|---------|:----------:|:------------------:|:-----:|:---------------------:|
+| View Dashboard & Stats | ✅ | ✅ | ✅ | ✅ (own) |
+| Create Tickets | ✅ | ✅ | ❌ | ❌ |
+| Assign Tickets | ✅ | ✅ | ❌ | ❌ |
+| Start Work on Ticket | ✅ | ✅ | ❌ | ✅ |
+| Update Ticket Fields | ✅ | ✅ | ❌ | ✅ (limited) |
+| Escalate Internally | ❌ | ❌ | ❌ | ✅ |
+| Pass Ticket | ❌ | ❌ | ❌ | ✅ |
+| Escalate Externally | ✅ | ✅ | ❌ | ✅ |
+| Request Closure | ❌ | ❌ | ❌ | ✅ |
+| Close Ticket | ✅ | ✅ | ❌ | ❌ |
+| Confirm Ticket | ✅ | ✅ | ❌ | ❌ |
+| Review Ticket | ✅ | ✅ | ❌ | ❌ |
+| Link Tickets | ✅ | ✅ | ❌ | ❌ |
+| Manage Knowledge Hub | ✅ | ✅ | ✅ | ❌ |
+| View Knowledge Hub | ✅ | ✅ | ✅ | ✅ |
+| Manage Products | ✅ | ✅ | ✅ | ❌ |
+| Manage Clients | ✅ | ✅ | ✅ | ❌ |
+| Manage Categories | ✅ | ✅ | ✅ | ❌ |
+| Manage Types of Service | ✅ | ✅ | ❌ | ❌ |
+| Manage Call Logs | ✅ | ✅ | ❌ | ❌ |
+| Submit CSAT Feedback | ✅ | ✅ | ❌ | ❌ |
+| View Audit Logs | ✅ | ✅ (scoped) | ✅ (scoped) | ❌ |
+| Export Audit Logs | ✅ | ✅ | ✅ | ❌ |
+| Manage Users | ✅ | ❌ | ❌ | ❌ |
+| Manage Announcements | ✅ | ❌ | ❌ | ❌ |
+| Manage Retention Policy | ✅ | ❌ | ❌ | ❌ |
+| View Announcements | ✅ | ✅ | ✅ | ✅ |
+| Chat (Admin ↔ Employee) | ✅ | ✅ | ✅ | ✅ |
+| Receive Notifications | ✅ | ✅ | ✅ | ✅ |
+| Update Profile | ✅ | ✅ | ✅ | ✅ |
+| Change Password | ✅ | ✅ | ✅ | ✅ |
 
 ---
 

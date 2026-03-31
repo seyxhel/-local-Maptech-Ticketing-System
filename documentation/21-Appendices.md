@@ -86,7 +86,7 @@ Client (1) ─────────── (N) Ticket
 
 | Model | Key Fields |
 |-------|------------|
-| **User** | email (PK), first_name, last_name, middle_name, role, department, phone, profile_picture, is_agreed_privacy_policy |
+| **User** | email (PK), first_name, last_name, middle_name, role (employee/sales/admin/superadmin), department, phone, profile_picture, is_agreed_privacy_policy |
 | **Ticket** | ticket_number, status, priority, category, product, client, created_by, sla_deadline, current_session |
 | **AssignmentSession** | ticket, assigned_to, assigned_by, started_at, ended_at, is_active |
 | **Message** | ticket, sender, content, message_type, parent_message, is_edited, is_deleted |
@@ -245,25 +245,26 @@ Client (1) ─────────── (N) Ticket
 
 ## Appendix E: User Role Permissions Matrix
 
-| Feature | SuperAdmin | Admin (Supervisor) | Employee (Technician) |
-|---------|:----------:|:------------------:|:---------------------:|
-| View all tickets | ✅ | ✅ | ❌ (own only) |
-| Create tickets | ✅ | ✅ | ❌ |
-| Assign tickets | ✅ | ✅ | ❌ |
-| Escalate tickets | ✅ | ✅ | ✅ |
-| Pass tickets | ❌ | ❌ | ✅ |
-| Close tickets (direct) | ✅ | ✅ | ❌ |
-| Request closure | ❌ | ❌ | ✅ |
-| Review closures | ✅ | ✅ | ❌ |
-| Manage users | ✅ | ❌ | ❌ |
-| View audit logs | ✅ | ✅ | ❌ |
-| Manage categories | ✅ | ✅ | ❌ |
-| Manage products | ✅ | ✅ | ❌ |
-| Send messages | ✅ | ✅ | ✅ |
-| Upload attachments | ✅ | ✅ | ✅ |
-| View statistics | ✅ | ✅ | ✅ (limited) |
-| Manage announcements | ✅ | ✅ | ❌ |
-| Manage retention policies | ✅ | ❌ | ❌ |
+| Feature | SuperAdmin | Admin (Supervisor) | Sales | Employee (Technician) |
+|---------|:----------:|:------------------:|:-----:|:---------------------:|
+| View all tickets | ✅ | ✅ | ✅ | ❌ (own only) |
+| Create tickets | ✅ | ✅ | ❌ | ❌ |
+| Assign tickets | ✅ | ✅ | ❌ | ❌ |
+| Escalate tickets | ✅ | ✅ | ❌ | ✅ |
+| Pass tickets | ❌ | ❌ | ❌ | ✅ |
+| Close tickets (direct) | ✅ | ✅ | ❌ | ❌ |
+| Request closure | ❌ | ❌ | ❌ | ✅ |
+| Review closures | ✅ | ✅ | ❌ | ❌ |
+| Manage users | ✅ | ❌ | ❌ | ❌ |
+| View audit logs | ✅ | ✅ | ✅ (scoped) | ❌ |
+| Manage categories | ✅ | ✅ | ✅ | ❌ |
+| Manage products | ✅ | ✅ | ✅ | ❌ |
+| Manage clients | ✅ | ✅ | ✅ | ❌ |
+| Send messages | ✅ | ✅ | ✅ | ✅ |
+| Upload attachments | ✅ | ✅ | ❌ | ✅ |
+| View statistics | ✅ | ✅ | ✅ | ✅ (limited) |
+| Manage announcements | ✅ | ✅ | ❌ | ❌ |
+| Manage retention policies | ✅ | ❌ | ❌ | ❌ |
 
 ---
 

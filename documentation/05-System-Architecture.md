@@ -31,7 +31,7 @@ The system is organized into the following logical layers:
 ```mermaid
 flowchart TB
     subgraph PL["PRESENTATION LAYER"]
-        PL1["<b>React SPA (TypeScript)</b>\n• Role-Based Layouts (Superadmin, Admin, Employee)\n• Pages & Components\n• Context Providers (Auth, Theme)\n• Service Layer (API calls, WebSocket clients)\n• Route Guards (ProtectedRoute)"]
+        PL1["<b>React SPA (TypeScript)</b>\n• Role-Based Layouts (Superadmin, Admin, Sales, Employee)\n• Pages & Components\n• Context Providers (Auth, Theme)\n• Service Layer (API calls, WebSocket clients)\n• Route Guards (ProtectedRoute)"]
     end
 
     PL ==>|"HTTP / WebSocket"| AL
