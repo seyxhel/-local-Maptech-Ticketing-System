@@ -67,6 +67,17 @@ export function AdminLayout() {
 
   if (!user) return null;
 
+  const navItems =
+    user.role === 'sales'
+      ? NAV_ITEMS.map((item) => {
+          if (item.id !== 'logs' || !item.children) return item;
+          return {
+            ...item,
+            children: item.children.filter((child) => child.id !== 'call-logs'),
+          };
+        })
+      : NAV_ITEMS;
+
   return (
     <Layout
       role="Admin"
@@ -74,7 +85,7 @@ export function AdminLayout() {
       onNavigate={handleNavigate}
       isDark={isDark}
       onToggleDark={toggleDark}
-      navItems={NAV_ITEMS}
+      navItems={navItems}
     >
       <NetworkErrorModal isOpen={isOffline} onRetry={retry} onDismiss={dismiss} retrying={retrying} />
       <Outlet />

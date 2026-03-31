@@ -21,6 +21,16 @@ SEED_USERS = [
         'password': 'Employee123!',
         'role': User.ROLE_EMPLOYEE,
     },
+    {
+        'username': 'Sales',
+        'first_name': 'Sales',
+        'last_name': 'User',
+        'email': 'sales@maptechisi.com',
+        'password': 'Sales123!',
+        'role': User.ROLE_SALES,
+        'is_staff': True,
+        'is_superuser': False,
+    },
 ]
 
 

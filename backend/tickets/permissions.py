@@ -31,6 +31,17 @@ class IsAdminLevel(BasePermission):
         )
 
 
+class IsSupervisorLevel(BasePermission):
+    """Allow supervisor-level users (admin and superadmin), excluding sales."""
+    message = 'Only supervisors can perform this action.'
+
+    def has_permission(self, request, view):
+        return (
+            request.user.is_authenticated
+            and request.user.role in (User.ROLE_ADMIN, User.ROLE_SUPERADMIN)
+        )
+
+
 class IsSuperAdmin(BasePermission):
     """Allow only users with `superadmin` role."""
     message = 'Only superadmins can perform this action.'

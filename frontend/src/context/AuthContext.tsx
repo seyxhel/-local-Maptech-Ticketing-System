@@ -9,7 +9,7 @@ import {
   clearLegacyAuthStorage,
 } from '../utils/authStorage';
 
-export type Role = 'superadmin' | 'admin' | 'employee' | null;
+export type Role = 'superadmin' | 'admin' | 'employee' | 'sales' | null;
 
 export interface AuthUser {
   role: Role;
@@ -47,6 +47,7 @@ function normalizeRole(role: string): Role {
   if (r === 'superadmin' || r === 'super_admin') return 'superadmin';
   if (r === 'admin') return 'admin';
   if (r === 'employee') return 'employee';
+  if (r === 'sales') return 'sales';
   return null;
 }
 
@@ -54,6 +55,7 @@ function roleToPath(role: Role): string {
   switch (role) {
     case 'superadmin': return '/superadmin/dashboard';
     case 'admin': return '/admin/dashboard';
+    case 'sales': return '/admin/dashboard';
     case 'employee': return '/employee/dashboard';
     case null:
     default: return '/login';

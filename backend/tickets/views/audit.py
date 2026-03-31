@@ -31,7 +31,7 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
                 Q(actor__role__in=[User.ROLE_ADMIN, User.ROLE_EMPLOYEE]) |
                 Q(actor__isnull=True)
             )
-        elif user.role == User.ROLE_ADMIN:
+        elif user.role in (User.ROLE_ADMIN, User.ROLE_SALES):
             qs = qs.filter(actor__role=User.ROLE_EMPLOYEE)
         else:
             qs = qs.none()

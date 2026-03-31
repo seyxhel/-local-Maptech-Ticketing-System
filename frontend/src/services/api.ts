@@ -557,7 +557,7 @@ export interface CreateUserPayload {
   suffix?: string;
   email: string;
   phone?: string;
-  role: 'employee' | 'admin';
+  role: 'employee' | 'sales' | 'admin';
 }
 
 export async function createUser(data: CreateUserPayload): Promise<BackendUser> {

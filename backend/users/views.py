@@ -494,7 +494,7 @@ class UserViewSet(viewsets.GenericViewSet):
                 setattr(target, field, request.data[field])
         # Keep is_staff in sync with role
         if 'role' in request.data:
-            target.is_staff = target.role in (User.ROLE_ADMIN, User.ROLE_SUPERADMIN)
+            target.is_staff = target.role in (User.ROLE_SALES, User.ROLE_ADMIN, User.ROLE_SUPERADMIN)
             target.is_superuser = target.role == User.ROLE_SUPERADMIN
         target.save()
         return Response(UserSerializer(target).data)

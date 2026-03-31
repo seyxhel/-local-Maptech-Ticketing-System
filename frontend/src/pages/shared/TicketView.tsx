@@ -10,13 +10,13 @@ import {
   MessageSquare, ArrowLeft, Camera, Video, Upload, FileText, ClipboardList, Package,
   Paperclip, CheckCircle, Wifi, WifiOff, Send, X, Smile, Reply, ChevronDown,
   Search as SearchIcon, Check, CheckCheck, CornerDownRight, Maximize2, Minimize2,
-  User as UserIcon, Shield, Image, Film, File, Download, Play, ArrowUpRight, Share2,
+  User as UserIcon, Shield, Image, Film, File, Download, Play, Phone, PhoneOff, Pause, ArrowUpRight, Share2,
   FileDown, FileSpreadsheet
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { TicketChatSocket } from '../../services/chatService';
 import type { ChatMessage, ChatEvent, ChatAttachment } from '../../services/chatService';
-import { fetchTicketByStf, fetchTicketById, uploadResolutionProof, deleteAttachment, closeTicket, updateEmployeeFields, saveProductDetails, escalateTicket, escalateExternal, startWork, createCSATFeedback, updateTicket, deleteTicket as apiDeleteTicket, fetchProducts, submitForObservation, assignTicket, fetchEmployees, fetchTickets } from '../../services/api';
+import { fetchTicketByStf, fetchTicketById, uploadResolutionProof, deleteAttachment, closeTicket, updateEmployeeFields, saveProductDetails, escalateTicket, escalateExternal, startWork, createCSATFeedback, updateTicket, deleteTicket as apiDeleteTicket, fetchProducts, submitForObservation, assignTicket, fetchEmployees, fetchTickets, createCallLog, endCallLog, reviewTicket, confirmTicket } from '../../services/api';
 import type { Product } from '../../services/api';
 import { toast } from 'sonner';
 import type { BackendTicket } from '../../services/api';
@@ -29,6 +29,7 @@ import XLSXStyle from 'xlsx-js-style';
 import { buildPdfDocument, openPrintWindow } from '../../utils/pdfTemplate';
 
 const JOB_STATUSES = ['Completed', 'Under Warranty', 'For Quotation', 'Pending', 'Chargeable', 'Under Contract'];
+type ReassignModalStep = 'stf-details' | 'ongoing' | 'assign';
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🎉', '🔥', '👀'];
 
@@ -714,6 +715,16 @@ export function TicketView() {
   const [reassigning, setReassigning] = useState(false);
   const [showReassignModal, setShowReassignModal] = useState(false);
   const [employeeTickets, setEmployeeTickets] = useState<Record<number, BackendTicket[]>>({});
+  const [priorityLevel, setPriorityLevel] = useState('');
+  const [callLogId, setCallLogId] = useState<number | null>(null);
+  const [callStartTime, setCallStartTime] = useState<Date | null>(null);
+  const [callTimer, setCallTimer] = useState(0);
+  const [callCompleted, setCallCompleted] = useState(false);
+  const [callEndTime, setCallEndTime] = useState<Date | null>(null);
+  const [callOnHold, setCallOnHold] = useState(false);
+  const [holdStartTime, setHoldStartTime] = useState<number | null>(null);
+  const [holdOffset, setHoldOffset] = useState(0);
+  const [reassignModalStep, setReassignModalStep] = useState<ReassignModalStep>('assign');
 
   // Show reassign when: ticket is Escalated (admin handles escalation),
   // OR the employee hasn't clicked Start Work yet (time_in is null),
@@ -724,6 +735,7 @@ export function TicketView() {
       !btData?.time_in ||
       btData?.assigned_to?.id === user?.id
     );
+  const needsCallPriorityWorkflow = isAdmin && !!btData && !btData.confirmed_by_admin && ticket.status !== 'Closed';
 
   const filteredEmployees = [...employees]
     .sort((a, b) => a.active_ticket_count - b.active_ticket_count)
@@ -735,6 +747,101 @@ export function TicketView() {
       const username = emp.username.toLowerCase();
       return fullName.includes(query) || reverseFullName.includes(query) || username.includes(query);
     });
+
+  useEffect(() => {
+    if (!callStartTime || callCompleted || callOnHold) return;
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - callStartTime.getTime() - holdOffset;
+      setCallTimer(Math.max(0, Math.floor(elapsed / 1000)));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [callStartTime, callCompleted, callOnHold, holdOffset]);
+
+  const formatCallDuration = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
+
+  const resetCallAndPriorityState = () => {
+    setPriorityLevel('');
+    setCallLogId(null);
+    setCallStartTime(null);
+    setCallTimer(0);
+    setCallCompleted(false);
+    setCallEndTime(null);
+    setCallOnHold(false);
+    setHoldStartTime(null);
+    setHoldOffset(0);
+    setReassignModalStep('assign');
+  };
+
+  const openReassignModal = () => {
+    setShowReassignModal(true);
+    setReassignSearch('');
+    setReassignEmployeeId('');
+    if (needsCallPriorityWorkflow) {
+      resetCallAndPriorityState();
+      setReassignModalStep('stf-details');
+    } else {
+      setReassignModalStep('assign');
+    }
+  };
+
+  const handleStartCall = async () => {
+    if (!backendTicketId || !btData) return;
+    setCallCompleted(false);
+    setCallTimer(0);
+    setCallEndTime(null);
+    setCallOnHold(false);
+    setHoldStartTime(null);
+    setHoldOffset(0);
+    try {
+      const log = await createCallLog({
+        ticket: backendTicketId,
+        client_name: btData.client || ticket.client || 'Client',
+        phone_number: btData.mobile_no || btData.landline || '',
+        call_start: new Date().toISOString(),
+      });
+      setCallLogId(log.id);
+      setCallStartTime(new Date());
+      setReassignModalStep('ongoing');
+    } catch {
+      setCallStartTime(new Date());
+      setReassignModalStep('ongoing');
+    }
+  };
+
+  const handleEndCall = async () => {
+    if (callLogId) {
+      try {
+        await endCallLog(callLogId, { call_end: new Date().toISOString() });
+      } catch {
+        // Keep UI flow moving even if logging fails.
+      }
+    }
+    if (callOnHold && holdStartTime) {
+      setHoldOffset((prev) => prev + (Date.now() - holdStartTime));
+      setHoldStartTime(null);
+      setCallOnHold(false);
+    }
+    setCallEndTime(new Date());
+    setCallStartTime(null);
+    setCallCompleted(true);
+    setReassignModalStep('stf-details');
+  };
+
+  const handleConfirmPriority = () => {
+    if (!callCompleted) {
+      toast.error('Please complete the client call before assigning an employee.');
+      return;
+    }
+    if (!priorityLevel) {
+      toast.error('Please select a priority level before assigning an employee.');
+      return;
+    }
+    setReassignModalStep('assign');
+  };
 
   useEffect(() => {
     if (!canAdminReassign) return;
@@ -1020,14 +1127,31 @@ export function TicketView() {
   /** Admin reassigns escalated ticket to a chosen employee */
   const handleReassignTicket = async () => {
     if (!reassignEmployeeId || !backendTicketId) return;
+    if (needsCallPriorityWorkflow) {
+      if (!callCompleted) {
+        toast.error('Please complete the client call before assigning an employee.');
+        return;
+      }
+      if (!priorityLevel) {
+        toast.error('Please select a priority level before assigning an employee.');
+        return;
+      }
+    }
     setReassigning(true);
     try {
+      if (needsCallPriorityWorkflow) {
+        await reviewTicket(backendTicketId, {
+          priority: reverseMapPriority(priorityLevel),
+        });
+        await confirmTicket(backendTicketId);
+      }
       const updated = await assignTicket(backendTicketId, Number(reassignEmployeeId));
       setBtData(updated);
-      toast.success('Ticket reassigned successfully.');
+      toast.success(needsCallPriorityWorkflow ? 'Call, priority, and assignment completed.' : 'Ticket reassigned successfully.');
       setReassignEmployeeId('');
       setReassignSearch('');
       setShowReassignModal(false);
+      resetCallAndPriorityState();
     } catch (err: any) {
       toast.error(err?.message || 'Failed to reassign ticket.');
     } finally {
@@ -2286,10 +2410,10 @@ export function TicketView() {
                 <>
                   <button
                     type="button"
-                    onClick={() => setShowReassignModal(true)}
+                    onClick={openReassignModal}
                     className="w-full py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-orange-500 to-orange-600 hover:shadow-lg hover:shadow-orange-500/20 flex items-center justify-center gap-2 transition-all text-sm"
                   >
-                    <UserCheck className="w-4 h-4" /> Reassign to Employee
+                    <UserCheck className="w-4 h-4" /> {needsCallPriorityWorkflow ? 'Call & Set Priority' : 'Reassign to Employee'}
                   </button>
                   {showHandleYourselfDivider && (
                     <div className="flex items-center gap-2 pt-1">
@@ -3435,127 +3559,309 @@ export function TicketView() {
 
       {/* ── Reassign Ticket Modal ── */}
       {showReassignModal && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900 dark:text-white">Reassign Employee</h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Select a technical to handle this ticket</p>
+        <div className="fixed inset-0 z-[9999] bg-black/60 flex items-center justify-center p-4">
+          {needsCallPriorityWorkflow && reassignModalStep === 'stf-details' && (
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-5">
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">STF Details</h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Review the ticket before proceeding</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowReassignModal(false);
+                      setReassignSearch('');
+                      setReassignEmployeeId('');
+                      resetCallAndPriorityState();
+                    }}
+                    className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                  >
+                    <X className="w-5 h-5 text-gray-500" />
+                  </button>
                 </div>
+
+                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 space-y-2 text-sm mb-5 max-h-60 overflow-y-auto">
+                  {[
+                    ['STF No.', btData?.stf_no || String(ticket.id)],
+                    ['Client', btData?.client || ticket.client || ''],
+                    ['Contact Person', btData?.contact_person || ticket.client || ''],
+                    ['Mobile', btData?.mobile_no || ticket.mobile || '—'],
+                    ['Landline', btData?.landline || '—'],
+                    ['Email', btData?.email_address || '—'],
+                    ['Designation', btData?.designation || '—'],
+                    ['Department', btData?.department_organization || '—'],
+                    ['Address', btData?.address || '—'],
+                    ['Type of Service', btData?.type_of_service_detail?.name || btData?.type_of_service_others || ticket.service || '—'],
+                    ['Support Type', btData?.preferred_support_type || '—'],
+                    ['Description', btData?.description_of_problem || ticket.description || '—'],
+                  ].map(([label, value]) => (
+                    <div key={String(label)} className="flex gap-2">
+                      <span className="text-gray-500 dark:text-gray-400 w-32 shrink-0 font-medium">{label}:</span>
+                      <span className="text-gray-900 dark:text-white break-words">{String(value || '—')}</span>
+                    </div>
+                  ))}
+                </div>
+
                 <button
-                  onClick={() => {
-                    setShowReassignModal(false);
-                    setReassignSearch('');
-                    setReassignEmployeeId('');
-                  }}
-                  className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                  onClick={handleStartCall}
+                  className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-colors mb-5 ${callCompleted ? 'bg-gray-100 dark:bg-gray-700 text-green-600 dark:text-green-400 cursor-default' : 'bg-[#3BC25B] hover:bg-[#2ea34a] text-white'}`}
+                  disabled={callCompleted}
                 >
-                  <X className="w-5 h-5 text-gray-500" />
+                  {callCompleted ? (
+                    <><CheckCircle className="w-4 h-4" /> Call Completed</>
+                  ) : (
+                    <><Phone className="w-4 h-4" /> Call Client</>
+                  )}
                 </button>
-              </div>
 
-              <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 mb-4 text-sm">
-                <span className="text-gray-500 dark:text-gray-400">Ticket: </span>
-                <span className="font-bold text-gray-900 dark:text-white">{ticket.id}</span>
-              </div>
-
-              <div className="relative mb-3">
-                <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  value={reassignSearch}
-                  onChange={(e) => setReassignSearch(e.target.value)}
-                  placeholder="Search employee by name or username..."
-                  className="w-full pl-10 pr-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#3BC25B]"
-                />
-              </div>
-
-              <div className="space-y-3 max-h-[26rem] overflow-y-auto pr-1">
-                {employees.length === 0 && (
-                  <p className="text-sm text-gray-400 text-center py-4">No technicals found.</p>
-                )}
-                {employees.length > 0 && filteredEmployees.length === 0 && (
-                  <p className="text-sm text-gray-400 text-center py-4">No employees match your search.</p>
-                )}
-                {filteredEmployees.map((emp) => {
-                  const tickets = employeeTickets[emp.id] || [];
-                  const isSelected = reassignEmployeeId === String(emp.id);
-                  const name = `${emp.first_name} ${emp.last_name}`.trim() || emp.username;
-                  return (
-                    <div key={emp.id} className={`rounded-xl border-2 transition-all ${isSelected ? 'border-[#3BC25B] bg-[#f0fdf4] dark:bg-green-900/20 ring-1 ring-[#3BC25B]' : 'border-gray-200 dark:border-gray-600 hover:border-[#3BC25B]'}`}>
+                <div className={`${!callCompleted ? 'opacity-40 pointer-events-none' : ''}`}>
+                  <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Priority Level {!callCompleted && <span className="text-xs font-normal text-gray-400 ml-1">(complete a call first)</span>}</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {[
+                      { label: 'Low', color: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700 text-blue-700 dark:text-blue-300', active: 'bg-blue-500 text-white border-blue-500 ring-2 ring-blue-300 dark:ring-blue-700' },
+                      { label: 'Medium', color: 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-700 text-yellow-700 dark:text-yellow-300', active: 'bg-yellow-500 text-white border-yellow-500 ring-2 ring-yellow-300 dark:ring-yellow-700' },
+                      { label: 'High', color: 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-700 text-orange-700 dark:text-orange-300', active: 'bg-orange-500 text-white border-orange-500 ring-2 ring-orange-300 dark:ring-orange-700' },
+                      { label: 'Critical', color: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700 text-red-700 dark:text-red-300', active: 'bg-red-500 text-white border-red-500 ring-2 ring-red-300 dark:ring-red-700' },
+                    ].map(({ label, color, active }) => (
                       <button
+                        key={label}
                         type="button"
-                        onClick={() => setReassignEmployeeId(isSelected ? '' : String(emp.id))}
-                        className="w-full flex items-center gap-3 p-3 text-left"
+                        onClick={() => setPriorityLevel(label)}
+                        className={`px-2 py-3 rounded-xl border-2 text-xs font-bold transition-all ${priorityLevel === label ? active : `${color} hover:opacity-80`}`}
                       >
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${isSelected ? 'bg-[#3BC25B] text-white' : 'bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300'}`}>
-                          {name.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-gray-900 dark:text-white text-sm truncate">{name}</div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">{emp.username}</div>
-                        </div>
-                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${emp.active_ticket_count === 0 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : emp.active_ticket_count <= 3 ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
-                          {emp.active_ticket_count} active
-                        </span>
-                        {isSelected && <CheckCircle className="w-5 h-5 text-[#3BC25B] shrink-0" />}
-                        {!isSelected && <div className="w-2 h-2 bg-green-400 rounded-full shrink-0" title="Available" />}
+                        {label}
                       </button>
+                    ))}
+                  </div>
+                </div>
 
-                      {tickets.length > 0 && (
-                        <div className="px-3 pb-3">
-                          <p className="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5 ml-1">Current Working Tickets</p>
-                          <div className="space-y-1.5">
-                            {tickets.slice(0, 3).map((t) => (
-                              <div key={t.id} className="flex items-center gap-2 bg-white dark:bg-gray-700 rounded-lg px-3 py-2 border border-gray-100 dark:border-gray-600">
-                                <div className="flex-1 min-w-0">
-                                  <div className="text-xs font-semibold text-gray-800 dark:text-gray-200 truncate">{t.stf_no}</div>
-                                  <div className="text-[11px] text-gray-500 dark:text-gray-400 truncate">{t.type_of_service_detail?.name || 'N/A'}</div>
-                                </div>
-                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${priorityBadgeClass(t.priority)}`}>
-                                  {formatPriorityLabel(t.priority)}
-                                </span>
-                              </div>
-                            ))}
-                            {tickets.length > 3 && (
-                              <p className="text-[10px] text-gray-400 dark:text-gray-500">+{tickets.length - 3} more active tickets</p>
-                            )}
+                <div className="mt-5">
+                  <button
+                    onClick={handleConfirmPriority}
+                    disabled={!callCompleted || !priorityLevel}
+                    className="w-full px-4 py-2.5 rounded-lg bg-[#3BC25B] hover:bg-[#2ea34a] text-white text-sm font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    Continue to Assign
+                  </button>
+                </div>
+
+                {callCompleted && (
+                  <div className="mt-4 bg-white dark:bg-gray-800/50 rounded-lg p-3 border border-gray-100 dark:border-gray-700 text-sm">
+                    <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Call Log Preview</h4>
+                    <div className="space-y-3">
+                      <div className="flex items-start gap-3">
+                        <div className="w-2 h-2 rounded-full bg-green-500 mt-1" />
+                        <div>
+                          <div className="font-medium">Call Connected</div>
+                          <div className="text-xs text-gray-500">{callStartTime ? callStartTime.toLocaleString() : '—'} • {btData?.mobile_no || btData?.landline || ticket.mobile || '—'}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className="w-2 h-2 rounded-full bg-blue-500 mt-1" />
+                        <div>
+                          <div className="font-medium">Ongoing</div>
+                          <div className="text-xs text-gray-500">Duration: {formatCallDuration(callTimer)}</div>
+                        </div>
+                      </div>
+                      {holdOffset > 0 && (
+                        <div className="flex items-start gap-3">
+                          <div className="w-2 h-2 rounded-full bg-yellow-500 mt-1" />
+                          <div>
+                            <div className="font-medium">On Hold</div>
+                            <div className="text-xs text-gray-500">Total hold: {formatCallDuration(Math.floor(holdOffset / 1000))}</div>
                           </div>
                         </div>
                       )}
+                      <div className="flex items-start gap-3">
+                        <div className="w-2 h-2 rounded-full bg-red-500 mt-1" />
+                        <div>
+                          <div className="font-medium">End Call</div>
+                          <div className="text-xs text-gray-500">{callEndTime ? callEndTime.toLocaleString() : '—'}</div>
+                        </div>
+                      </div>
                     </div>
-                  );
-                })}
-              </div>
-
-              <div className="mt-5 flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowReassignModal(false);
-                    setReassignSearch('');
-                    setReassignEmployeeId('');
-                  }}
-                  className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 text-sm font-medium transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleReassignTicket}
-                  disabled={!reassignEmployeeId || reassigning}
-                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 text-white text-sm font-semibold hover:shadow-lg hover:shadow-orange-500/20 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all"
-                >
-                  {reassigning ? (
-                    <><Loader2 className="w-4 h-4 animate-spin" /> Reassigning...</>
-                  ) : (
-                    <><UserCheck className="w-4 h-4" /> Reassign to Employee</>
-                  )}
-                </button>
+                  </div>
+                )}
               </div>
             </div>
-          </div>
+          )}
+
+          {needsCallPriorityWorkflow && reassignModalStep === 'ongoing' && (
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+              <div className="p-8 text-center">
+                <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-green-500 flex items-center justify-center">
+                  <Phone className="w-10 h-10 text-white animate-bounce" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Call Connected</h3>
+                <p className="text-gray-500 dark:text-gray-400 mb-2">{btData?.contact_person || ticket.client || 'Client'} — {btData?.mobile_no || btData?.landline || ticket.mobile || 'N/A'}</p>
+                <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium mb-4 ${callOnHold ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400' : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'}`}>
+                  <span className={`w-2 h-2 rounded-full ${callOnHold ? 'bg-yellow-500' : 'bg-green-500 animate-pulse'}`} /> {callOnHold ? 'On Hold' : 'Ongoing Call'}
+                </div>
+                <div className={`text-3xl font-bold mb-6 tabular-nums font-mono ${callOnHold ? 'text-yellow-500' : 'text-[#3BC25B]'}`}>
+                  {formatCallDuration(callTimer)}
+                </div>
+                <div className="flex items-center justify-center gap-3">
+                  <button
+                    onClick={() => {
+                      if (callOnHold) {
+                        if (holdStartTime) {
+                          setHoldOffset((prev) => prev + (Date.now() - holdStartTime));
+                        }
+                        setHoldStartTime(null);
+                        setCallOnHold(false);
+                      } else {
+                        setHoldStartTime(Date.now());
+                        setCallOnHold(true);
+                      }
+                    }}
+                    className={`flex items-center gap-2 px-6 py-3 rounded-full font-semibold transition-colors shadow-lg ${
+                      callOnHold
+                        ? 'bg-green-500 hover:bg-green-600 text-white shadow-green-500/30'
+                        : 'bg-yellow-500 hover:bg-yellow-600 text-white shadow-yellow-500/30'
+                    }`}
+                  >
+                    {callOnHold ? <><Play className="w-5 h-5" /> Resume</> : <><Pause className="w-5 h-5" /> On Hold</>}
+                  </button>
+                  <button onClick={handleEndCall} className="flex items-center gap-2 px-8 py-3 bg-red-500 hover:bg-red-600 text-white rounded-full font-semibold transition-colors shadow-lg shadow-red-500/30">
+                    <PhoneOff className="w-5 h-5" /> End Call
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {(!needsCallPriorityWorkflow || reassignModalStep === 'assign') && (
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">{needsCallPriorityWorkflow ? 'Assign Technical' : 'Reassign Employee'}</h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Select a technical to handle this ticket</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (needsCallPriorityWorkflow) {
+                        setReassignModalStep('stf-details');
+                        return;
+                      }
+                      setShowReassignModal(false);
+                      setReassignSearch('');
+                      setReassignEmployeeId('');
+                      resetCallAndPriorityState();
+                    }}
+                    className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                  >
+                    <X className="w-5 h-5 text-gray-500" />
+                  </button>
+                </div>
+
+                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 mb-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6 text-sm">
+                  <div>
+                    <span className="text-gray-500 dark:text-gray-400">Ticket: </span>
+                    <span className="font-bold text-gray-900 dark:text-white">{btData?.stf_no || ticket.id}</span>
+                  </div>
+                  {needsCallPriorityWorkflow && (
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400">Priority: </span>
+                      <span className={`font-semibold ${priorityLevel === 'Critical' ? 'text-red-600' : priorityLevel === 'High' ? 'text-orange-600' : priorityLevel === 'Medium' ? 'text-yellow-600' : 'text-blue-600'}`}>{priorityLevel || '—'}</span>
+                    </div>
+                  )}
+                  {needsCallPriorityWorkflow && (
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400">Service: </span>
+                      <span className="font-medium text-gray-900 dark:text-white">{btData?.type_of_service_detail?.name || btData?.type_of_service_others || ticket.service || '—'}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-3 max-h-[26rem] overflow-y-auto pr-1">
+                  {employees.length === 0 && (
+                    <p className="text-sm text-gray-400 text-center py-4">No technicals found.</p>
+                  )}
+                  {employees.length > 0 && filteredEmployees.length === 0 && (
+                    <p className="text-sm text-gray-400 text-center py-4">No employees match your search.</p>
+                  )}
+                  {filteredEmployees.map((emp) => {
+                    const tickets = employeeTickets[emp.id] || [];
+                    const isSelected = reassignEmployeeId === String(emp.id);
+                    const name = `${emp.first_name} ${emp.last_name}`.trim() || emp.username;
+                    return (
+                      <div key={emp.id} className={`rounded-xl border-2 transition-all ${isSelected ? 'border-[#3BC25B] bg-[#f0fdf4] dark:bg-green-900/20 ring-1 ring-[#3BC25B]' : 'border-gray-200 dark:border-gray-600 hover:border-[#3BC25B]'}`}>
+                        <button
+                          type="button"
+                          onClick={() => setReassignEmployeeId(isSelected ? '' : String(emp.id))}
+                          className="w-full flex items-center gap-3 p-3 text-left"
+                        >
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${isSelected ? 'bg-[#3BC25B] text-white' : 'bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300'}`}>
+                            {name.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-gray-900 dark:text-white text-sm truncate">{name}</div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">{emp.username}</div>
+                          </div>
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${emp.active_ticket_count === 0 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : emp.active_ticket_count <= 3 ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
+                            {emp.active_ticket_count} active
+                          </span>
+                          {isSelected && <CheckCircle className="w-5 h-5 text-[#3BC25B] shrink-0" />}
+                          {!isSelected && <div className="w-2 h-2 bg-green-400 rounded-full shrink-0" title="Available" />}
+                        </button>
+
+                        {tickets.length > 0 && (
+                          <div className="px-3 pb-3">
+                            <p className="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5 ml-1">Current Working Tickets</p>
+                            <div className="space-y-1.5">
+                              {tickets.slice(0, 3).map((t) => (
+                                <div key={t.id} className="flex items-center gap-2 bg-white dark:bg-gray-700 rounded-lg px-3 py-2 border border-gray-100 dark:border-gray-600">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-xs font-semibold text-gray-800 dark:text-gray-200 truncate">{t.stf_no}</div>
+                                    <div className="text-[11px] text-gray-500 dark:text-gray-400 truncate">{t.type_of_service_detail?.name || 'N/A'}</div>
+                                  </div>
+                                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${priorityBadgeClass(t.priority)}`}>
+                                    {formatPriorityLabel(t.priority)}
+                                  </span>
+                                </div>
+                              ))}
+                              {tickets.length > 3 && (
+                                <p className="text-[10px] text-gray-400 dark:text-gray-500">+{tickets.length - 3} more active tickets</p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-5 flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowReassignModal(false);
+                      setReassignSearch('');
+                      setReassignEmployeeId('');
+                      resetCallAndPriorityState();
+                    }}
+                    className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 text-sm font-medium transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleReassignTicket}
+                    disabled={!reassignEmployeeId || reassigning}
+                    className="flex-1 py-2.5 rounded-xl bg-[#3BC25B] hover:bg-[#2ea34a] text-white text-sm font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {reassigning ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" /> Assigning...</>
+                    ) : (
+                      <><UserCheck className="w-4 h-4" /> {needsCallPriorityWorkflow ? 'Assign Ticket' : 'Reassign to Employee'}</>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>,
         document.body
       )}

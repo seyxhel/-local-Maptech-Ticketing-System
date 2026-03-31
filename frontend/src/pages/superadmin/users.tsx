@@ -42,7 +42,7 @@ interface UserAccount {
   suffix: string;
   email: string;
   phone: string;
-  role: 'Supervisor' | 'Technical' | 'Superadmin';
+  role: 'Supervisor' | 'Technical' | 'Sales' | 'Superadmin';
   status: 'Active' | 'Blocked';
 }
 
@@ -52,9 +52,10 @@ function toUserAccount(u: BackendUser): UserAccount {
     .map((s) => (s || '').trim())
     .filter(Boolean)
     .join(' ');
-  const roleMap: Record<string, 'Supervisor' | 'Technical' | 'Superadmin'> = {
+  const roleMap: Record<string, 'Supervisor' | 'Technical' | 'Sales' | 'Superadmin'> = {
     admin: 'Supervisor',
     employee: 'Technical',
+    sales: 'Sales',
     superadmin: 'Superadmin',
   };
   return {
@@ -82,6 +83,7 @@ function cap(s: string): string {
 const ROLE_LABELS: Record<string, string> = {
   technical: 'Technical Staff',
   supervisor: 'Supervisor',
+  sales: 'Sales',
   superadmin: 'Superadmin',
   admin: 'Admin',
   employee: 'Employee',
@@ -98,7 +100,7 @@ const EMPTY_FORM = {
   suffix: '',
   email: '',
   contactNumber: '',
-  role: 'employee' as 'admin' | 'employee',
+  role: 'employee' as 'admin' | 'employee' | 'sales',
 };
 
 export default function UserManagement() {
@@ -106,7 +108,7 @@ export default function UserManagement() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [roleFilter, setRoleFilter] = useState<
-    'All' | 'Supervisor' | 'Technical' | 'Superadmin'>(
+    'All' | 'Supervisor' | 'Technical' | 'Sales' | 'Superadmin'>(
     'All');
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -158,7 +160,13 @@ export default function UserManagement() {
       suffix: user.suffix || '',
       email: user.email,
       contactNumber: user.phone || '',
-      role: (user.role === 'Technical' ? 'employee' : 'admin') as 'admin' | 'employee',
+      role: (
+        user.role === 'Technical'
+          ? 'employee'
+          : user.role === 'Sales'
+            ? 'sales'
+            : 'admin'
+      ) as 'admin' | 'employee' | 'sales',
     });
     setIsModalOpen(true);
   };
@@ -209,7 +217,7 @@ export default function UserManagement() {
           middle_name: formData.middleName.trim(),
           email: formData.email.trim(),
           phone: formData.contactNumber.trim(),
-          role: formData.role.toLowerCase() as 'employee' | 'admin',
+          role: formData.role.toLowerCase() as 'employee' | 'admin' | 'sales',
         };
         const created = await createUser(payload);
         setIsModalOpen(false);
@@ -249,6 +257,8 @@ export default function UserManagement() {
     return 'bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-700';
     if (r === 'technical')
     return 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-700';
+    if (r === 'sales')
+    return 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-700';
     if (r === 'superadmin')
     return 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-700';
     return 'bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-600';
@@ -257,6 +267,7 @@ export default function UserManagement() {
     All: users.length,
     Supervisor: users.filter((u) => u.role === 'Supervisor').length,
     Technical: users.filter((u) => u.role === 'Technical').length,
+    Sales: users.filter((u) => u.role === 'Sales').length,
     Superadmin: users.filter((u) => u.role === 'Superadmin').length
   };
   return (
@@ -321,7 +332,7 @@ export default function UserManagement() {
       <Card accent>
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <div className="flex flex-wrap bg-gray-100 dark:bg-gray-700 p-1 rounded-lg gap-1 w-full md:w-auto">
-            {(['All', 'Supervisor', 'Technical', 'Superadmin'] as const).map((tab) =>
+            {(['All', 'Supervisor', 'Technical', 'Sales', 'Superadmin'] as const).map((tab) =>
             <button
               key={tab}
               onClick={() => setRoleFilter(tab)}
@@ -476,7 +487,7 @@ export default function UserManagement() {
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                   {editingUser
                     ? `Editing: ${displayName(editingUser)}`
-                    : 'Create a new Supervisor or Technical account'}
+                    : 'Create a new Supervisor, Sales, or Technical account'}
                 </p>
               </div>
               <button
@@ -571,11 +582,12 @@ export default function UserManagement() {
                 <select
                   value={formData.role}
                   onChange={(e) =>
-                    setFormData((p) => ({ ...p, role: e.target.value as 'admin' | 'employee' }))
+                    setFormData((p) => ({ ...p, role: e.target.value as 'admin' | 'employee' | 'sales' }))
                   }
                   className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-[#3BC25B] outline-none"
                 >
                   <option value="admin">Supervisor</option>
+                  <option value="sales">Sales</option>
                   <option value="employee">Technical</option>
                 </select>
               </div>

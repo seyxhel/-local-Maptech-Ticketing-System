@@ -7,14 +7,14 @@ from django.utils import timezone
 
 from ..models import CallLog, CSATFeedback
 from ..serializers import CallLogSerializer, CSATFeedbackSerializer
-from ..permissions import IsAdminLevel
+from ..permissions import IsAdminLevel, IsSupervisorLevel
 
 
 class CallLogViewSet(viewsets.ModelViewSet):
     """CRUD for call logs. Admin creates, all admin-level can list."""
     queryset = CallLog.objects.all().order_by('-call_start')
     serializer_class = CallLogSerializer
-    permission_classes = [IsAuthenticated, IsAdminLevel]
+    permission_classes = [IsAuthenticated, IsSupervisorLevel]
     swagger_tags = ['Call Logs']
 
     def get_queryset(self):

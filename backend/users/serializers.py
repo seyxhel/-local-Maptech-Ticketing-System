@@ -37,10 +37,10 @@ class AdminUserCreateSerializer(serializers.Serializer):
     suffix = serializers.CharField(max_length=3, required=False, allow_blank=True)
     email = serializers.EmailField()
     phone = serializers.CharField(max_length=13, required=False, allow_blank=True)
-    role = serializers.ChoiceField(choices=[('employee', 'Employee'), ('admin', 'Admin')])
+    role = serializers.ChoiceField(choices=[('employee', 'Employee'), ('sales', 'Sales'), ('admin', 'Admin')])
 
     def validate_role(self, value):
-        """Admin can only create employees; superadmin can create employees and admins."""
+        """Admin can only create employees; superadmin can create employees, sales, and admins."""
         request = self.context.get('request')
         if request and hasattr(request, 'user'):
             if request.user.role == User.ROLE_ADMIN and value != 'employee':
@@ -100,7 +100,7 @@ class AdminUserCreateSerializer(serializers.Serializer):
             middle_name=validated_data.get('middle_name', ''),
             suffix=validated_data.get('suffix', ''),
             phone=phone,
-            is_staff=role in (User.ROLE_ADMIN, User.ROLE_SUPERADMIN),
+            is_staff=role in (User.ROLE_SALES, User.ROLE_ADMIN, User.ROLE_SUPERADMIN),
             is_superuser=role == User.ROLE_SUPERADMIN,
         )
         return user

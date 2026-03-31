@@ -15,7 +15,7 @@ from ..serializers import (
     EscalationLogSerializer, MessageSerializer, AssignmentSessionSerializer,
     AdminCreateTicketSerializer, EmployeeTicketActionSerializer,
 )
-from ..permissions import IsAdminLevel, IsAssignedEmployee, IsAdminOrAssignedEmployee, IsTicketParticipant
+from ..permissions import IsAdminLevel, IsSupervisorLevel, IsAssignedEmployee, IsAdminOrAssignedEmployee, IsTicketParticipant
 from users.serializers import UserSerializer
 from ._helpers import _get_client_ip
 
@@ -133,10 +133,10 @@ class TicketViewSet(viewsets.ModelViewSet):
 
             ticket = serializer.save(created_by=user)
 
-            if priority and priority in dict(Ticket.PRIORITY_CHOICES):
+            if user.role != User.ROLE_SALES and priority and priority in dict(Ticket.PRIORITY_CHOICES):
                 ticket.priority = priority
 
-            if assign_to_id:
+            if user.role != User.ROLE_SALES and assign_to_id:
                 try:
                     emp = User.objects.get(id=assign_to_id, role=User.ROLE_EMPLOYEE)
                     new_session = AssignmentSession.objects.create(ticket=ticket, employee=emp)
@@ -145,7 +145,9 @@ class TicketViewSet(viewsets.ModelViewSet):
                 except User.DoesNotExist:
                     pass
 
-            ticket.confirmed_by_admin = True
+            # Sales-created STF entries are intentionally unconfirmed and unprioritized
+            # so a supervisor can perform call + priority review later.
+            ticket.confirmed_by_admin = user.role != User.ROLE_SALES
             ticket.save()
 
             self._audit_ticket(request, ticket, AuditLog.ACTION_CREATE,
@@ -205,9 +207,9 @@ class TicketViewSet(viewsets.ModelViewSet):
             'partial_update':           [IsAuthenticated(), IsTicketParticipant()],
             'destroy':                  [IsAuthenticated(), IsAdminLevel()],
             # Admin-only lifecycle actions
-            'assign':                   [IsAuthenticated(), IsAdminLevel()],
-            'review':                   [IsAuthenticated(), IsAdminLevel()],
-            'confirm_ticket':           [IsAuthenticated(), IsAdminLevel()],
+            'assign':                   [IsAuthenticated(), IsSupervisorLevel()],
+            'review':                   [IsAuthenticated(), IsSupervisorLevel()],
+            'confirm_ticket':           [IsAuthenticated(), IsSupervisorLevel()],
             'close_ticket':             [IsAuthenticated(), IsAdminLevel()],
             # Assigned-employee-only actions
             'escalate':                 [IsAuthenticated(), IsAssignedEmployee()],
@@ -460,6 +462,8 @@ class TicketViewSet(viewsets.ModelViewSet):
     def review(self, request, pk=None):
         """Admin/Superadmin reviews a ticket — optionally sets priority."""
         ticket = self.get_object()
+        if request.user.role == User.ROLE_SALES:
+            return Response({'detail': 'Sales users cannot set ticket priority.'}, status=status.HTTP_403_FORBIDDEN)
         priority = request.data.get('priority')
         if priority and priority in dict(Ticket.PRIORITY_CHOICES):
             ticket.priority = priority
@@ -608,6 +612,8 @@ class TicketViewSet(viewsets.ModelViewSet):
     def confirm_ticket(self, request, pk=None):
         """Admin/Superadmin confirms they've contacted the client and verified the issue."""
         ticket = self.get_object()
+        if request.user.role == User.ROLE_SALES:
+            return Response({'detail': 'Sales users cannot confirm client call verification.'}, status=status.HTTP_403_FORBIDDEN)
         ticket.confirmed_by_admin = True
         ticket.save()
 

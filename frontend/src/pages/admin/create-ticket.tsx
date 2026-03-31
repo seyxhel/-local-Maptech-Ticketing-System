@@ -60,6 +60,7 @@ import {
   fetchDeviceEquipment,
 } from '../../services/api';
 import type { TypeOfService as ServiceType, ClientRecord, Product, BackendTicket } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 
 /** Pick an icon for a service type based on keyword matching in its name. */
 function getServiceIcon(name: string): LucideIcon {
@@ -140,6 +141,8 @@ function priorityBadgeClass(priority?: string | null): string {
 
 export default function AdminCreateTicket() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isSalesUser = user?.role === 'sales';
   const [searchParams] = useSearchParams();
   const linkedTicketId = searchParams.get('linkedTicketId') ? Number(searchParams.get('linkedTicketId')) : null;
   const linkedStf = searchParams.get('linkedStf') || null;
@@ -576,6 +579,78 @@ export default function AdminCreateTicket() {
       toast.error('Please fix the highlighted errors.');
       return;
     }
+
+    if (isSalesUser) {
+      const supportTypeMap: Record<string, string> = {
+        'Remote / Online': 'remote_online',
+        'Remote/Online': 'remote_online',
+        Onsite: 'onsite',
+        Chat: 'chat',
+        Call: 'call',
+      };
+
+      const matchedService = serviceTypes.find((s) => s.name === serviceType);
+
+      try {
+        const ticketData: Record<string, unknown> = {
+          project_title: projectTitle.trim(),
+          client: contactValues.client,
+          contact_person: contactValues.contactPerson,
+          landline: contactValues.landline,
+          mobile_no: contactValues.mobile,
+          designation: contactValues.designation,
+          department_organization: contactValues.department,
+          email_address: email.trim(),
+          address,
+          description_of_problem: description,
+          preferred_support_type: supportTypeMap[supportType?.trim()] || 'remote_online',
+        };
+
+        if (combinedSalesReps) {
+          ticketData.sales_representative = combinedSalesReps;
+        }
+
+        if (matchedService) {
+          ticketData.type_of_service = matchedService.id;
+        } else if (serviceType === 'Others') {
+          ticketData.type_of_service_others = serviceOthersText;
+          if (estimatedDaysOverride && Number(estimatedDaysOverride) > 0) {
+            ticketData.estimated_resolution_days_override = Number(estimatedDaysOverride);
+          }
+        } else if (serviceType) {
+          ticketData.type_of_service_others = serviceType;
+        }
+
+        if (isExistingClient && selectedClientId) {
+          ticketData.client_record = selectedClientId;
+          ticketData.is_existing_client = true;
+        }
+
+        if (isExistingProduct) {
+          applySelectedProductToTicketData(ticketData);
+          if (salesNo.trim()) ticketData.sales_no = salesNo.trim();
+        } else {
+          if (newProductInfo.device_equipment.trim()) ticketData.device_equipment = newProductInfo.device_equipment.trim();
+          if (newProductInfo.product_name.trim()) ticketData.product = newProductInfo.product_name.trim();
+          if (newProductInfo.brand.trim()) ticketData.brand = newProductInfo.brand.trim();
+          if (newProductInfo.model_name.trim()) ticketData.model_name = newProductInfo.model_name.trim();
+          if (newProductInfo.serial_no.trim()) ticketData.serial_no = newProductInfo.serial_no.trim();
+          if (newProductInfo.version_no.trim()) ticketData.version_no = newProductInfo.version_no.trim();
+          if (newProductInfo.date_purchased) ticketData.date_purchased = newProductInfo.date_purchased;
+          ticketData.has_warranty = newProductInfo.has_warranty;
+          if (salesNo.trim()) ticketData.sales_no = salesNo.trim();
+        }
+
+        const created = await createTicket(ticketData as never);
+        adminCreateTicketDraft = null;
+        toast.success(`STF ${created.stf_no} submitted to supervisors for call and priority review.`);
+        navigate(`/admin/ticket-details?stf=${encodeURIComponent(created.stf_no)}`);
+      } catch (err: any) {
+        toast.error(err?.message || 'Failed to create ticket.');
+      }
+      return;
+    }
+
     // Show STF details modal for review, call, and priority
     setModalStep('stf-details');
     setCallCompleted(false);

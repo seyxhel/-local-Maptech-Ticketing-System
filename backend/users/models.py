@@ -13,10 +13,12 @@ def _generate_recovery_key():
 
 class User(AbstractUser):
     ROLE_EMPLOYEE = 'employee'
+    ROLE_SALES = 'sales'
     ROLE_ADMIN = 'admin'
     ROLE_SUPERADMIN = 'superadmin'
     ROLE_CHOICES = [
         (ROLE_EMPLOYEE, 'Employee'),
+        (ROLE_SALES, 'Sales'),
         (ROLE_ADMIN, 'Admin'),
         (ROLE_SUPERADMIN, 'Superadmin'),
     ]
@@ -46,8 +48,8 @@ class User(AbstractUser):
 
     @property
     def is_admin_level(self):
-        """Returns True for both admin and superadmin roles."""
-        return self.role in (self.ROLE_ADMIN, self.ROLE_SUPERADMIN)
+        """Returns True for admin-level roles."""
+        return self.role in (self.ROLE_SALES, self.ROLE_ADMIN, self.ROLE_SUPERADMIN)
 
     def __str__(self):
         return f"{self.username} ({self.role})"
