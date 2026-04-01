@@ -2012,51 +2012,57 @@ export default function AdminCreateTicket() {
                   </div>
                 </div>
 
-                {/* Call Client button */}
-                <button
-                  onClick={handleStartCall}
-                  className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-colors mb-5 ${clientAvailabilityChoice !== 'available' ? 'bg-gray-100 dark:bg-gray-700 text-gray-400 cursor-not-allowed' : callCompleted ? 'bg-gray-100 dark:bg-gray-700 text-green-600 dark:text-green-400 cursor-default' : 'bg-[#3BC25B] hover:bg-[#2ea34a] text-white'}`}
-                  disabled={clientAvailabilityChoice !== 'available' || callCompleted}
-                >
-                  {callCompleted ? (
-                    <><CheckCircle2 className="w-4 h-4" /> Call Completed</>
-                  ) : (
-                    <><Phone className="w-4 h-4" /> Call Client</>
-                  )}
-                </button>
-
-                {/* Priority selector */}
-                <div className={`${(clientAvailabilityChoice !== 'available' || !callCompleted) ? 'opacity-40 pointer-events-none' : ''}`}>
-                  <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Priority Level {(clientAvailabilityChoice !== 'available' || !callCompleted) && <span className="text-xs font-normal text-gray-400 ml-1">(client must be available and call must be completed first)</span>}</p>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {[
-                      { label: 'Low', color: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700 text-blue-700 dark:text-blue-300', active: 'bg-blue-500 text-white border-blue-500 ring-2 ring-blue-300 dark:ring-blue-700' },
-                      { label: 'Medium', color: 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-700 text-yellow-700 dark:text-yellow-300', active: 'bg-yellow-500 text-white border-yellow-500 ring-2 ring-yellow-300 dark:ring-yellow-700' },
-                      { label: 'High', color: 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-700 text-orange-700 dark:text-orange-300', active: 'bg-orange-500 text-white border-orange-500 ring-2 ring-orange-300 dark:ring-orange-700' },
-                      { label: 'Critical', color: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700 text-red-700 dark:text-red-300', active: 'bg-red-500 text-white border-red-500 ring-2 ring-red-300 dark:ring-red-700' },
-                    ].map(({ label, color, active }) => (
-                      <button
-                        key={label}
-                        type="button"
-                        onClick={() => setPriorityLevel(label)}
-                        className={`px-2 py-3 rounded-xl border-2 text-xs font-bold transition-all ${priorityLevel === label ? active : `${color} hover:opacity-80`}`}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Continue to Assign */}
-                <div className="mt-5">
+                {/* Call Client button - only show if client is available */}
+                {clientAvailabilityChoice === 'available' && (
                   <button
-                    onClick={handleConfirmPriority}
-                    disabled={clientAvailabilityChoice !== 'available' || !callCompleted || !priorityLevel}
-                    className="w-full px-4 py-2.5 rounded-lg bg-[#3BC25B] hover:bg-[#2ea34a] text-white text-sm font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    onClick={handleStartCall}
+                    className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-colors mb-5 ${callCompleted ? 'bg-gray-100 dark:bg-gray-700 text-green-600 dark:text-green-400 cursor-default' : 'bg-[#3BC25B] hover:bg-[#2ea34a] text-white'}`}
+                    disabled={callCompleted}
                   >
-                    Continue to Assign
+                    {callCompleted ? (
+                      <><CheckCircle2 className="w-4 h-4" /> Call Completed</>
+                    ) : (
+                      <><Phone className="w-4 h-4" /> Call Client</>
+                    )}
                   </button>
-                </div>
+                )}
+
+                {/* Priority selector - only show if client is available */}
+                {clientAvailabilityChoice === 'available' && (
+                  <div>
+                    <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Priority Level {!callCompleted && <span className="text-xs font-normal text-gray-400 ml-1">(call must be completed first)</span>}</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {[
+                        { label: 'Low', color: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700 text-blue-700 dark:text-blue-300', active: 'bg-blue-500 text-white border-blue-500 ring-2 ring-blue-300 dark:ring-blue-700' },
+                        { label: 'Medium', color: 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-700 text-yellow-700 dark:text-yellow-300', active: 'bg-yellow-500 text-white border-yellow-500 ring-2 ring-yellow-300 dark:ring-yellow-700' },
+                        { label: 'High', color: 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-700 text-orange-700 dark:text-orange-300', active: 'bg-orange-500 text-white border-orange-500 ring-2 ring-orange-300 dark:ring-orange-700' },
+                        { label: 'Critical', color: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700 text-red-700 dark:text-red-300', active: 'bg-red-500 text-white border-red-500 ring-2 ring-red-300 dark:ring-red-700' },
+                      ].map(({ label, color, active }) => (
+                        <button
+                          key={label}
+                          type="button"
+                          onClick={() => setPriorityLevel(label)}
+                          className={`px-2 py-3 rounded-xl border-2 text-xs font-bold transition-all ${priorityLevel === label ? active : `${color} hover:opacity-80`}`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Continue to Assign - only show if client is available */}
+                {clientAvailabilityChoice === 'available' && (
+                  <div className="mt-5">
+                    <button
+                      onClick={handleConfirmPriority}
+                      disabled={!callCompleted || !priorityLevel}
+                      className="w-full px-4 py-2.5 rounded-lg bg-[#3BC25B] hover:bg-[#2ea34a] text-white text-sm font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Continue to Assign
+                    </button>
+                  </div>
+                )}
 
                 {clientAvailabilityChoice === 'unavailable' && (
                   <div className="mt-3 space-y-2">
@@ -2073,8 +2079,8 @@ export default function AdminCreateTicket() {
                   </div>
                 )}
 
-                {/* Call events summary shown after call completed */}
-                {callCompleted && (
+                {/* Call events summary shown after call completed - only show if client is available */}
+                {callCompleted && clientAvailabilityChoice === 'available' && (
                   <div className="mt-4 bg-white dark:bg-gray-800/50 rounded-lg p-3 border border-gray-100 dark:border-gray-700 text-sm">
                     <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Call Log Preview</h4>
                     <div className="space-y-3">
