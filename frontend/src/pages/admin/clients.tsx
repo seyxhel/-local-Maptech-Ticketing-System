@@ -23,8 +23,10 @@ import {
   updateClient,
   deleteClient,
   fetchTickets,
+  fetchProducts,
   type ClientRecord,
   type BackendTicket,
+  type Product,
 } from '../../services/api';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { PriorityBadge } from '../../components/ui/PriorityBadge';
@@ -67,7 +69,9 @@ export default function Clients() {
   // Records view
   const [viewingClient, setViewingClient] = useState<ClientRecord | null>(null);
   const [clientTickets, setClientTickets] = useState<BackendTicket[]>([]);
+  const [clientProducts, setClientProducts] = useState<Product[]>([]);
   const [ticketsLoading, setTicketsLoading] = useState(false);
+  const [historySearchTerm, setHistorySearchTerm] = useState('');
 
   const loadClients = useCallback(async () => {
     try {
@@ -89,16 +93,21 @@ export default function Clients() {
   // Load tickets for a specific client
   const viewRecords = async (client: ClientRecord) => {
     setViewingClient(client);
+    setHistorySearchTerm('');
     setTicketsLoading(true);
     try {
-      const allTickets = await fetchTickets();
+      const [allTickets, relatedProducts] = await Promise.all([
+        fetchTickets(),
+        fetchProducts({ clientId: client.id }),
+      ]);
       // Filter tickets linked to this client record
       const related = allTickets.filter(
         (t) => t.client_record === client.id || t.client?.toLowerCase() === client.client_name.toLowerCase()
       );
       setClientTickets(related);
+      setClientProducts(relatedProducts);
     } catch {
-      toast.error('Failed to load client tickets.');
+      toast.error('Failed to load client records.');
     } finally {
       setTicketsLoading(false);
     }
@@ -242,6 +251,24 @@ export default function Clients() {
 
   // ── Records View (Client Ticket History) ──
   if (viewingClient) {
+    const historyQuery = historySearchTerm.trim().toLowerCase();
+    const filteredClientProducts = clientProducts.filter((p) => {
+      if (!historyQuery) return true;
+      const haystack = [
+        p.project_title,
+        p.product_name,
+        p.device_equipment,
+        p.category_detail?.name,
+        p.brand,
+        p.model_name,
+        p.serial_no,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(historyQuery);
+    });
+
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
@@ -275,6 +302,67 @@ export default function Clients() {
               <p className="text-sm text-gray-900 dark:text-white mt-0.5">{viewingClient.address || '—'}</p>
             </div>
           </div>
+        </Card>
+
+        {/* Tickets Table */}
+        <Card>
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 px-6 pt-6">
+            <FileText className="w-5 h-5 inline mr-2 text-[#3BC25B]" />
+            Project / Product History ({filteredClientProducts.length})
+          </h3>
+          {ticketsLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#3BC25B]"></div>
+              <span className="ml-2 text-sm text-gray-400">Loading project/product history...</span>
+            </div>
+          ) : clientProducts.length === 0 ? (
+            <div className="text-center py-12 text-gray-400">
+              <FileText className="w-10 h-10 mx-auto mb-2 opacity-30" />
+              No project/product history found for this client.
+            </div>
+          ) : (
+            <div className="overflow-x-auto px-6 pb-6">
+              <div className="relative max-w-md mb-4">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  value={historySearchTerm}
+                  onChange={(e) => setHistorySearchTerm(e.target.value)}
+                  placeholder="Search project/product history..."
+                  className="w-full pl-10 pr-4 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#3BC25B]"
+                />
+              </div>
+
+              {filteredClientProducts.length === 0 ? (
+                <div className="text-center py-10 text-sm text-gray-400">No matching project/product history.</div>
+              ) : (
+              <table className="w-full text-sm text-left">
+                <thead>
+                  <tr className="text-xs text-gray-500 dark:text-gray-400 uppercase border-b border-gray-100 dark:border-gray-700">
+                    <th className="pb-3 font-medium">Project Title</th>
+                    <th className="pb-3 font-medium">Product</th>
+                    <th className="pb-3 font-medium">Device / Equipment</th>
+                    <th className="pb-3 font-medium">Brand / Model</th>
+                    <th className="pb-3 font-medium">Serial No.</th>
+                    <th className="pb-3 font-medium">Date Purchased</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
+                  {filteredClientProducts.map((p) => (
+                    <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                      <td className="py-3 font-medium text-gray-900 dark:text-white">{p.project_title || '—'}</td>
+                      <td className="py-3 text-gray-600 dark:text-gray-300">{p.product_name || '—'}</td>
+                      <td className="py-3 text-gray-600 dark:text-gray-300">{p.device_equipment || p.category_detail?.name || '—'}</td>
+                      <td className="py-3 text-gray-600 dark:text-gray-300">{[p.brand, p.model_name].filter(Boolean).join(' / ') || '—'}</td>
+                      <td className="py-3 text-gray-600 dark:text-gray-300 font-mono text-xs">{p.serial_no || '—'}</td>
+                      <td className="py-3 text-gray-600 dark:text-gray-300 text-xs">{p.date_purchased ? new Date(p.date_purchased).toLocaleDateString() : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              )}
+            </div>
+          )}
         </Card>
 
         {/* Tickets Table */}
@@ -434,8 +522,8 @@ export default function Clients() {
                     </td>
                     <td className="py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => viewRecords(client)} className="p-1.5 rounded-lg text-gray-400 hover:text-[#0E8F79] hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors" title="View Records">
-                          <FileText className="w-4 h-4" />
+                        <button onClick={() => viewRecords(client)} className="p-1.5 rounded-lg text-gray-400 hover:text-[#0E8F79] hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors" title="View">
+                          <Eye className="w-4 h-4" />
                         </button>
                         <button onClick={() => openEditModal(client)} className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors" title="Edit">
                           <Edit2 className="w-4 h-4" />

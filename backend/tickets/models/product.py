@@ -10,9 +10,10 @@ class Product(models.Model):
         on_delete=models.SET_NULL,
         help_text='Product category',
     )
+    project_title = models.CharField(max_length=300, help_text='Project title this product belongs to')
     client = models.ForeignKey(
-        Client, related_name='products', null=True, blank=True,
-        on_delete=models.SET_NULL,
+        Client, related_name='products',
+        on_delete=models.PROTECT,
         help_text='Client that owns this product',
     )
     device_equipment = models.CharField(max_length=300, blank=True)
@@ -28,8 +29,15 @@ class Product(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     date_purchased = models.DateField(null=True, blank=True)
     others = models.TextField(blank=True, default='')
+
     class Meta:
         ordering = ['-created_at']
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(project_title=''),
+                name='product_project_title_not_blank',
+            ),
+        ]
 
     def __str__(self):
         parts = [self.product_name, self.brand, self.model_name, self.serial_no]

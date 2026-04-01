@@ -75,6 +75,7 @@ class TicketViewSet(viewsets.ModelViewSet):
             priority = serializer.validated_data.pop('priority', '') or request.data.get('priority', '')
             assign_to_id = serializer.validated_data.pop('assign_to', None) or request.data.get('assign_to')
             is_existing = serializer.validated_data.pop('is_existing_client', False)
+            type_of_service_others = serializer.validated_data.pop('type_of_service_others', '') or ''
 
             # Extract write-only client text fields (no longer on the Ticket model)
             client_text = {
@@ -86,6 +87,7 @@ class TicketViewSet(viewsets.ModelViewSet):
                 'department_organization': serializer.validated_data.pop('department_organization', '') or '',
                 'mobile_no':               serializer.validated_data.pop('mobile_no', '') or '',
                 'email_address':           serializer.validated_data.pop('email_address', '') or '',
+                'sales_representative':    serializer.validated_data.pop('sales_representative', '') or '',
             }
 
             # For new (non-existing) clients, auto-create a Client record
@@ -93,10 +95,18 @@ class TicketViewSet(viewsets.ModelViewSet):
                 if any(client_text.values()):
                     if not client_text['client_name']:
                         client_text['client_name'] = 'Unknown'
+                    if not client_text['sales_representative']:
+                        return Response(
+                            {'detail': 'Sales Representative is required for new clients.'},
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
                     serializer.validated_data['client_record'] = Client.objects.create(**client_text)
+
+            linked_product = serializer.validated_data.get('product_record')
 
             # Extract write-only product text fields
             product_text = {
+                'project_title':    serializer.validated_data.pop('project_title', '') or '',
                 'product_name':     serializer.validated_data.pop('product', '') or '',
                 'brand':            serializer.validated_data.pop('brand', '') or '',
                 'model_name':       serializer.validated_data.pop('model_name', '') or '',
@@ -109,8 +119,9 @@ class TicketViewSet(viewsets.ModelViewSet):
                 'others':           serializer.validated_data.pop('others', '') or '',
             }
 
-            linked_product = serializer.validated_data.get('product_record')
             if linked_product:
+                if not product_text['project_title']:
+                    product_text['project_title'] = linked_product.project_title
                 for field in ('product_name', 'brand', 'model_name', 'device_equipment', 'version_no', 'serial_no', 'sales_no'):
                     if product_text[field] in (None, ''):
                         product_text[field] = getattr(linked_product, field, product_text[field])
@@ -120,11 +131,22 @@ class TicketViewSet(viewsets.ModelViewSet):
             # If no product_record linked and product data present, auto-create a Product record
             if not serializer.validated_data.get('product_record'):
                 if any(v for v in product_text.values() if v not in (None, '', False)):
+                    if not serializer.validated_data.get('client_record'):
+                        return Response(
+                            {'detail': 'A client is required to create a product.'},
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
+                    if not product_text['project_title']:
+                        return Response(
+                            {'detail': 'A project title is required to create a product.'},
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
                     product_record_data = {
                         key: value
                         for key, value in product_text.items()
-                        if key not in ('date_purchased', 'others')
+                        if key != 'others'
                     }
+                    product_record_data['client'] = serializer.validated_data['client_record']
                     serializer.validated_data['product_record'] = Product.objects.create(**product_record_data)
 
             # Product details are stored on the linked `Product` record (`product_record`).
@@ -132,6 +154,10 @@ class TicketViewSet(viewsets.ModelViewSet):
             # contains those columns and passing them to `Ticket.objects.create()` raises.
 
             ticket = serializer.save(created_by=user)
+
+            if type_of_service_others and ticket.type_of_service:
+                ticket.type_of_service.type_of_service_others = type_of_service_others
+                ticket.type_of_service.save(update_fields=['type_of_service_others'])
 
             if user.role != User.ROLE_SALES and priority and priority in dict(Ticket.PRIORITY_CHOICES):
                 ticket.priority = priority

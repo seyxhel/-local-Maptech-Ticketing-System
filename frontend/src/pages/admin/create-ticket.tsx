@@ -291,7 +291,7 @@ export default function AdminCreateTicket() {
   const selectedClient = selectedClientId ? existingClients.find((c) => c.id === selectedClientId) ?? null : null;
   const combinedSalesReps = [selectedSalesRep.trim(), ...additionalSalesReps.map((r) => r.trim()).filter(Boolean)].filter(Boolean).join(', ');
 
-  // Fetch employees, service types, clients, and products from backend
+  // Fetch employees, service types, and clients from backend
   useEffect(() => {
     fetchEmployees()
       .then((emps) => {
@@ -313,14 +313,24 @@ export default function AdminCreateTicket() {
     fetchClients()
       .then((c) => setExistingClients(c))
       .catch(() => {});
-    fetchProducts()
-      .then((p) => setProducts(p))
-      .catch(() => {});
     fetchDeviceEquipment().then((list) => { setDeviceEquipments(list); setDevicePage(1); }).catch(() => {});
     fetchNextTicketStfNo()
       .then((nextStfNo) => setStfNo(nextStfNo))
       .catch(() => {});
   }, []);
+
+  // Load products for selected client when available; otherwise, load full catalog.
+  useEffect(() => {
+    const productPromise = isExistingClient && selectedClientId
+      ? fetchProducts({ clientId: selectedClientId })
+      : fetchProducts();
+
+    productPromise
+      .then((p) => {
+        setProducts(p);
+      })
+      .catch(() => {});
+  }, [isExistingClient, selectedClientId]);
 
   // Multi-step form state (reduced to 4 steps; Service now includes Support+Description)
   const steps = ['Contact', 'Product', 'Service', 'Review & Submit'];
@@ -475,6 +485,8 @@ export default function AdminCreateTicket() {
     if (!selectedProductId) return;
     const p = products.find((x) => x.id === selectedProductId);
     if (!p) return;
+    setProjectTitle(p.project_title || '');
+    setSalesNo(p.sales_no || '');
     setNewProductInfo({
       device_equipment: p.device_equipment || '',
       product_name: p.product_name || '',
@@ -506,7 +518,9 @@ export default function AdminCreateTicket() {
         has_warranty: newProductInfo.has_warranty,
       };
       await updateProduct(selectedProductId, payload);
-      const refreshed = await fetchProducts();
+      const refreshed = isExistingClient && selectedClientId
+        ? await fetchProducts({ clientId: selectedClientId })
+        : await fetchProducts();
       setProducts(refreshed);
       toast.success('Product details saved.');
     } catch (err: any) {
@@ -560,6 +574,7 @@ export default function AdminCreateTicket() {
   // When selecting an existing client, auto-fill contact fields
   const handleClientSelect = (clientId: number) => {
     setSelectedClientId(clientId);
+    setSelectedProductId(null);
     const client = existingClients.find((c) => c.id === clientId);
     if (client) {
       setContactValues({

@@ -54,6 +54,14 @@ class ProductViewSet(viewsets.ModelViewSet):
         if not self.request.user.is_admin_level:
             qs = qs.filter(is_active=True)
 
+        client_id = self.request.query_params.get('client')
+        if client_id:
+            try:
+                qs = qs.filter(client_id=int(client_id))
+            except (TypeError, ValueError):
+                # Ignore invalid client filter values and return unfiltered results.
+                pass
+
         search = self.request.query_params.get('search')
         if search:
             qs = qs.filter(
@@ -62,7 +70,9 @@ class ProductViewSet(viewsets.ModelViewSet):
                 Q(model_name__icontains=search) |
                 Q(serial_no__icontains=search) |
                 Q(device_equipment__icontains=search) |
-                Q(sales_no__icontains=search)
+                Q(sales_no__icontains=search) |
+                Q(project_title__icontains=search) |
+                Q(client__client_name__icontains=search)
             )
         return qs
 

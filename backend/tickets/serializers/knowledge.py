@@ -35,7 +35,9 @@ class KnowledgeHubAttachmentSerializer(serializers.ModelSerializer):
 
     def get_type_of_service_name(self, obj):
         tos = obj.ticket.type_of_service
-        return tos.name if tos else obj.ticket.type_of_service_others or ''
+        if not tos:
+            return ''
+        return tos.name or tos.type_of_service_others or ''
 
     def get_assigned_to_name(self, obj):
         emp = obj.ticket.assigned_to

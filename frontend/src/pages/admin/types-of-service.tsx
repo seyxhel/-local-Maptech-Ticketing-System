@@ -5,6 +5,7 @@ import { GreenButton } from '../../components/ui/GreenButton';
 import {
   Search,
   Plus,
+  Eye,
   Edit2,
   Trash2,
   X,
@@ -39,6 +40,7 @@ export default function TypesOfService() {
 
   // Delete confirmation state
   const [deleteTarget, setDeleteTarget] = useState<TypeOfService | null>(null);
+  const [viewingService, setViewingService] = useState<TypeOfService | null>(null);
 
   // ── Load services ──
   const loadServices = useCallback(async () => {
@@ -282,6 +284,13 @@ export default function TypesOfService() {
                     <td className="py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <button
+                          onClick={() => setViewingService(service)}
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-[#0E8F79] hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
+                          title="View"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button
                           onClick={() => openEditModal(service)}
                           className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
                           title="Edit"
@@ -436,6 +445,41 @@ export default function TypesOfService() {
                 </GreenButton>
               </div>
             </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* View Modal */}
+      {viewingService && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-lg relative">
+            <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-gray-700">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Service Type Details</h2>
+              <button onClick={() => setViewingService(null)} className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Name</p>
+                <p className="text-sm text-gray-900 dark:text-white mt-1">{viewingService.name || '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Description</p>
+                <p className="text-sm text-gray-900 dark:text-white mt-1 whitespace-pre-wrap">{viewingService.description || '—'}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Estimated Days</p>
+                  <p className="text-sm text-gray-900 dark:text-white mt-1">{viewingService.estimated_resolution_days ?? 0}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Status</p>
+                  <p className="text-sm text-gray-900 dark:text-white mt-1">{viewingService.is_active ? 'Active' : 'Inactive'}</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>,
         document.body

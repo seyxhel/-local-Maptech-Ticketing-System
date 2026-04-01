@@ -43,6 +43,7 @@ class TicketSerializer(serializers.ModelSerializer):
     )
     linked_ticket_stfs = serializers.SerializerMethodField()
     was_for_observation = serializers.SerializerMethodField()
+    type_of_service_others = serializers.SerializerMethodField()
 
     # ── Client fields: read-only virtual fields from client_record FK ──
     client = serializers.SerializerMethodField()
@@ -190,6 +191,23 @@ class TicketSerializer(serializers.ModelSerializer):
             entity=AuditLog.ENTITY_TICKET, entity_id=str(obj.id), action=AuditLog.ACTION_OBSERVE
         ).exists()
 
+    def get_type_of_service_others(self, obj):
+        tos = getattr(obj, 'type_of_service', None)
+        if not tos:
+            return ''
+        return tos.type_of_service_others or ''
+
+    def _sync_type_of_service_others(self, ticket):
+        """Persist optional input onto the selected TypeOfService record."""
+        others_value = self.initial_data.get('type_of_service_others')
+        if others_value is None:
+            return
+        tos = getattr(ticket, 'type_of_service', None)
+        if not tos:
+            return
+        tos.type_of_service_others = others_value
+        tos.save(update_fields=['type_of_service_others'])
+
     def _get_allowed_fields(self):
         """Return the set of writable field names based on the requesting user's role."""
         request = self.context.get('request')
@@ -208,14 +226,18 @@ class TicketSerializer(serializers.ModelSerializer):
         allowed = self._get_allowed_fields()
         # Strip out any fields the user's role is not allowed to write
         filtered = {k: v for k, v in validated_data.items() if k in allowed}
-        return super().update(instance, filtered)
+        ticket = super().update(instance, filtered)
+        self._sync_type_of_service_others(ticket)
+        return ticket
 
     def create(self, validated_data):
         allowed = self._get_allowed_fields()
         # Always allow `created_by` to pass through (set by the view),
         # even if it's not in the role-writable fields.
         filtered = {k: v for k, v in validated_data.items() if k in allowed or k == 'created_by'}
-        return super().create(filtered)
+        ticket = super().create(filtered)
+        self._sync_type_of_service_others(ticket)
+        return ticket
 
 
 class AdminCreateTicketSerializer(serializers.ModelSerializer):
@@ -233,6 +255,7 @@ class AdminCreateTicketSerializer(serializers.ModelSerializer):
     department_organization = serializers.CharField(required=False, allow_blank=True, write_only=True)
     mobile_no = serializers.CharField(required=False, allow_blank=True, write_only=True)
     email_address = serializers.EmailField(required=False, allow_blank=True, write_only=True)
+    sales_representative = serializers.CharField(required=False, allow_blank=True, write_only=True)
     # Write-only product fields – used to auto-create a Product record
     has_warranty = serializers.BooleanField(required=False, default=False, write_only=True)
     product = serializers.CharField(required=False, allow_blank=True, write_only=True)
@@ -244,6 +267,8 @@ class AdminCreateTicketSerializer(serializers.ModelSerializer):
     serial_no = serializers.CharField(required=False, allow_blank=True, write_only=True)
     sales_no = serializers.CharField(required=False, allow_blank=True, write_only=True)
     others = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    type_of_service_others = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    project_title = serializers.CharField(required=False, allow_blank=True, write_only=True)
 
     class Meta:
         model = Ticket
@@ -251,6 +276,7 @@ class AdminCreateTicketSerializer(serializers.ModelSerializer):
             # Client creation fields (write-only, not model fields)
             'client', 'contact_person', 'address', 'designation',
             'landline', 'department_organization', 'mobile_no', 'email_address',
+            'sales_representative',
             'type_of_service', 'type_of_service_others',
             'description_of_problem', 'preferred_support_type',
             'priority', 'assign_to',
@@ -260,6 +286,7 @@ class AdminCreateTicketSerializer(serializers.ModelSerializer):
             # Product creation fields (write-only, not model fields)
             'has_warranty', 'product', 'brand', 'model_name',
             'device_equipment', 'version_no', 'date_purchased', 'serial_no', 'sales_no', 'others',
+            'project_title',
         ]
         extra_kwargs = {
             'email_address': {'required': False, 'allow_blank': True, 'default': ''},

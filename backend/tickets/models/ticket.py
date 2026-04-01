@@ -91,7 +91,6 @@ class Ticket(models.Model):
     time_in = models.DateTimeField(null=True, blank=True)       # when employee starts working
     time_out = models.DateTimeField(null=True, blank=True)      # when employee clicks resolve
     type_of_service = models.ForeignKey(TypeOfService, null=True, blank=True, on_delete=models.SET_NULL, related_name='tickets')
-    type_of_service_others = models.CharField(max_length=200, blank=True)
 
     # ---- FK to Client and Product (optional, for existing clients) ----
     client_record = models.ForeignKey(Client, null=True, blank=True, on_delete=models.SET_NULL, related_name='tickets',

@@ -2,7 +2,7 @@ from datetime import date
 
 from django.core.management.base import BaseCommand
 
-from tickets.models import Category, Product
+from tickets.models import Category, Client, Product
 
 
 SEED_PRODUCTS = [
@@ -17,6 +17,8 @@ SEED_PRODUCTS = [
         "sales_no": "INV-2026-001",
         "has_warranty": True,
         "date_purchased": date(2026, 1, 15),
+        "client_name": "Maptech Demo Client",
+        "project_title": "IT Infrastructure Refresh",
     },
     {
         "category_name": "Closed-Circuit Television (CCTV)",
@@ -29,6 +31,8 @@ SEED_PRODUCTS = [
         "sales_no": "INV-2026-002",
         "has_warranty": True,
         "date_purchased": date(2025, 11, 22),
+        "client_name": "Maptech Demo Client",
+        "project_title": "CCTV Modernization",
     },
     {
         "category_name": "Printing Devices & Consumables",
@@ -41,6 +45,8 @@ SEED_PRODUCTS = [
         "sales_no": "INV-2026-003",
         "has_warranty": False,
         "date_purchased": date(2025, 8, 7),
+        "client_name": "Maptech Demo Client",
+        "project_title": "Office Printing Rollout",
     },
     {
         "category_name": "Door Access",
@@ -53,6 +59,8 @@ SEED_PRODUCTS = [
         "sales_no": "INV-2026-004",
         "has_warranty": True,
         "date_purchased": date(2026, 2, 3),
+        "client_name": "Maptech Demo Client",
+        "project_title": "Access Control Upgrade",
     },
 ]
 
@@ -67,9 +75,18 @@ class Command(BaseCommand):
         for data in SEED_PRODUCTS:
             category_name = data["category_name"]
             category = Category.objects.filter(name=category_name).first()
+            client_name = (data.get("client_name") or "Unknown Client").strip()
+            project_title = (data.get("project_title") or "General").strip() or "General"
+
+            client, _ = Client.objects.get_or_create(
+                client_name=client_name,
+                defaults={"is_active": True},
+            )
 
             defaults = {
                 "category": category,
+                "client": client,
+                "project_title": project_title,
                 "product_name": data["product_name"],
                 "brand": data["brand"],
                 "model_name": data["model_name"],

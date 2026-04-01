@@ -4,6 +4,7 @@ from django.db import models
 class TypeOfService(models.Model):
     """Admin-managed lookup table for Type of Service dropdown."""
     name = models.CharField(max_length=200)
+    type_of_service_others = models.CharField(max_length=200, blank=True, default='')
     description = models.TextField(blank=True)
     is_active = models.BooleanField(default=True)
     estimated_resolution_days = models.PositiveIntegerField(

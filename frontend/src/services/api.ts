@@ -117,7 +117,7 @@ export interface BackendTicket {
   mobile_no: string;
   email_address: string;
   type_of_service: number | null;
-  type_of_service_detail: { id: number; name: string; description: string; is_active: boolean } | null;
+  type_of_service_detail: { id: number; name: string; type_of_service_others?: string; description: string; is_active: boolean } | null;
   type_of_service_others: string;
   preferred_support_type: string;
   description_of_problem: string;
@@ -170,6 +170,7 @@ export interface BackendTicket {
 export interface TypeOfService {
   id: number;
   name: string;
+  type_of_service_others?: string;
   description: string;
   is_active: boolean;
   estimated_resolution_days: number;
@@ -189,6 +190,9 @@ export interface Product {
   id: number;
   category: number | null;
   category_detail: DeviceEquipment | null;
+  client: number;
+  client_detail: ClientRecord | null;
+  project_title: string;
   device_equipment: string;
   version_no: string;
   date_purchased: string | null;
@@ -913,9 +917,14 @@ export async function deleteDeviceEquipment(id: number): Promise<void> {
   }
 }
 
-/** Fetch all products. */
-export async function fetchProducts(): Promise<Product[]> {
-  const res = await apiFetch(`${API_BASE}/products/`, { headers: authHeaders() });
+/** Fetch products, optionally filtered by client and/or search text. */
+export async function fetchProducts(options?: { clientId?: number; search?: string }): Promise<Product[]> {
+  const params = new URLSearchParams();
+  if (options?.clientId != null) params.set('client', String(options.clientId));
+  if (options?.search?.trim()) params.set('search', options.search.trim());
+  const query = params.toString();
+  const url = query ? `${API_BASE}/products/?${query}` : `${API_BASE}/products/`;
+  const res = await apiFetch(url, { headers: authHeaders() });
   return handleResponse<Product[]>(res);
 }
 

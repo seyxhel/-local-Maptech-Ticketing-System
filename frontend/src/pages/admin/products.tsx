@@ -5,6 +5,7 @@ import { GreenButton } from '../../components/ui/GreenButton';
 import {
   Search,
   Plus,
+  Eye,
   Edit2,
   Trash2,
   X,
@@ -19,14 +20,19 @@ import {
   updateProduct,
   deleteProduct,
   fetchDeviceEquipment,
+  fetchClients,
   type Product,
   type DeviceEquipment,
+  type ClientRecord,
 } from '../../services/api';
 
 const ITEMS_PER_PAGE = 10;
 
 const EMPTY_FORM = {
+  client_id: '' as string | number,
+  project_title: '',
   product_name: '',
+  sales_no: '',
   brand: '',
   model_name: '',
   device_equipment: '',
@@ -41,6 +47,7 @@ const EMPTY_FORM = {
 export default function Products() {
   const [products, setProducts] = useState<Product[]>([]);
   const [deviceEquipment, setDeviceEquipment] = useState<DeviceEquipment[]>([]);
+  const [clients, setClients] = useState<ClientRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -59,13 +66,15 @@ export default function Products() {
 
   // Delete confirmation
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
+  const [viewingProduct, setViewingProduct] = useState<Product | null>(null);
 
   const loadProducts = useCallback(async () => {
     try {
       setLoading(true);
-      const [data, list] = await Promise.all([fetchProducts(), fetchDeviceEquipment()]);
+      const [data, list, clientList] = await Promise.all([fetchProducts(), fetchDeviceEquipment(), fetchClients()]);
       setProducts(data);
       setDeviceEquipment(list);
+      setClients(clientList.filter((c) => c.is_active));
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to fetch products.';
       toast.error(msg);
@@ -85,6 +94,9 @@ export default function Products() {
     const q = searchTerm.toLowerCase();
     const matchesSearch =
       (p.product_name || '').toLowerCase().includes(q) ||
+      (p.project_title || '').toLowerCase().includes(q) ||
+      (p.sales_no || '').toLowerCase().includes(q) ||
+      (p.client_detail?.client_name || '').toLowerCase().includes(q) ||
       (p.brand || '').toLowerCase().includes(q) ||
       (p.model_name || '').toLowerCase().includes(q) ||
       (p.serial_no || '').toLowerCase().includes(q);
@@ -107,7 +119,10 @@ export default function Products() {
   const openEditModal = (product: Product) => {
     setEditingProduct(product);
     setFormData({
+      client_id: product.client || '',
+      project_title: product.project_title || '',
       product_name: product.product_name || '',
+      sales_no: product.sales_no || '',
       brand: product.brand || '',
       model_name: product.model_name || '',
       device_equipment: product.device_equipment || '',
@@ -134,23 +149,27 @@ export default function Products() {
   const validate = (): boolean => {
     const errors: Record<string, string> = {};
     if (!formData.product_name.trim()) errors.product_name = 'Product name is required.';
+    if (!formData.client_id) errors.client_id = 'Client is required.';
+    if (!formData.project_title.trim()) errors.project_title = 'Project title is required.';
     if (!formData.device_equipment_id && !formData.device_equipment.trim()) errors.device_equipment = 'Device/Equipment (Category) is required.';
     if (!formData.brand.trim()) errors.brand = 'Brand is required.';
     if (!formData.model_name.trim()) errors.model_name = 'Model is required.';
     if (!formData.version_no.trim()) errors.version_no = 'Version number is required.';
     if (!formData.date_purchased) errors.date_purchased = 'Date purchased is required.';
     if (!formData.serial_no.trim()) errors.serial_no = 'Serial number is required.';
+    if (!formData.sales_no.trim()) errors.sales_no = 'Sales / Invoice No. is required.';
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const saveProduct = async (keepOpenAfterCreate = false) => {
     if (!validate()) return;
 
     setSubmitting(true);
     try {
       const payload: Record<string, unknown> = {
+        client: Number(formData.client_id),
+        project_title: formData.project_title.trim(),
         product_name: formData.product_name.trim(),
         brand: formData.brand.trim(),
         model_name: formData.model_name.trim(),
@@ -158,6 +177,7 @@ export default function Products() {
         version_no: formData.version_no.trim(),
         date_purchased: formData.date_purchased || null,
         serial_no: formData.serial_no.trim(),
+        sales_no: formData.sales_no.trim(),
         has_warranty: formData.has_warranty,
         is_active: formData.is_active,
         category: formData.device_equipment_id ? Number(formData.device_equipment_id) : null,
@@ -172,18 +192,40 @@ export default function Products() {
         const updated = await updateProduct(editingProduct.id, payload as any);
         setProducts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
         toast.success(`"${updated.product_name || updated.device_equipment}" updated successfully.`);
-      } else {
-        const created = await createProduct(payload as any);
-        setProducts((prev) => [...prev, created]);
-        toast.success(`"${created.product_name || created.device_equipment}" created successfully.`);
+        closeModal();
+        return;
       }
-      closeModal();
+
+      const created = await createProduct(payload as any);
+      setProducts((prev) => [...prev, created]);
+      toast.success(`"${created.product_name || created.device_equipment}" created successfully.`);
+
+      if (keepOpenAfterCreate) {
+        // Keep client/project for faster repeated entries.
+        setFormData((prev) => ({
+          ...EMPTY_FORM,
+          client_id: prev.client_id,
+          project_title: prev.project_title,
+        }));
+        setFieldErrors({});
+      } else {
+        closeModal();
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to save product.';
       toast.error(msg);
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await saveProduct(false);
+  };
+
+  const handleSaveAndAddAnother = async () => {
+    await saveProduct(true);
   };
 
   const confirmDelete = async () => {
@@ -276,7 +318,8 @@ export default function Products() {
             <thead>
               <tr className="text-xs text-gray-500 dark:text-gray-400 uppercase border-b border-gray-100 dark:border-gray-700">
                 <th className="pb-3 font-medium">Product Name</th>
-                <th className="pb-3 font-medium">Device/Equipment (Category)</th>
+                <th className="pb-3 font-medium">Client</th>
+                <th className="pb-3 font-medium">Project Title</th>
                 <th className="pb-3 font-medium">Brand</th>
                 <th className="pb-3 font-medium">Model</th>
                 <th className="pb-3 font-medium">Serial No.</th>
@@ -288,7 +331,7 @@ export default function Products() {
             <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
               {paged.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-gray-400 dark:text-gray-500">
+                  <td colSpan={10} className="py-12 text-center text-gray-400 dark:text-gray-500">
                     <Package className="w-10 h-10 mx-auto mb-2 opacity-30" />
                     No products found.
                   </td>
@@ -299,15 +342,8 @@ export default function Products() {
                     <td className="py-3 font-medium text-gray-900 dark:text-white">
                       {product.product_name || product.device_equipment || '—'}
                     </td>
-                    <td className="py-3 text-gray-600 dark:text-gray-300">
-                      {product.category_detail ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
-                          {product.category_detail.name}
-                        </span>
-                      ) : (
-                        <span className="text-gray-600 dark:text-gray-300">{product.device_equipment || '—'}</span>
-                      )}
-                    </td>
+                    <td className="py-3 text-gray-600 dark:text-gray-300">{product.client_detail?.client_name || '—'}</td>
+                    <td className="py-3 text-gray-600 dark:text-gray-300">{product.project_title || '—'}</td>
                     <td className="py-3 text-gray-600 dark:text-gray-300">{product.brand || '—'}</td>
                     <td className="py-3 text-gray-600 dark:text-gray-300">{product.model_name || '—'}</td>
                     <td className="py-3 text-gray-600 dark:text-gray-300 font-mono text-xs">{product.serial_no || '—'}</td>
@@ -335,6 +371,9 @@ export default function Products() {
                     </td>
                     <td className="py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
+                        <button onClick={() => setViewingProduct(product)} className="p-1.5 rounded-lg text-gray-400 hover:text-[#0E8F79] hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors" title="View">
+                          <Eye className="w-4 h-4" />
+                        </button>
                         <button onClick={() => openEditModal(product)} className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors" title="Edit">
                           <Edit2 className="w-4 h-4" />
                         </button>
@@ -379,7 +418,27 @@ export default function Products() {
             </div>
 
             <form onSubmit={handleSave} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Project Title <span className="text-red-500">*</span></label>
+                <input type="text" value={formData.project_title} onChange={(e) => setFormData({ ...formData, project_title: e.target.value })} className={`w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B] ${fieldErrors.project_title ? 'border-red-400' : 'border-gray-200 dark:border-gray-600'}`} placeholder="e.g. CCTV Upgrade 2026" />
+                {fieldErrors.project_title && <p className="mt-1 text-xs text-red-500">{fieldErrors.project_title}</p>}
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Client <span className="text-red-500">*</span></label>
+                  <select
+                    value={formData.client_id}
+                    onChange={(e) => setFormData({ ...formData, client_id: e.target.value })}
+                    className={`w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B] ${fieldErrors.client_id ? 'border-red-400' : 'border-gray-200 dark:border-gray-600'}`}
+                  >
+                    <option value="">Select client</option>
+                    {clients.map((c) => (
+                      <option key={c.id} value={c.id}>{c.client_name}</option>
+                    ))}
+                  </select>
+                  {fieldErrors.client_id && <p className="mt-1 text-xs text-red-500">{fieldErrors.client_id}</p>}
+                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Product Name <span className="text-red-500">*</span></label>
                   <input type="text" value={formData.product_name} onChange={(e) => setFormData({ ...formData, product_name: e.target.value })} className={`w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B] ${fieldErrors.product_name ? 'border-red-400' : 'border-gray-200 dark:border-gray-600'}`} placeholder="e.g. Laptop" />
@@ -436,6 +495,11 @@ export default function Products() {
                   <input type="text" value={formData.serial_no} onChange={(e) => setFormData({ ...formData, serial_no: e.target.value })} className={`w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B] ${fieldErrors.serial_no ? 'border-red-400' : 'border-gray-200 dark:border-gray-600'}`} placeholder="e.g. SN123456" />
                   {fieldErrors.serial_no && <p className="mt-1 text-xs text-red-500">{fieldErrors.serial_no}</p>}
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Sales / Invoice No. <span className="text-red-500">*</span></label>
+                  <input type="text" value={formData.sales_no} onChange={(e) => setFormData({ ...formData, sales_no: e.target.value })} className={`w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B] ${fieldErrors.sales_no ? 'border-red-400' : 'border-gray-200 dark:border-gray-600'}`} placeholder="e.g. INV-2026-001" />
+                  {fieldErrors.sales_no && <p className="mt-1 text-xs text-red-500">{fieldErrors.sales_no}</p>}
+                </div>
               </div>
 
               {/* Warranty toggle */}
@@ -460,11 +524,45 @@ export default function Products() {
 
               <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-gray-700">
                 <GreenButton type="button" variant="outline" onClick={closeModal} disabled={submitting}>Cancel</GreenButton>
+                {!editingProduct && (
+                  <GreenButton type="button" variant="outline" onClick={handleSaveAndAddAnother} disabled={submitting}>
+                    Create & Add Another
+                  </GreenButton>
+                )}
                 <GreenButton type="submit" isLoading={submitting} disabled={submitting}>
                   {editingProduct ? 'Save Changes' : 'Create'}
                 </GreenButton>
               </div>
             </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* View Modal */}
+      {viewingProduct && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-2xl relative max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-gray-700">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Product Details</h2>
+              <button onClick={() => setViewingProduct(null)} className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div><p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Project Title</p><p className="text-sm text-gray-900 dark:text-white mt-1">{viewingProduct.project_title || '—'}</p></div>
+              <div><p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Client</p><p className="text-sm text-gray-900 dark:text-white mt-1">{viewingProduct.client_detail?.client_name || '—'}</p></div>
+              <div><p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Product</p><p className="text-sm text-gray-900 dark:text-white mt-1">{viewingProduct.product_name || '—'}</p></div>
+              <div><p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Device / Equipment</p><p className="text-sm text-gray-900 dark:text-white mt-1">{viewingProduct.device_equipment || viewingProduct.category_detail?.name || '—'}</p></div>
+              <div><p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Brand</p><p className="text-sm text-gray-900 dark:text-white mt-1">{viewingProduct.brand || '—'}</p></div>
+              <div><p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Model</p><p className="text-sm text-gray-900 dark:text-white mt-1">{viewingProduct.model_name || '—'}</p></div>
+              <div><p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Version</p><p className="text-sm text-gray-900 dark:text-white mt-1">{viewingProduct.version_no || '—'}</p></div>
+              <div><p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Serial No.</p><p className="text-sm text-gray-900 dark:text-white mt-1 font-mono">{viewingProduct.serial_no || '—'}</p></div>
+              <div><p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Sales / Invoice No.</p><p className="text-sm text-gray-900 dark:text-white mt-1 font-mono">{viewingProduct.sales_no || '—'}</p></div>
+              <div><p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Date Purchased</p><p className="text-sm text-gray-900 dark:text-white mt-1">{viewingProduct.date_purchased ? new Date(viewingProduct.date_purchased).toLocaleDateString() : '—'}</p></div>
+              <div><p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Warranty</p><p className="text-sm text-gray-900 dark:text-white mt-1">{viewingProduct.has_warranty ? 'With Warranty' : 'Without Warranty'}</p></div>
+              <div><p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Status</p><p className="text-sm text-gray-900 dark:text-white mt-1">{viewingProduct.is_active ? 'Active' : 'Inactive'}</p></div>
+            </div>
           </div>
         </div>,
         document.body
