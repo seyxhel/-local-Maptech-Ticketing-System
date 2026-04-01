@@ -269,6 +269,7 @@ class AdminCreateTicketSerializer(serializers.ModelSerializer):
     others = serializers.CharField(required=False, allow_blank=True, write_only=True)
     type_of_service_others = serializers.CharField(required=False, allow_blank=True, write_only=True)
     project_title = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    client_unavailable_for_call = serializers.BooleanField(required=False, default=False, write_only=True)
 
     class Meta:
         model = Ticket
@@ -280,6 +281,7 @@ class AdminCreateTicketSerializer(serializers.ModelSerializer):
             'type_of_service', 'type_of_service_others',
             'description_of_problem', 'preferred_support_type',
             'priority', 'assign_to',
+            'client_unavailable_for_call',
             'client_record', 'product_record',
             'estimated_resolution_days_override',
             'is_existing_client',

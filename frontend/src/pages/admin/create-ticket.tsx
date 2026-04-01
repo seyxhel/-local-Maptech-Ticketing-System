@@ -146,6 +146,7 @@ const CONTACT_FIELDS = [
 
 /* Flow: form → stf-details (with Call Client + Priority) → ongoing → stf-details (priority enabled) → assign employee → redirect */
 type ModalStep = 'none' | 'stf-details' | 'ongoing' | 'assign';
+type ClientAvailabilityChoice = '' | 'available' | 'unavailable';
 
 type AdminCreateTicketDraft = {
   currentStep: number;
@@ -223,6 +224,7 @@ export default function AdminCreateTicket() {
 
   // Modal state
   const [modalStep, setModalStep] = useState<ModalStep>('none');
+  const [clientAvailabilityChoice, setClientAvailabilityChoice] = useState<ClientAvailabilityChoice>('');
   const [priorityLevel, setPriorityLevel] = useState('');
   const [selectedEmployee, setSelectedEmployee] = useState<number | null>(null);
 
@@ -723,8 +725,8 @@ export default function AdminCreateTicket() {
 
     // Show STF details modal for review, call, and priority
     setModalStep('stf-details');
-    setCallCompleted(false);
-    setPriorityLevel('');
+    setClientAvailabilityChoice('');
+    resetCallWorkflowState();
   };
 
   // Real call timer (tracks duration when in "ongoing" step, pauses when on hold)
@@ -742,6 +744,18 @@ export default function AdminCreateTicket() {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
     return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
+
+  const resetCallWorkflowState = () => {
+    setCallLogId(null);
+    setCallStartTime(null);
+    setCallTimer(0);
+    setCallCompleted(false);
+    setCallOnHold(false);
+    setHoldOffset(0);
+    setHoldStartTime(null);
+    setCallEndTime(null);
+    setPriorityLevel('');
   };
 
   /** Start call from the STF details modal */
@@ -802,6 +816,76 @@ export default function AdminCreateTicket() {
     setSelectedEmployee(null);
   };
 
+  const buildTicketData = (options?: { includePriority?: boolean; clientUnavailableForCall?: boolean }) => {
+    const supportTypeMap: Record<string, string> = {
+      'Remote / Online': 'remote_online',
+      'Remote/Online': 'remote_online',
+      'Onsite': 'onsite',
+      'Chat': 'chat',
+      'Call': 'call',
+    };
+
+    const matchedService = serviceTypes.find((s) => s.name === serviceType);
+    const ticketData: Record<string, unknown> = {
+      project_title: projectTitle.trim(),
+      client: contactValues.client,
+      contact_person: contactValues.contactPerson,
+      landline: contactValues.landline,
+      mobile_no: contactValues.mobile,
+      designation: contactValues.designation,
+      department_organization: contactValues.department,
+      email_address: email.trim(),
+      address,
+      description_of_problem: description,
+      preferred_support_type: supportTypeMap[supportType?.trim()] || 'remote_online',
+    };
+
+    if (options?.includePriority && priorityLevel) {
+      ticketData.priority = priorityLevel.toLowerCase();
+    }
+
+    if (options?.clientUnavailableForCall) {
+      ticketData.client_unavailable_for_call = true;
+    }
+
+    if (combinedSalesReps) {
+      ticketData.sales_representative = combinedSalesReps;
+    }
+
+    if (matchedService) {
+      ticketData.type_of_service = matchedService.id;
+    } else if (serviceType === 'Others') {
+      ticketData.type_of_service_others = serviceOthersText;
+      if (estimatedDaysOverride && Number(estimatedDaysOverride) > 0) {
+        ticketData.estimated_resolution_days_override = Number(estimatedDaysOverride);
+      }
+    } else if (serviceType) {
+      ticketData.type_of_service_others = serviceType;
+    }
+
+    if (isExistingClient && selectedClientId) {
+      ticketData.client_record = selectedClientId;
+      ticketData.is_existing_client = true;
+    }
+
+    if (isExistingProduct) {
+      applySelectedProductToTicketData(ticketData);
+      if (salesNo.trim()) ticketData.sales_no = salesNo.trim();
+    } else {
+      if (newProductInfo.device_equipment.trim()) ticketData.device_equipment = newProductInfo.device_equipment.trim();
+      if (newProductInfo.product_name.trim()) ticketData.product = newProductInfo.product_name.trim();
+      if (newProductInfo.brand.trim()) ticketData.brand = newProductInfo.brand.trim();
+      if (newProductInfo.model_name.trim()) ticketData.model_name = newProductInfo.model_name.trim();
+      if (newProductInfo.serial_no.trim()) ticketData.serial_no = newProductInfo.serial_no.trim();
+      if (newProductInfo.version_no.trim()) ticketData.version_no = newProductInfo.version_no.trim();
+      if (newProductInfo.date_purchased) ticketData.date_purchased = newProductInfo.date_purchased;
+      ticketData.has_warranty = newProductInfo.has_warranty;
+      if (salesNo.trim()) ticketData.sales_no = salesNo.trim();
+    }
+
+    return ticketData;
+  };
+
   const handleAssign = async () => {
     if (!selectedEmployee) {
       toast.error('Please select a technical to assign.');
@@ -811,68 +895,8 @@ export default function AdminCreateTicket() {
     setIsAssigning(true);
     const emp = employees.find((e) => e.id === selectedEmployee);
 
-    // Map support type label to backend value
-    const supportTypeMap: Record<string, string> = {
-      'Remote / Online': 'remote_online',
-      'Remote/Online': 'remote_online',
-      'Onsite': 'onsite',
-      'Chat': 'chat',
-      'Call': 'call',
-    };
-
-    // Find the service type ID from the backend
-    const matchedService = serviceTypes.find((s) => s.name === serviceType);
-
     try {
-      const ticketData: Record<string, unknown> = {
-        project_title: projectTitle.trim(),
-        client: contactValues.client,
-        contact_person: contactValues.contactPerson,
-        landline: contactValues.landline,
-        mobile_no: contactValues.mobile,
-        designation: contactValues.designation,
-        department_organization: contactValues.department,
-        email_address: email.trim(),
-        address,
-        description_of_problem: description,
-        preferred_support_type: supportTypeMap[supportType?.trim()] || 'remote_online',
-        priority: priorityLevel.toLowerCase(),
-      };
-
-      if (combinedSalesReps) {
-        ticketData.sales_representative = combinedSalesReps;
-      }
-
-      if (matchedService) {
-        ticketData.type_of_service = matchedService.id;
-      } else if (serviceType === 'Others') {
-        ticketData.type_of_service_others = serviceOthersText;
-        if (estimatedDaysOverride && Number(estimatedDaysOverride) > 0) {
-          ticketData.estimated_resolution_days_override = Number(estimatedDaysOverride);
-        }
-      } else if (serviceType) {
-        ticketData.type_of_service_others = serviceType;
-      }
-
-      // Existing client / product linkage
-      if (isExistingClient && selectedClientId) {
-        ticketData.client_record = selectedClientId;
-        ticketData.is_existing_client = true;
-      }
-      if (isExistingProduct) {
-        applySelectedProductToTicketData(ticketData);
-        if (salesNo.trim()) ticketData.sales_no = salesNo.trim();
-      } else {
-        if (newProductInfo.device_equipment.trim()) ticketData.device_equipment = newProductInfo.device_equipment.trim();
-        if (newProductInfo.product_name.trim()) ticketData.product = newProductInfo.product_name.trim();
-        if (newProductInfo.brand.trim()) ticketData.brand = newProductInfo.brand.trim();
-        if (newProductInfo.model_name.trim()) ticketData.model_name = newProductInfo.model_name.trim();
-        if (newProductInfo.serial_no.trim()) ticketData.serial_no = newProductInfo.serial_no.trim();
-        if (newProductInfo.version_no.trim()) ticketData.version_no = newProductInfo.version_no.trim();
-        if (newProductInfo.date_purchased) ticketData.date_purchased = newProductInfo.date_purchased;
-        ticketData.has_warranty = newProductInfo.has_warranty;
-        if (salesNo.trim()) ticketData.sales_no = salesNo.trim();
-      }
+      const ticketData = buildTicketData({ includePriority: true });
 
       const created = await createTicket(ticketData as any);
       await assignTicket(created.id, selectedEmployee);
@@ -903,64 +927,8 @@ export default function AdminCreateTicket() {
     if (isAssigning) return;
     setIsAssigning(true);
 
-    const supportTypeMap: Record<string, string> = {
-      'Remote / Online': 'remote_online',
-      'Remote/Online': 'remote_online',
-      'Onsite': 'onsite',
-      'Chat': 'chat',
-      'Call': 'call',
-    };
-    const matchedService = serviceTypes.find((s) => s.name === serviceType);
-
     try {
-      const ticketData: Record<string, unknown> = {
-        project_title: projectTitle.trim(),
-        client: contactValues.client,
-        contact_person: contactValues.contactPerson,
-        landline: contactValues.landline,
-        mobile_no: contactValues.mobile,
-        designation: contactValues.designation,
-        department_organization: contactValues.department,
-        email_address: email.trim(),
-        address,
-        description_of_problem: description,
-        preferred_support_type: supportTypeMap[supportType?.trim()] || 'remote_online',
-        priority: priorityLevel.toLowerCase(),
-      };
-
-      if (combinedSalesReps) {
-        ticketData.sales_representative = combinedSalesReps;
-      }
-
-      if (matchedService) {
-        ticketData.type_of_service = matchedService.id;
-      } else if (serviceType === 'Others') {
-        ticketData.type_of_service_others = serviceOthersText;
-        if (estimatedDaysOverride && Number(estimatedDaysOverride) > 0) {
-          ticketData.estimated_resolution_days_override = Number(estimatedDaysOverride);
-        }
-      } else if (serviceType) {
-        ticketData.type_of_service_others = serviceType;
-      }
-
-      if (isExistingClient && selectedClientId) {
-        ticketData.client_record = selectedClientId;
-        ticketData.is_existing_client = true;
-      }
-      if (isExistingProduct) {
-        applySelectedProductToTicketData(ticketData);
-        if (salesNo.trim()) ticketData.sales_no = salesNo.trim();
-      } else {
-        if (newProductInfo.device_equipment.trim()) ticketData.device_equipment = newProductInfo.device_equipment.trim();
-        if (newProductInfo.product_name.trim()) ticketData.product = newProductInfo.product_name.trim();
-        if (newProductInfo.brand.trim()) ticketData.brand = newProductInfo.brand.trim();
-        if (newProductInfo.model_name.trim()) ticketData.model_name = newProductInfo.model_name.trim();
-        if (newProductInfo.serial_no.trim()) ticketData.serial_no = newProductInfo.serial_no.trim();
-        if (newProductInfo.version_no.trim()) ticketData.version_no = newProductInfo.version_no.trim();
-        if (newProductInfo.date_purchased) ticketData.date_purchased = newProductInfo.date_purchased;
-        ticketData.has_warranty = newProductInfo.has_warranty;
-        if (salesNo.trim()) ticketData.sales_no = salesNo.trim();
-      }
+      const ticketData = buildTicketData({ includePriority: true });
 
       const created = await createTicket(ticketData as any);
 
@@ -981,6 +949,37 @@ export default function AdminCreateTicket() {
       navigate(`/admin/ticket-details?stf=${encodeURIComponent(created.stf_no)}`);
     } catch (err: any) {
       toast.error(err?.message || 'Failed to create ticket.');
+    } finally {
+      setIsAssigning(false);
+    }
+  };
+
+  const handleSavePendingClientAvailability = async () => {
+    if (isAssigning) return;
+    setIsAssigning(true);
+
+    try {
+      const ticketData = buildTicketData({ clientUnavailableForCall: true });
+      const created = await createTicket(ticketData as any);
+
+      if (linkedTicketId) {
+        try {
+          await linkTickets(linkedTicketId, [created.id]);
+        } catch {
+          // linking is best-effort
+        }
+      }
+
+      setModalStep('none');
+      adminCreateTicketDraft = null;
+      toast.success(`Ticket ${created.stf_no} saved as pending client availability`, {
+        description: linkedStf
+          ? `Linked to ${linkedStf}. Assignment will remain blocked until client call and priority review are completed.`
+          : 'Assignment will remain blocked until client call and priority review are completed.',
+      });
+      navigate(`/admin/ticket-details?stf=${encodeURIComponent(created.stf_no)}`);
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to create pending ticket.');
     } finally {
       setIsAssigning(false);
     }
@@ -1990,11 +1989,34 @@ export default function AdminCreateTicket() {
                   ))}
                 </div>
 
+                <div className="mb-5">
+                  <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Client Availability</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setClientAvailabilityChoice('available')}
+                      className={`px-3 py-2.5 rounded-xl border-2 text-xs font-bold transition-all ${clientAvailabilityChoice === 'available' ? 'border-[#3BC25B] bg-[#3BC25B] text-white ring-2 ring-green-200 dark:ring-green-900/50' : 'border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:border-[#3BC25B]'}`}
+                    >
+                      Client is Available Now
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setClientAvailabilityChoice('unavailable');
+                        resetCallWorkflowState();
+                      }}
+                      className={`px-3 py-2.5 rounded-xl border-2 text-xs font-bold transition-all ${clientAvailabilityChoice === 'unavailable' ? 'border-amber-500 bg-amber-500 text-white ring-2 ring-amber-200 dark:ring-amber-900/50' : 'border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:border-amber-400'}`}
+                    >
+                      Client is Not Available
+                    </button>
+                  </div>
+                </div>
+
                 {/* Call Client button */}
                 <button
                   onClick={handleStartCall}
-                  className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-colors mb-5 ${callCompleted ? 'bg-gray-100 dark:bg-gray-700 text-green-600 dark:text-green-400 cursor-default' : 'bg-[#3BC25B] hover:bg-[#2ea34a] text-white'}`}
-                  disabled={callCompleted}
+                  className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-colors mb-5 ${clientAvailabilityChoice !== 'available' ? 'bg-gray-100 dark:bg-gray-700 text-gray-400 cursor-not-allowed' : callCompleted ? 'bg-gray-100 dark:bg-gray-700 text-green-600 dark:text-green-400 cursor-default' : 'bg-[#3BC25B] hover:bg-[#2ea34a] text-white'}`}
+                  disabled={clientAvailabilityChoice !== 'available' || callCompleted}
                 >
                   {callCompleted ? (
                     <><CheckCircle2 className="w-4 h-4" /> Call Completed</>
@@ -2004,8 +2026,8 @@ export default function AdminCreateTicket() {
                 </button>
 
                 {/* Priority selector */}
-                <div className={`${!callCompleted ? 'opacity-40 pointer-events-none' : ''}`}>
-                  <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Priority Level {!callCompleted && <span className="text-xs font-normal text-gray-400 ml-1">(complete a call first)</span>}</p>
+                <div className={`${(clientAvailabilityChoice !== 'available' || !callCompleted) ? 'opacity-40 pointer-events-none' : ''}`}>
+                  <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Priority Level {(clientAvailabilityChoice !== 'available' || !callCompleted) && <span className="text-xs font-normal text-gray-400 ml-1">(client must be available and call must be completed first)</span>}</p>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {[
                       { label: 'Low', color: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700 text-blue-700 dark:text-blue-300', active: 'bg-blue-500 text-white border-blue-500 ring-2 ring-blue-300 dark:ring-blue-700' },
@@ -2029,12 +2051,27 @@ export default function AdminCreateTicket() {
                 <div className="mt-5">
                   <button
                     onClick={handleConfirmPriority}
-                    disabled={!callCompleted || !priorityLevel}
+                    disabled={clientAvailabilityChoice !== 'available' || !callCompleted || !priorityLevel}
                     className="w-full px-4 py-2.5 rounded-lg bg-[#3BC25B] hover:bg-[#2ea34a] text-white text-sm font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     Continue to Assign
                   </button>
                 </div>
+
+                {clientAvailabilityChoice === 'unavailable' && (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                      Save this ticket as pending client availability. It will be stored but cannot be assigned yet.
+                    </p>
+                    <button
+                      onClick={handleSavePendingClientAvailability}
+                      disabled={isAssigning}
+                      className="w-full px-4 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {isAssigning ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</> : 'Save as Pending'}
+                    </button>
+                  </div>
+                )}
 
                 {/* Call events summary shown after call completed */}
                 {callCompleted && (

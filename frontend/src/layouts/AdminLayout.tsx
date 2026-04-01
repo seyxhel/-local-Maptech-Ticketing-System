@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { Layout } from '../components/layout/Layout';
 import type { NavItem } from '../components/layout/Sidebar';
-import { LayoutDashboard, Ticket, ShieldAlert, BarChart3, PlusCircle, ScrollText, BookOpen, Settings2, Package, Users, Monitor, Upload, FileCheck, Archive, Shield, PhoneCall } from 'lucide-react';
+import { LayoutDashboard, Ticket, ShieldAlert, PauseCircle, BarChart3, PlusCircle, ScrollText, BookOpen, Settings2, Package, Users, Monitor, Upload, FileCheck, Archive, Shield, PhoneCall } from 'lucide-react';
 import { NetworkErrorModal, useNetworkStatus } from '../shared';
 
 const NAV_ITEMS: NavItem[] = [
@@ -16,6 +16,7 @@ const NAV_ITEMS: NavItem[] = [
     children: [
       { id: 'all-tickets', label: 'All Tickets', icon: Ticket, path: '/admin/tickets', exact: true },
       { id: 'escalated-tickets', label: 'Escalated Tickets', icon: ShieldAlert, path: '/admin/tickets/escalated' },
+      { id: 'on-hold-tickets', label: 'On Hold Tickets', icon: PauseCircle, path: '/admin/tickets/on-hold' },
     ],
   },
   { id: 'create-ticket', label: 'Create Ticket', icon: PlusCircle, path: '/admin/create-ticket' },

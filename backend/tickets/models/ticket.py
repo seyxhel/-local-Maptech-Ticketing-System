@@ -156,6 +156,8 @@ class Ticket(models.Model):
     @property
     def sla_estimated_days(self):
         """Return the effective estimated resolution days (from TypeOfService or override for Others)."""
+        if not self.confirmed_by_admin or not self.priority:
+            return 0
         if self.estimated_resolution_days_override:
             return self.estimated_resolution_days_override
         if self.type_of_service and self.type_of_service.estimated_resolution_days:

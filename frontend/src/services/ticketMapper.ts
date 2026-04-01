@@ -78,6 +78,10 @@ export interface UITicket {
 
 /** Compute SLA hours remaining based on estimated_resolution days from the backend. */
 function computeSla(ticket: BackendTicket): { sla: number; totalSla: number } {
+  // SLA should only run after call verification is confirmed and priority is identified.
+  if (!ticket.confirmed_by_admin || !String(ticket.priority || '').trim()) {
+    return { sla: 0, totalSla: 0 };
+  }
   const totalSla = (ticket.sla_estimated_days || 0) * 24;
   if (totalSla === 0) return { sla: 0, totalSla: 0 };
   const created = new Date(ticket.created_at).getTime();

@@ -22,6 +22,7 @@ import SuperAdminAuditLogs from './pages/superadmin/audit-logs';
 import AdminDashboard from './pages/admin/dashboard';
 import AdminTickets from './pages/admin/tickets';
 import AdminEscalatedTickets from './pages/admin/escalated-tickets';
+import AdminOnHoldTickets from './pages/admin/on-hold-tickets';
 import AdminEscalation from './pages/admin/escalation';
 import AdminReports from './pages/admin/reports';
 import AdminCreateTicket from './pages/admin/create-ticket';
@@ -95,6 +96,7 @@ export function App() {
               <Route path="dashboard" element={<AdminDashboard />} />
               <Route path="tickets" element={<AdminTickets />} />
               <Route path="tickets/escalated" element={<AdminEscalatedTickets />} />
+              <Route path="tickets/on-hold" element={<AdminOnHoldTickets />} />
               <Route path="escalation" element={<AdminEscalation />} />
               <Route path="reports" element={<AdminReports />} />
               <Route path="create-ticket" element={<AdminCreateTicket />} />

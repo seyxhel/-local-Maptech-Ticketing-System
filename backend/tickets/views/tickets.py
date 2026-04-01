@@ -74,6 +74,7 @@ class TicketViewSet(viewsets.ModelViewSet):
         if user.is_admin_level:
             priority = serializer.validated_data.pop('priority', '') or request.data.get('priority', '')
             assign_to_id = serializer.validated_data.pop('assign_to', None) or request.data.get('assign_to')
+            client_unavailable_for_call = serializer.validated_data.pop('client_unavailable_for_call', False)
             is_existing = serializer.validated_data.pop('is_existing_client', False)
             type_of_service_others = serializer.validated_data.pop('type_of_service_others', '') or ''
 
@@ -159,7 +160,7 @@ class TicketViewSet(viewsets.ModelViewSet):
                 ticket.type_of_service.type_of_service_others = type_of_service_others
                 ticket.type_of_service.save(update_fields=['type_of_service_others'])
 
-            if user.role != User.ROLE_SALES and priority and priority in dict(Ticket.PRIORITY_CHOICES):
+            if user.role != User.ROLE_SALES and not client_unavailable_for_call and priority and priority in dict(Ticket.PRIORITY_CHOICES):
                 ticket.priority = priority
 
             if user.role != User.ROLE_SALES and assign_to_id:
@@ -171,9 +172,9 @@ class TicketViewSet(viewsets.ModelViewSet):
                 except User.DoesNotExist:
                     pass
 
-            # Sales-created STF entries are intentionally unconfirmed and unprioritized
-            # so a supervisor can perform call + priority review later.
-            ticket.confirmed_by_admin = user.role != User.ROLE_SALES
+            # Sales-created and client-unavailable entries are intentionally unconfirmed
+            # so a supervisor can complete call + priority review before assignment.
+            ticket.confirmed_by_admin = (user.role != User.ROLE_SALES) and (not client_unavailable_for_call)
             ticket.save()
 
             self._audit_ticket(request, ticket, AuditLog.ACTION_CREATE,
@@ -264,6 +265,12 @@ class TicketViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def assign(self, request, pk=None):
         ticket = self.get_object()
+
+        if not ticket.confirmed_by_admin:
+            return Response(
+                {'detail': 'This ticket is pending client availability. Complete call and priority review first.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         # Block reassignment if the employee has already clicked Start Work,
         # unless the ticket is escalated (admin must be able to reassign after escalation),
