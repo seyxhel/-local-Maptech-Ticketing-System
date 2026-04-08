@@ -29,6 +29,7 @@ import {
 } from 'recharts';
 import { toast } from 'sonner';
 import { AnnouncementBanner } from '../../components/ui/AnnouncementBanner';
+import { Calendar } from '../../components/ui/Calendar';
 import {
   fetchTickets,
   fetchTicketStats,
@@ -40,7 +41,7 @@ import {
   escalateExternal,
 } from '../../services/api';
 import type { BackendTicket, TicketStats } from '../../services/api';
-import { mapBackendTicketToUI, reverseMapStatus, reverseMapPriority } from '../../services/ticketMapper';
+import { mapBackendTicketToUI, mapBackendTicketToTechnicalStaff, reverseMapStatus, reverseMapPriority } from '../../services/ticketMapper';
 import type { UITicket } from '../../services/ticketMapper';
 
 const STATUSES = ['Pending', 'Assigned', 'In Progress', 'Escalated', 'For Observation', 'Unresolved', 'Resolved', 'Closed'];
@@ -203,6 +204,7 @@ export default function AdminDashboard() {
   const escalatedBackendTickets = sortedBackendTickets.filter((ticket) => ticket.status === 'escalated' || ticket.status === 'escalated_external');
   const activeFeedBackendTickets = ticketFeedView === 'submitted' ? submittedBackendTickets : escalatedBackendTickets;
   const latestTicketCards = activeFeedBackendTickets.slice(0, 5).map(mapBackendTicketToUI);
+  const supervisorCalendarTickets = backendTickets.map(mapBackendTicketToTechnicalStaff);
 
   const statusChartPalette: Record<string, string> = {
     Pending: '#F59E0B',
@@ -409,6 +411,8 @@ export default function AdminDashboard() {
               )}
             </div>
           </Card>
+
+          <Calendar tickets={supervisorCalendarTickets} />
 
           <Card>
             <div className="flex items-center gap-2 mb-4">
