@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import requests as http_requests
 
 from rest_framework import viewsets, status
@@ -17,6 +18,8 @@ from django.utils.encoding import force_bytes, force_str
 from django.utils import timezone
 from .serializers import UserSerializer
 
+logger = logging.getLogger(__name__)
+
 
 def _is_password_pwned(password: str) -> bool:
     """Check the HIBP Passwords API (k-anonymity).  Returns True if breached."""
@@ -33,9 +36,9 @@ def _is_password_pwned(password: str) -> bool:
                 hash_suffix, _, _ = line.partition(':')
                 if hash_suffix.strip() == suffix:
                     return True
-    except Exception:
+    except Exception as e:
         # Network failure — allow the password rather than blocking the user
-        pass
+        logger.warning(f'HIBP password check failed: {e}')
     return False
 
 User = get_user_model()

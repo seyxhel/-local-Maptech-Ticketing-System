@@ -329,17 +329,17 @@ export default function AdminCreateTicket() {
           }))
         );
       })
-      .catch(() => {});
+      .catch((err) => console.error('Failed to load employees:', err));
     fetchTypesOfService()
       .then((types) => setServiceTypes(types))
-      .catch(() => {});
+      .catch((err) => console.error('Failed to load service types:', err));
     fetchClients()
       .then((c) => setExistingClients(c))
-      .catch(() => {});
-    fetchDeviceEquipment().then((list) => { setDeviceEquipments(list); setDevicePage(1); }).catch(() => {});
+      .catch((err) => console.error('Failed to load clients:', err));
+    fetchDeviceEquipment().then((list) => { setDeviceEquipments(list); setDevicePage(1); }).catch((err) => console.error('Failed to load device equipment:', err));
     fetchNextTicketStfNo()
       .then((nextStfNo) => setStfNo(nextStfNo))
-      .catch(() => {});
+      .catch((err) => console.error('Failed to get next STF number:', err));
   }, []);
 
   // Load products for selected client when available; otherwise, load full catalog.
@@ -352,7 +352,7 @@ export default function AdminCreateTicket() {
       .then((p) => {
         setProducts(p);
       })
-      .catch(() => {});
+      .catch((err) => console.error('Failed to load products:', err));
   }, [isExistingClient, selectedClientId]);
 
   // Multi-step form state
@@ -893,7 +893,8 @@ export default function AdminCreateTicket() {
       });
       setCallLogId(log.id);
       setCallStartTime(new Date());
-    } catch {
+    } catch (err) {
+      console.error('Failed to create call log:', err);
       setCallStartTime(new Date());
     }
   };
@@ -903,8 +904,8 @@ export default function AdminCreateTicket() {
     if (callLogId) {
       try {
         await endCallLog(callLogId, { call_end: new Date().toISOString() });
-      } catch {
-        // Continue even if endCallLog fails
+      } catch (err) {
+        console.error('Failed to end call log:', err);
       }
     }
     setCallCompleted(true);
@@ -931,7 +932,7 @@ export default function AdminCreateTicket() {
         }
         setEmployeeTickets(grouped);
       })
-      .catch(() => {});
+      .catch((err) => console.error('Failed to load tickets for assignment:', err));
     setModalStep('assign');
     setSelectedEmployee(null);
   };
@@ -1027,7 +1028,9 @@ export default function AdminCreateTicket() {
       if (linkedTicketId) {
         try {
           await linkTickets(linkedTicketId, [created.id]);
-        } catch { /* linking is best-effort */ }
+        } catch (err) {
+          console.error('Failed to link tickets:', err);
+        }
       }
 
       setModalStep('none');
@@ -1058,7 +1061,9 @@ export default function AdminCreateTicket() {
       if (linkedTicketId) {
         try {
           await linkTickets(linkedTicketId, [created.id]);
-        } catch { /* linking is best-effort */ }
+        } catch (err) {
+          console.error('Failed to link tickets:', err);
+        }
       }
 
       setModalStep('none');
@@ -1087,8 +1092,8 @@ export default function AdminCreateTicket() {
       if (linkedTicketId) {
         try {
           await linkTickets(linkedTicketId, [created.id]);
-        } catch {
-          // linking is best-effort
+        } catch (err) {
+          console.error('Failed to link tickets:', err);
         }
       }
 

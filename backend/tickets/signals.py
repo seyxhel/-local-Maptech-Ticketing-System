@@ -2,6 +2,9 @@ from django.db.models.signals import post_migrate, post_save, post_delete, pre_s
 from django.contrib.auth.signals import user_logged_in, user_logged_out
 from django.dispatch import receiver
 from django.contrib.auth import get_user_model
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @receiver(post_migrate)
@@ -22,9 +25,10 @@ def create_initial_admin(sender, **kwargs):
                 is_staff=True,
                 is_superuser=False,
             )
-    except Exception:
+    except Exception as e:
         # avoid failing migrations if DB not ready
-        pass
+        logger.warning(f'Failed to create initial admin: {e}')
+
 
 # ── Audit logging signals ──
 
@@ -43,8 +47,8 @@ def audit_user_login(sender, request, user, **kwargs):
             actor=user,
             ip_address=ip,
         )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error(f'Failed to log user login audit: {e}')
 
 
 @receiver(user_logged_out)
@@ -63,8 +67,8 @@ def audit_user_logout(sender, request, user, **kwargs):
                 actor=user,
                 ip_address=ip,
             )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error(f'Failed to log user logout audit: {e}')
 
 
 @receiver(post_save, sender='users.User')
@@ -80,8 +84,8 @@ def audit_user_save(sender, instance, created, **kwargs):
                 activity=f"{instance.email} account created with role {instance.role}",
                 actor=None,  # May not have request context in signal
             )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error(f'Failed to log user create audit: {e}')
 
 
 # ── Notification signals ──
@@ -107,8 +111,8 @@ def notify_ticket_changes(sender, instance, created, **kwargs):
                     message=f'Ticket {instance.stf_no} has been created by {instance.created_by.username}.',
                     ticket=instance,
                 )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error(f'Failed to send ticket notification: {e}')
 
 
 @receiver(pre_save, sender='tickets.Ticket')
@@ -122,7 +126,8 @@ def capture_ticket_old_values(sender, instance, **kwargs):
             ).first()
             instance._old_assigned_to_id = old['assigned_to_id'] if old else None
             instance._old_status = old['status'] if old else None
-        except Exception:
+        except Exception as e:
+            logger.warning(f'Failed to capture old ticket values: {e}')
             instance._old_assigned_to_id = None
             instance._old_status = None
     else:
@@ -203,8 +208,8 @@ def notify_ticket_assignment_and_status(sender, instance, created, **kwargs):
                     message=f'Ticket {instance.stf_no} has been closed.',
                     ticket=instance,
                 )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error(f'Failed to send assignment/status notification: {e}')
 
 
 @receiver(post_save, sender='tickets.EscalationLog')
@@ -223,5 +228,5 @@ def notify_escalation_log(sender, instance, created, **kwargs):
                 message=f'Ticket {instance.ticket.stf_no} has been escalated to you. Notes: {instance.notes[:100]}',
                 ticket=instance.ticket,
             )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error(f'Failed to send escalation notification: {e}')

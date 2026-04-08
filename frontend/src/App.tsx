@@ -46,6 +46,7 @@ import SalesProducts from './pages/sales/products';
 import SalesClients from './pages/sales/clients';
 import SalesCategories from './pages/sales/categories';
 import SalesSettings from './pages/sales/settings';
+import SalesDashboard from './pages/sales/dashboard';
 
 import TechnicalStaffDashboard from './pages/technical-staff/dashboard';
 import TechnicalStaffMyTickets from './pages/technical-staff/my-tickets';
@@ -137,7 +138,8 @@ export function App() {
                 </ProtectedRoute>
               }
             >
-              <Route index element={<Navigate to="/sales/tickets" replace />} />
+              <Route index element={<Navigate to="/sales/dashboard" replace />} />
+              <Route path="dashboard" element={<SalesDashboard />} />
               <Route path="tickets" element={<SalesTickets />} />
               <Route path="create-ticket" element={<SalesCreateTicket />} />
               <Route path="ticket-details" element={<SalesTicketDetails />} />

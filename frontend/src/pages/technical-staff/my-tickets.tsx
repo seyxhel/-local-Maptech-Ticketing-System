@@ -36,6 +36,7 @@ export default function TechnicalStaffMyTickets() {
   const [pageSize, setPageSize] = useState(10);
   const [tickets, setTickets] = useState<UITechnicalStaffTicket[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Fetch tickets from backend
   useEffect(() => {
@@ -45,8 +46,10 @@ export default function TechnicalStaffMyTickets() {
         const raw = await fetchTickets();
         if (cancelled) return;
         setTickets(raw.map(mapBackendTicketToTechnicalStaff));
-      } catch {
-        // silently fail
+        setError(null);
+      } catch (err) {
+        console.error('Failed to load tickets:', err);
+        if (!cancelled) setError('Failed to load tickets. Please try again.');
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -76,12 +79,39 @@ export default function TechnicalStaffMyTickets() {
     return filtered.slice(start, start + pageSize);
   }, [filtered, currentPage, pageSize, totalPages]);
 
+  const handleRetry = () => {
+    setLoading(true);
+    setError(null);
+    (async () => {
+      try {
+        const raw = await fetchTickets();
+        setTickets(raw.map(mapBackendTicketToTechnicalStaff));
+        setError(null);
+      } catch (err) {
+        console.error('Failed to load tickets:', err);
+        setError('Failed to load tickets. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  };
+
   return (
     <div className="space-y-6">
       {loading ? (
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#3BC25B]"></div>
           <span className="ml-3 text-gray-500">Loading tickets...</span>
+        </div>
+      ) : error ? (
+        <div className="flex flex-col items-center justify-center h-64 space-y-4">
+          <div className="text-red-500 text-lg">{error}</div>
+          <button
+            onClick={handleRetry}
+            className="px-4 py-2 bg-[#3BC25B] text-white rounded-lg hover:bg-[#2da34a] transition-colors"
+          >
+            Retry
+          </button>
         </div>
       ) : (
       <>

@@ -3,10 +3,11 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { Layout } from '../components/layout/Layout';
 import type { NavItem } from '../components/layout/Sidebar';
-import { Ticket, PlusCircle, Package, Users, Monitor } from 'lucide-react';
+import { Ticket, PlusCircle, Package, Users, Monitor, LayoutDashboard } from 'lucide-react';
 import { NetworkErrorModal, useNetworkStatus } from '../shared';
 
 const NAV_ITEMS: NavItem[] = [
+  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/sales/dashboard' },
   { id: 'tickets', label: 'Tickets', icon: Ticket, path: '/sales/tickets' },
   { id: 'create-ticket', label: 'Create Ticket', icon: PlusCircle, path: '/sales/create-ticket' },
   { id: 'clients', label: 'Clients', icon: Users, path: '/sales/clients' },

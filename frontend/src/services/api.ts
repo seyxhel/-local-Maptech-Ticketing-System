@@ -277,6 +277,22 @@ export interface EscalationLog {
   created_at: string;
 }
 
+export interface TicketMessage {
+  id: number;
+  ticket: number;
+  user: { id: number; first_name: string; last_name: string; username: string };
+  content: string;
+  created_at: string;
+}
+
+export interface AssignmentHistoryEntry {
+  id: number;
+  ticket: number;
+  assigned_by: { id: number; first_name: string; last_name: string; username: string } | null;
+  assigned_to: { id: number; first_name: string; last_name: string; username: string } | null;
+  created_at: string;
+}
+
 export interface TicketStats {
   total: number;
   open: number;
@@ -286,7 +302,6 @@ export interface TicketStats {
   pending_closure: number;
   by_priority: Record<string, number>;
   avg_resolution_time: number | null;
-  [key: string]: unknown;
 }
 
 // ── Ticket endpoints ──
@@ -489,8 +504,16 @@ export async function linkTickets(ticketId: number, ticketIds: number[]): Promis
   return handleResponse<BackendTicket>(res);
 }
 
+export interface UploadedAttachment {
+  id: number;
+  file: string;
+  uploaded_by: number;
+  uploaded_at: string;
+  is_resolution_proof: boolean;
+}
+
 /** Upload resolution proof (supports one or multiple files). */
-export async function uploadResolutionProof(ticketId: number, files: File | File[]): Promise<unknown> {
+export async function uploadResolutionProof(ticketId: number, files: File | File[]): Promise<UploadedAttachment[]> {
   const formData = new FormData();
   const fileList = Array.isArray(files) ? files : [files];
   for (const f of fileList) {
@@ -501,14 +524,29 @@ export async function uploadResolutionProof(ticketId: number, files: File | File
     headers: authHeaders(false),
     body: formData,
   });
-  const uploaded = await handleResponse<any>(res);
+  const uploaded = await handleResponse<UploadedAttachment[]>(res);
   if (Array.isArray(uploaded)) {
     return uploaded.map((attachment) => ({
       ...attachment,
       file: normalizeMediaUrl(attachment?.file),
     }));
   }
-  return uploaded;
+  return [];
+}
+
+export interface TaskStatusUpdate {
+  id: number;
+  status: string;
+}
+
+/** Update task status. */
+export async function updateTaskStatus(ticketId: number, taskId: number, status: string): Promise<TaskStatusUpdate> {
+  const res = await apiFetch(`${API_BASE}/tickets/${ticketId}/update_task_status/${taskId}/`, {
+    method: 'PATCH',
+    headers: authHeaders(),
+    body: JSON.stringify({ status }),
+  });
+  return handleResponse<TaskStatusUpdate>(res);
 }
 
 /** Delete an attachment. */
@@ -523,16 +561,6 @@ export async function deleteAttachment(ticketId: number, attachmentId: number): 
   }
 }
 
-/** Update a task status. */
-export async function updateTaskStatus(ticketId: number, taskId: number, status: string): Promise<unknown> {
-  const res = await apiFetch(`${API_BASE}/tickets/${ticketId}/update_task/${taskId}/`, {
-    method: 'PATCH',
-    headers: authHeaders(),
-    body: JSON.stringify({ status }),
-  });
-  return handleResponse(res);
-}
-
 /** Fetch ticket statistics for dashboards. */
 export async function fetchTicketStats(): Promise<TicketStats> {
   const res = await apiFetch(`${API_BASE}/tickets/stats/`, { headers: authHeaders() });
@@ -540,15 +568,15 @@ export async function fetchTicketStats(): Promise<TicketStats> {
 }
 
 /** Fetch ticket messages (REST fallback for chat history). */
-export async function fetchMessages(ticketId: number): Promise<unknown[]> {
+export async function fetchMessages(ticketId: number): Promise<TicketMessage[]> {
   const res = await apiFetch(`${API_BASE}/tickets/${ticketId}/messages/`, { headers: authHeaders() });
-  return handleResponse<unknown[]>(res);
+  return handleResponse<TicketMessage[]>(res);
 }
 
 /** Fetch assignment history for a ticket. */
-export async function fetchAssignmentHistory(ticketId: number): Promise<unknown[]> {
+export async function fetchAssignmentHistory(ticketId: number): Promise<AssignmentHistoryEntry[]> {
   const res = await apiFetch(`${API_BASE}/tickets/${ticketId}/assignment_history/`, { headers: authHeaders() });
-  return handleResponse<unknown[]>(res);
+  return handleResponse<AssignmentHistoryEntry[]>(res);
 }
 
 // ── Employee endpoints ──

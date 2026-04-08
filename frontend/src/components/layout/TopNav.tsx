@@ -100,7 +100,7 @@ export function TopNav({
           setNotifications(data.map(backendToNotificationItem));
         }
       })
-      .catch(() => { /* silently ignore if backend not reachable */ });
+      .catch((err) => console.error('Failed to load notifications:', err));
     return () => { cancelled = true; };
   }, []);
 
@@ -121,24 +121,48 @@ export function TopNav({
 
   // ── Handlers that call the backend API ──
   const handleMarkRead = useCallback(async (ids: number[]) => {
+    const previous = notifications;
     setNotifications((prev) => prev.map((n) => ids.includes(n.id) ? { ...n, is_read: true } : n));
-    try { await markNotificationsRead(ids); } catch { /* revert on error if desired */ }
-  }, []);
+    try {
+      await markNotificationsRead(ids);
+    } catch (err) {
+      console.error('Failed to mark notifications as read:', err);
+      setNotifications(previous);
+    }
+  }, [notifications]);
 
   const handleMarkAllRead = useCallback(async () => {
+    const previous = notifications;
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
-    try { await markAllNotificationsRead(); } catch { /* ignore */ }
-  }, []);
+    try {
+      await markAllNotificationsRead();
+    } catch (err) {
+      console.error('Failed to mark all notifications as read:', err);
+      setNotifications(previous);
+    }
+  }, [notifications]);
 
   const handleDelete = useCallback(async (id: number) => {
+    const previous = notifications;
     setNotifications((prev) => prev.filter((n) => n.id !== id));
-    try { await apiDeleteNotification(id); } catch { /* ignore */ }
-  }, []);
+    try {
+      await apiDeleteNotification(id);
+    } catch (err) {
+      console.error('Failed to delete notification:', err);
+      setNotifications(previous);
+    }
+  }, [notifications]);
 
   const handleClearAll = useCallback(async () => {
+    const previous = notifications;
     setNotifications([]);
-    try { await clearAllNotifications(); } catch { /* ignore */ }
-  }, []);
+    try {
+      await clearAllNotifications();
+    } catch (err) {
+      console.error('Failed to clear notifications:', err);
+      setNotifications(previous);
+    }
+  }, [notifications]);
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
   const badgeLabel = unreadCount > 99 ? '99+' : unreadCount > 0 ? String(unreadCount) : null;

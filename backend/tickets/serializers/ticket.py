@@ -1,4 +1,6 @@
 from rest_framework import serializers
+from django.utils import timezone
+import re
 from ..models import (
     Ticket, TicketTask, TicketAttachment, EscalationLog, AuditLog,
 )
@@ -8,6 +10,10 @@ from .client import ClientSerializer
 from .product import ProductSerializer
 from .support import FeedbackRatingSerializer
 from .audit import EscalationLogSerializer
+
+
+# Phone validation pattern for Philippine numbers
+PHONE_PATTERN = re.compile(r'^(\+63|0)?9\d{9}$')
 
 
 class TicketTaskSerializer(serializers.ModelSerializer):
@@ -334,6 +340,42 @@ class AdminCreateTicketSerializer(serializers.ModelSerializer):
             'email_address': {'required': False, 'allow_blank': True, 'default': ''},
         }
 
+    def validate_mobile_no(self, value):
+        """Validate Philippine mobile number format."""
+        if value:
+            cleaned = value.replace(' ', '').replace('-', '')
+            if not PHONE_PATTERN.match(cleaned):
+                raise serializers.ValidationError(
+                    'Invalid phone format. Use +639XXXXXXXXX or 09XXXXXXXXX'
+                )
+        return value
+
+    def validate_date_purchased(self, value):
+        """Ensure date_purchased is not in the future."""
+        if value and value > timezone.now().date():
+            raise serializers.ValidationError('Purchase date cannot be in the future.')
+        return value
+
+    def validate_client(self, value):
+        """Validate client name is not too long."""
+        if value and len(value) > 500:
+            raise serializers.ValidationError('Client name must be 500 characters or less.')
+        return value
+
+    def validate(self, attrs):
+        """Cross-field validation."""
+        is_existing = attrs.get('is_existing_client', False)
+        client_record = attrs.get('client_record')
+        client_name = attrs.get('client', '')
+
+        # If not using existing client, require client name
+        if not is_existing and not client_record and not client_name:
+            raise serializers.ValidationError({
+                'client': 'Client name is required when not using an existing client.'
+            })
+
+        return attrs
+
 
 class EmployeeTicketActionSerializer(serializers.Serializer):
     """Form shown to employees: pick a ticket, fill in product/service fields."""
@@ -359,3 +401,9 @@ class EmployeeTicketActionSerializer(serializers.Serializer):
     observation = serializers.CharField(required=False, allow_blank=True, style={'base_template': 'textarea.html'})
     signature = serializers.CharField(required=False, allow_blank=True)
     signed_by_name = serializers.CharField(required=False, allow_blank=True, max_length=200)
+
+    def validate_date_purchased(self, value):
+        """Ensure date_purchased is not in the future."""
+        if value and value > timezone.now().date():
+            raise serializers.ValidationError('Purchase date cannot be in the future.')
+        return value
