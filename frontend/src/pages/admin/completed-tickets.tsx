@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { PriorityBadge } from '../../components/ui/PriorityBadge';
-import { SLATimer } from '../../components/ui/SLATimer';
 import {
   Filter,
   Eye,
@@ -12,7 +11,7 @@ import {
   ChevronRight as ChevronRightIcon,
   X,
   Search,
-  PauseCircle,
+  CheckCircle2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchTickets } from '../../services/api';
@@ -23,7 +22,7 @@ import type { UITicket } from '../../services/ticketMapper';
 const ITEMS_PER_PAGE = 5;
 const PRIORITIES = ['Critical', 'High', 'Medium', 'Low'];
 
-export default function AdminPendingTickets() {
+export default function AdminCompletedTickets() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -37,13 +36,13 @@ export default function AdminPendingTickets() {
     (async () => {
       try {
         const raw = await fetchTickets();
-        const pendingTickets = raw
-          .filter((ticket: BackendTicket) => !ticket.confirmed_by_admin || !String(ticket.priority || '').trim())
+        const completedTickets = raw
+          .filter((ticket: BackendTicket) => ticket.status === 'closed')
           .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
         if (cancelled) return;
-        setTickets(pendingTickets.map(mapBackendTicketToUI));
+        setTickets(completedTickets.map(mapBackendTicketToUI));
       } catch {
-        if (!cancelled) toast.error('Failed to load pending tickets.');
+        if (!cancelled) toast.error('Failed to load completed tickets.');
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -72,7 +71,7 @@ export default function AdminPendingTickets() {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#3BC25B]"></div>
-        <span className="ml-3 text-gray-500">Loading pending tickets...</span>
+        <span className="ml-3 text-gray-500">Loading completed tickets...</span>
       </div>
     );
   }
@@ -81,10 +80,10 @@ export default function AdminPendingTickets() {
     <div className="space-y-6">
       <div>
         <div className="flex items-center gap-2">
-          <PauseCircle className="w-6 h-6 text-amber-500" />
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Pending Tickets</h1>
+          <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Completed Tickets</h1>
         </div>
-        <p className="text-gray-500 dark:text-gray-400">Tickets waiting for client call confirmation and/or priority setup</p>
+        <p className="text-gray-500 dark:text-gray-400">Tickets already closed by admin</p>
       </div>
 
       <Card accent>
@@ -106,7 +105,6 @@ export default function AdminPendingTickets() {
                 <th className="px-6 py-4 font-semibold">Client</th>
                 <th className="px-6 py-4 font-semibold">Priority</th>
                 <th className="px-6 py-4 font-semibold">Status</th>
-                <th className="px-6 py-4 font-semibold">SLA Timer</th>
                 <th className="px-6 py-4 font-semibold min-w-[180px]">Assignee</th>
                 <th className="px-6 py-4 font-semibold">Ticket Created by</th>
                 <th className="px-6 py-4 font-semibold text-right">Actions</th>
@@ -114,7 +112,7 @@ export default function AdminPendingTickets() {
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
               {paged.length === 0 && (
-                <tr><td colSpan={8} className="px-6 py-12 text-center text-gray-400 dark:text-gray-500">No pending tickets match your filters.</td></tr>
+                <tr><td colSpan={7} className="px-6 py-12 text-center text-gray-400 dark:text-gray-500">No completed tickets match your filters.</td></tr>
               )}
               {paged.map((ticket) => (
                 <tr key={ticket.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
@@ -125,15 +123,6 @@ export default function AdminPendingTickets() {
                   <td className="px-6 py-4 text-gray-600 dark:text-gray-400">{ticket.client}</td>
                   <td className="px-6 py-4"><PriorityBadge priority={ticket.priority} /></td>
                   <td className="px-6 py-4"><StatusBadge status={ticket.status} /></td>
-                  <td className="px-6 py-4">
-                    {ticket.status === 'Resolved' || ticket.status === 'Closed' ? (
-                      <span className="text-xs text-gray-500 dark:text-gray-400">Completed</span>
-                    ) : ticket.totalSla === 0 ? (
-                      <span className="text-xs text-gray-400 dark:text-gray-500">No SLA</span>
-                    ) : (
-                      <SLATimer hoursRemaining={ticket.sla} totalHours={ticket.totalSla} status={ticket.status} />
-                    )}
-                  </td>
                   <td className="px-6 py-4 min-w-[180px]">
                     {ticket.assignee ? (
                       <div className="flex items-center gap-2 min-w-0">
@@ -173,7 +162,7 @@ export default function AdminPendingTickets() {
         <div className="fixed inset-0 z-[9999] bg-black/50 flex items-center justify-center p-4" onClick={() => setShowFilter(false)}>
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">Filter Pending Tickets</h3>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">Filter Completed Tickets</h3>
               <button onClick={() => setShowFilter(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"><X className="w-5 h-5 text-gray-500" /></button>
             </div>
             <div className="space-y-5">

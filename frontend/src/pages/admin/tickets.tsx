@@ -31,7 +31,7 @@ import { useAuth } from '../../context/AuthContext';
 
 const ITEMS_PER_PAGE = 5;
 const PRIORITIES = ['Critical', 'High', 'Medium', 'Low'];
-const STATUSES = ['New', 'Assigned', 'In Progress', 'Resolved', 'Closed', 'Pending'];
+const STATUSES = ['Pending', 'Assigned', 'In Progress', 'Resolved', 'Closed'];
 
 function truncateText(value: string, maxLength: number): string {
   if (value.length <= maxLength) return value;
@@ -184,7 +184,7 @@ export default function AdminTickets() {
                 <th className="px-6 py-4 font-semibold">Status</th>
                 <th className="px-6 py-4 font-semibold">SLA Timer</th>
                 <th className="px-6 py-4 font-semibold min-w-[180px]">Assignee</th>
-                <th className="px-6 py-4 font-semibold">Created</th>
+                <th className="px-6 py-4 font-semibold">Ticket Created by</th>
                 <th className="px-6 py-4 font-semibold text-right">Actions</th>
               </tr>
             </thead>
@@ -220,7 +220,10 @@ export default function AdminTickets() {
                       <span className="text-xs text-gray-400 italic">Unassigned</span>
                     )}
                   </td>
-                  <td className="px-6 py-4 text-gray-500 dark:text-gray-400 text-xs">{ticket.created}</td>
+                  <td className="px-6 py-4 text-gray-500 dark:text-gray-400 text-xs">
+                    <div className="font-medium text-gray-700 dark:text-gray-200">{ticket.createdBy}</div>
+                    <div className="text-[11px] text-gray-400 dark:text-gray-500">{ticket.created}</div>
+                  </td>
                   <td className="px-6 py-4 text-right">
                     <button onClick={() => navigate(`${routeBase}/ticket-details?stf=${ticket.id}`)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"><Eye className="w-5 h-5" /></button>
                   </td>
@@ -267,7 +270,7 @@ export default function AdminTickets() {
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Assignee</label>
-                {editTicket && !['New', 'Assigned', 'Escalated'].includes(editTicket.status) ? (
+                {editTicket && !['Pending', 'Assigned', 'Escalated'].includes(editTicket.status) ? (
                   <>
                     <select disabled className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed outline-none">
                       <option>{editTicket.assignee || 'Unassigned'}</option>

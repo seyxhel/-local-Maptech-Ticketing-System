@@ -43,7 +43,7 @@ import type { BackendTicket, TicketStats } from '../../services/api';
 import { mapBackendTicketToUI, reverseMapStatus, reverseMapPriority } from '../../services/ticketMapper';
 import type { UITicket } from '../../services/ticketMapper';
 
-const STATUSES = ['New', 'Assigned', 'In Progress', 'Escalated', 'For Observation', 'Unresolved', 'Resolved', 'Closed', 'Pending'];
+const STATUSES = ['Pending', 'Assigned', 'In Progress', 'Escalated', 'For Observation', 'Unresolved', 'Resolved', 'Closed'];
 const PRIORITIES = ['Critical', 'High', 'Medium', 'Low'];
 
 const ITEMS_PER_PAGE = 10;
@@ -205,7 +205,7 @@ export default function AdminDashboard() {
   const latestTicketCards = activeFeedBackendTickets.slice(0, 5).map(mapBackendTicketToUI);
 
   const statusChartPalette: Record<string, string> = {
-    New: '#3B82F6',
+    Pending: '#F59E0B',
     Assigned: '#0EA5E9',
     'In Progress': '#22C55E',
     Escalated: '#F97316',
@@ -213,7 +213,6 @@ export default function AdminDashboard() {
     Unresolved: '#EF4444',
     Resolved: '#14B8A6',
     Closed: '#6B7280',
-    Pending: '#F59E0B',
   };
   const statusPieData = Object.entries(
     tickets.reduce<Record<string, number>>((acc, ticket) => {
@@ -279,7 +278,7 @@ export default function AdminDashboard() {
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <StatCard title="Unassigned" value={String(tickets.filter(t => !t.assignee).length)} icon={Ticket} color="orange" subtext="Needs immediate assignment" />
-        <StatCard title="Open" value={String(stats?.open ?? tickets.filter(t => t.status === 'New').length)} icon={Clock} color="blue" subtext="Waiting for action" />
+        <StatCard title="Pending" value={String(stats?.open ?? tickets.filter(t => t.status === 'Pending').length)} icon={Clock} color="blue" subtext="Waiting for action" />
         <StatCard title="In Progress" value={String(stats?.in_progress ?? tickets.filter(t => t.status === 'In Progress' || t.status === 'Assigned').length)} icon={UserCheck} color="green" />
         <StatCard title="Escalated" value={String(stats?.escalated ?? tickets.filter(t => t.status === 'Escalated').length)} icon={AlertOctagon} color="purple" />
       </div>
@@ -457,7 +456,7 @@ export default function AdminDashboard() {
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Assignee</label>
-                {editTicket && !['New', 'Assigned', 'Escalated'].includes(editTicket.status) ? (
+                {editTicket && !['Pending', 'Assigned', 'Escalated'].includes(editTicket.status) ? (
                   <>
                     <select disabled className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed outline-none">
                       <option>{editTicket.assignee || 'Unassigned'}</option>

@@ -1,8 +1,10 @@
 import uuid
+import secrets
 
 from django.db import models
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.hashers import make_password, check_password
 
 
 def _generate_recovery_key():
@@ -35,15 +37,44 @@ class User(AbstractUser):
         help_text='User profile picture',
     )
     recovery_key = models.CharField(
-        max_length=39,
-        unique=True,
+        max_length=255,
+        db_index=True,
         blank=True,
-        help_text='Unique recovery key for password reset (xxxx-xxxx-xxxx-xxxx-xxxx-xxxx-xxxx-xxxx)',
+        help_text='Hashed recovery key for password reset verification.',
     )
+
+    @staticmethod
+    def generate_recovery_key() -> str:
+        return _generate_recovery_key()
+
+    @staticmethod
+    def hash_recovery_key(raw_key: str) -> str:
+        return make_password(raw_key, hasher='pbkdf2_sha256')
+
+    def set_recovery_key(self, raw_key: str) -> None:
+        self.recovery_key = self.hash_recovery_key(raw_key)
+
+    def check_recovery_key(self, raw_key: str) -> bool:
+        """Validate a provided recovery key against hashed storage.
+
+        Falls back to constant-time plaintext comparison for legacy rows
+        that have not yet been migrated.
+        """
+        key = (self.recovery_key or '').strip()
+        if not key:
+            return False
+        if '$' in key:
+            return check_password(raw_key, key)
+        return secrets.compare_digest(key, raw_key)
 
     def save(self, *args, **kwargs):
         if not self.recovery_key:
-            self.recovery_key = _generate_recovery_key()
+            plain_key = self.generate_recovery_key()
+            self.set_recovery_key(plain_key)
+            self._plain_recovery_key = plain_key
+        elif '$' not in self.recovery_key:
+            # Legacy plaintext key support during transition.
+            self.set_recovery_key(self.recovery_key)
         super().save(*args, **kwargs)
 
     @property

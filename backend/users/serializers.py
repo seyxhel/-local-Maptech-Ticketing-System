@@ -14,7 +14,6 @@ class UserSerializer(serializers.ModelSerializer):
             'first_name', 'middle_name', 'last_name', 'suffix', 'phone',
             'last_login', 'is_active', 'has_usable_password',
             'profile_picture', 'profile_picture_url',
-            'recovery_key',
         ]
         extra_kwargs = {'profile_picture': {'write_only': True, 'required': False}}
 
@@ -90,6 +89,7 @@ class AdminUserCreateSerializer(serializers.Serializer):
         )
         phone = self._format_phone(validated_data.get('phone', ''))
         role = validated_data['role']
+        recovery_key_plain = User.generate_recovery_key()
         user = User.objects.create_user(
             username=username,
             password='password123',
@@ -100,7 +100,9 @@ class AdminUserCreateSerializer(serializers.Serializer):
             middle_name=validated_data.get('middle_name', ''),
             suffix=validated_data.get('suffix', ''),
             phone=phone,
+            recovery_key=User.hash_recovery_key(recovery_key_plain),
             is_staff=role in (User.ROLE_SALES, User.ROLE_ADMIN, User.ROLE_SUPERADMIN),
             is_superuser=role == User.ROLE_SUPERADMIN,
         )
+        user._plain_recovery_key = recovery_key_plain
         return user

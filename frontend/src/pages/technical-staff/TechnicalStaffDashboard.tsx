@@ -22,6 +22,19 @@ import {
 interface TechnicalStaffDashboardProps {
   onNavigate?: (page: string) => void;
 }
+
+function isPriorityTicketActive(ticket: BackendTicket): boolean {
+  const status = String(ticket.status || '').trim().toLowerCase();
+  const jobStatus = String(ticket.job_status || '').trim().toLowerCase();
+
+  return ![
+    'closed',
+    'completed',
+    'pending_closure',
+    'resolved',
+  ].includes(status) && jobStatus !== 'completed';
+}
+
 export function TechnicalStaffDashboard({ onNavigate }: TechnicalStaffDashboardProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -52,6 +65,10 @@ export function TechnicalStaffDashboard({ onNavigate }: TechnicalStaffDashboardP
     })();
     return () => { cancelled = true; };
   }, []);
+      const activeTickets = React.useMemo(
+        () => rawTickets.filter(isPriorityTicketActive).map(mapBackendTicketToTechnicalStaff),
+        [rawTickets],
+      );
 
   const inProgressCount = stats?.in_progress ?? tickets.filter((t) => t.status === 'In Progress').length;
   const avgResolution = stats?.avg_resolution_time != null ? `${stats.avg_resolution_time.toFixed(1)}h` : '0h';
@@ -140,7 +157,7 @@ export function TechnicalStaffDashboard({ onNavigate }: TechnicalStaffDashboardP
             My Workspace
           </h1>
           <p className="text-gray-500 dark:text-gray-400">
-            Welcome back, {firstName}. You have {tickets.filter(t => t.status !== 'Resolved' && t.status !== 'Closed').length} tickets needing attention.
+            Welcome back, {firstName}. You have {activeTickets.length} tickets needing attention.
           </p>
         </div>
         <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-800 px-4 py-2 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
@@ -174,10 +191,10 @@ export function TechnicalStaffDashboard({ onNavigate }: TechnicalStaffDashboardP
             Priority Tickets
           </h3>
           <div className="max-h-[540px] overflow-y-auto space-y-4 pr-1">
-          {tickets.length === 0 && (
+          {activeTickets.length === 0 && (
             <p className="text-gray-400 dark:text-gray-500 text-center py-8">No tickets assigned to you.</p>
           )}
-          {tickets.map((ticket) =>
+          {activeTickets.map((ticket) =>
           <Card
             key={ticket.id}
             className="hover:border-[#3BC25B] dark:hover:border-[#3BC25B] hover:shadow-md transition-all group"

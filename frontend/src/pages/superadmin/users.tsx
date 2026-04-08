@@ -30,9 +30,11 @@ import {
   createUser,
   updateUser,
   toggleUserActive,
+  adminResetPassword,
   type BackendUser,
   type CreateUserPayload,
 } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 
 interface UserAccount {
   id: number;
@@ -105,6 +107,8 @@ const EMPTY_FORM = {
 };
 
 export default function UserManagement() {
+  const { user: authUser } = useAuth();
+  const isSuperadmin = authUser?.role === 'superadmin';
   const [users, setUsers] = useState<UserAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -118,6 +122,8 @@ export default function UserManagement() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [recoveryKeyModal, setRecoveryKeyModal] = useState<{ name: string; key: string } | null>(null);
   const [keyCopied, setKeyCopied] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   // ── Fetch users from backend ──
   const loadUsers = useCallback(async () => {
@@ -149,6 +155,8 @@ export default function UserManagement() {
   const openAddModal = () => {
     setEditingUser(null);
     setFormData(EMPTY_FORM);
+    setNewPassword('');
+    setConfirmPassword('');
     setIsModalOpen(true);
   };
 
@@ -169,6 +177,8 @@ export default function UserManagement() {
             : 'admin'
       ) as 'admin' | 'employee' | 'sales',
     });
+    setNewPassword('');
+    setConfirmPassword('');
     setIsModalOpen(true);
   };
   const handleSave = async (e: React.FormEvent) => {
@@ -188,6 +198,15 @@ export default function UserManagement() {
     if (emailErr) errs.email = emailErr;
     const phoneErr = validatePhone(formData.contactNumber, 'Contact Number');
     if (phoneErr) errs.contactNumber = phoneErr;
+
+    if (editingUser && isSuperadmin) {
+      const wantsPasswordUpdate = newPassword.trim().length > 0 || confirmPassword.trim().length > 0;
+      if (wantsPasswordUpdate) {
+        if (newPassword.length < 8) errs.newPassword = 'Password must be at least 8 characters.';
+        if (newPassword !== confirmPassword) errs.confirmPassword = 'Passwords do not match.';
+      }
+    }
+
     setFieldErrors(errs);
     if (Object.keys(errs).length > 0) {
       toast.error('Please fix the highlighted errors.');
@@ -207,6 +226,11 @@ export default function UserManagement() {
           role: formData.role.toLowerCase(),
         };
         await updateUser(editingUser.id, payload as never);
+
+        if (isSuperadmin && newPassword.trim()) {
+          await adminResetPassword(editingUser.id, newPassword);
+        }
+
         toast.success(`Account for ${formData.firstName} ${formData.lastName} updated successfully.`);
         setIsModalOpen(false);
         await loadUsers();
@@ -592,6 +616,49 @@ export default function UserManagement() {
                   <option value="employee">Technical Staff</option>
                 </select>
               </div>
+
+              {editingUser && isSuperadmin && (
+                <>
+                  <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">
+                      Password Change Section
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Fill these fields only if you want to update the account password.
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+                      New Password
+                      <span className="text-xs font-normal text-gray-400 ml-1">(optional)</span>
+                    </label>
+                    <input
+                      type="password"
+                      minLength={8}
+                      value={newPassword}
+                      onChange={(e) => { setNewPassword(e.target.value); setFieldErrors((p) => ({ ...p, newPassword: '' })); }}
+                      placeholder="Leave blank to keep current password"
+                      className={`w-full px-4 py-2.5 border ${fieldErrors.newPassword ? 'border-red-400 ring-2 ring-red-400' : 'border-gray-300 dark:border-gray-600'} rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-[#3BC25B] focus:border-transparent outline-none`}
+                    />
+                    {fieldErrors.newPassword && <p className="text-red-500 text-xs mt-1">{fieldErrors.newPassword}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+                      Confirm New Password
+                      <span className="text-xs font-normal text-gray-400 ml-1">(optional)</span>
+                    </label>
+                    <input
+                      type="password"
+                      minLength={8}
+                      value={confirmPassword}
+                      onChange={(e) => { setConfirmPassword(e.target.value); setFieldErrors((p) => ({ ...p, confirmPassword: '' })); }}
+                      placeholder="Repeat new password"
+                      className={`w-full px-4 py-2.5 border ${fieldErrors.confirmPassword ? 'border-red-400 ring-2 ring-red-400' : 'border-gray-300 dark:border-gray-600'} rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-[#3BC25B] focus:border-transparent outline-none`}
+                    />
+                    {fieldErrors.confirmPassword && <p className="text-red-500 text-xs mt-1">{fieldErrors.confirmPassword}</p>}
+                  </div>
+                </>
+              )}
 
               <div className="flex gap-3 pt-2">
                 <button

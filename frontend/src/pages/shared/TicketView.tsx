@@ -20,7 +20,7 @@ import { fetchTicketByStf, fetchTicketById, uploadResolutionProof, deleteAttachm
 import type { Product } from '../../services/api';
 import { toast } from 'sonner';
 import type { BackendTicket } from '../../services/api';
-import { mapStatus, mapPriority, getAssigneeName, reverseMapStatus, reverseMapPriority } from '../../services/ticketMapper';
+import { mapStatus, mapPriority, getAssigneeName, reverseMapStatus, reverseMapPriority, getUserDisplayName } from '../../services/ticketMapper';
 import { Loader2, Trash2, Star, Clock, PlayCircle, Eye, PenLine, Link2, AlertTriangle, Minus, UserCheck } from 'lucide-react';
 import { SignaturePad } from '../../components/ui/SignaturePad';
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -316,10 +316,11 @@ export function TicketView() {
         return {
           id: btData.stf_no,
           priority: mapPriority(btData.priority) as 'Critical' | 'High' | 'Medium' | 'Low',
-          status: mapStatus(btData.status, btData.assigned_to) as 'In Progress' | 'Assigned' | 'Resolved' | 'Closed' | 'Pending' | 'Escalated' | 'New' | 'For Observation' | 'Unresolved',
+          status: mapStatus(btData.status, btData.assigned_to) as 'In Progress' | 'Assigned' | 'Resolved' | 'Closed' | 'Pending' | 'Escalated' | 'For Observation' | 'Unresolved',
           sla,
           total,
           client: btData.client || 'N/A',
+          createdBy: getUserDisplayName(btData.created_by),
           created: new Date(btData.created_at).toLocaleDateString(),
           description: btData.description_of_problem || 'No description provided.',
           contact: btData.contact_person || 'N/A',
@@ -374,7 +375,7 @@ export function TicketView() {
     : {
         id: stfFromUrl ?? 'TK-0000',
         priority: 'Medium' as const,
-        status: 'New' as const,
+        status: 'Pending' as const,
         sla: 0,
         total: 24,
         client: '',
@@ -382,6 +383,7 @@ export function TicketView() {
         description: 'Loading...',
         contact: '',
         assignedTo: 'Unassigned',
+        createdBy: 'N/A',
         issue: 'Loading...',
         department: '',
         landline: '',
@@ -1017,7 +1019,7 @@ export function TicketView() {
   const canProcessTicket = isAssignedEmployee || isAdminProcessingEscalated;
   const canEdit = (canProcessTicket) && ticket.status !== 'Resolved' && ticket.status !== 'Closed';
   const canStartWorkAction = canProcessTicket && !btData?.time_in && (
-    ticket.status === 'Assigned' || ticket.status === 'New' || ticket.status === 'Escalated'
+    ticket.status === 'Assigned' || ticket.status === 'Pending' || ticket.status === 'Escalated'
   );
   const canSubmitObservationAction = canProcessTicket && !btData?.was_for_observation && !!btData?.time_in && (
     ticket.status === 'In Progress' || ticket.status === 'Assigned' ||
@@ -1229,7 +1231,7 @@ export function TicketView() {
   };
 
   const ADMIN_PRIORITIES = ['Critical', 'High', 'Medium', 'Low'];
-  const ADMIN_STATUSES = ['New', 'Assigned', 'In Progress', 'Escalated', 'For Observation', 'Unresolved', 'Resolved', 'Closed', 'Pending'];
+  const ADMIN_STATUSES = ['Pending', 'Assigned', 'In Progress', 'Escalated', 'For Observation', 'Unresolved', 'Resolved', 'Closed'];
 
   const openAdminEdit = () => {
     setAdminEditFields({ status: ticket.status, priority: ticket.priority });
@@ -1385,6 +1387,7 @@ export function TicketView() {
     const dateTag = new Date().toISOString().slice(0, 10);
     const pd = ticket.productDetails;
     const ticketIdValue = ticket.id || 'N/A';
+    const ticketCreatedByValue = ticket.createdBy || 'N/A';
     const jobStatusValue = ticket.jobStatus || 'N/A';
     const signedByValue = ticket.signedByName || 'N/A';
     const escLogs = btData.escalation_logs || [];
@@ -1396,9 +1399,14 @@ export function TicketView() {
         <div class="stat-card"><div class="stat-label">Type of Service</div><div class="stat-value">${ticket.typeOfService}</div></div>
         <div class="stat-card"><div class="stat-label">Assigned To</div><div class="stat-value">${ticket.assignedTo}</div></div>
       </div>
-      <h2>Client Information</h2>
+      <h2>Ticket Information</h2>
       <div class="info-grid">
         <div class="info-row"><span class="info-label">Ticket ID:</span><span class="info-value">${ticketIdValue}</span></div>
+        <div class="info-row"><span class="info-label">Ticket Created by:</span><span class="info-value">${ticketCreatedByValue}</span></div>
+        <div class="info-row"><span class="info-label">Date Created:</span><span class="info-value">${ticket.created}</span></div>
+      </div>
+      <h2>Client Information</h2>
+      <div class="info-grid">
         <div class="info-row"><span class="info-label">Client:</span><span class="info-value">${ticket.client}</span></div>
         <div class="info-row"><span class="info-label">Contact Person:</span><span class="info-value">${ticket.contact}</span></div>
         <div class="info-row"><span class="info-label">Email:</span><span class="info-value">${ticket.emailAddress}</span></div>
@@ -1593,13 +1601,13 @@ export function TicketView() {
       setCell(R, 5, sc('', C.WHITE, C.WHITE, { border: false }));
       rowHeights[R] = { hpt: 24 }; R++;
 
-      detailRow(R, 'Generated', `${dateStr}  ${timeStr}`, 'Created', ticket.created);
+      detailRow(R, 'Ticket ID', ticketIdValue, 'Ticket Created by', ticket.createdBy || 'N/A');
+      rowHeights[R] = { hpt: 22 }; R++;
+      detailRow(R, 'Generated', `${dateStr}  ${timeStr}`, 'Date Created', ticket.created);
       rowHeights[R] = { hpt: 22 }; R++;
       detailRow(R, 'Assigned To', ticket.assignedTo, 'Type of Service', ticket.typeOfService);
       rowHeights[R] = { hpt: 22 }; R++;
       detailRow(R, 'Support Type', ticket.preferredSupport);
-      rowHeights[R] = { hpt: 22 }; R++;
-      detailRow(R, 'Ticket ID', ticketIdValue);
       rowHeights[R] = { hpt: 22 }; R++;
 
       // Spacer
@@ -1833,6 +1841,9 @@ export function TicketView() {
 
             {/* Date Meta */}
             <div className="flex flex-wrap gap-6 text-sm mb-5">
+              <div className="text-gray-500 dark:text-gray-400">
+                Ticket Created by <span className="ml-1 font-medium text-gray-800 dark:text-gray-200">{ticket.createdBy}</span>
+              </div>
               <div className="text-gray-500 dark:text-gray-400">
                 Date Created <span className="ml-1 font-medium text-gray-800 dark:text-gray-200">{ticket.created}</span>
               </div>
@@ -3155,13 +3166,13 @@ export function TicketView() {
             <div className="px-6 py-5 space-y-4">
               <div>
                 <label className="block text-xs text-gray-500 dark:text-white/50 font-medium mb-2 uppercase tracking-wider">Status</label>
-                <select value={adminEditFields.status} onChange={(e) => setAdminEditFields((p) => ({ ...p, status: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-[#3BC25B] outline-none">
+                <select value={adminEditFields.status} onChange={(e) => setAdminEditFields((p) => ({ ...p, status: e.target.value as typeof p.status }))} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-[#3BC25B] outline-none">
                   {ADMIN_STATUSES.map((s) => <option key={s}>{s}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-xs text-gray-500 dark:text-white/50 font-medium mb-2 uppercase tracking-wider">Priority</label>
-                <select value={adminEditFields.priority} onChange={(e) => setAdminEditFields((p) => ({ ...p, priority: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-[#3BC25B] outline-none">
+                <select value={adminEditFields.priority} onChange={(e) => setAdminEditFields((p) => ({ ...p, priority: e.target.value as typeof p.priority }))} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-[#3BC25B] outline-none">
                   {ADMIN_PRIORITIES.map((p) => <option key={p}>{p}</option>)}
                 </select>
               </div>

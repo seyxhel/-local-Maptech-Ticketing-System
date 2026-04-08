@@ -121,6 +121,7 @@ export default function TechnicalStaffMyTickets() {
                 <th className="px-4 py-3">Ticket</th>
                 <th className="px-4 py-3">Issue</th>
                 <th className="px-4 py-3">Client</th>
+                <th className="px-4 py-3">Ticket Created by</th>
                 <th className="px-4 py-3">Priority</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">SLA</th>
@@ -135,6 +136,10 @@ export default function TechnicalStaffMyTickets() {
                     <span className="font-medium break-all">{truncateText(ticket.issue, 73)}</span>
                   </td>
                   <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{ticket.client}</td>
+                  <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
+                    <div className="font-medium text-gray-700 dark:text-gray-200">{ticket.createdBy}</div>
+                    <div className="text-[11px] text-gray-400 dark:text-gray-500">{ticket.created}</div>
+                  </td>
                   <td className="px-4 py-3"><PriorityBadge priority={ticket.priority} /></td>
                   <td className="px-4 py-3"><StatusBadge status={ticket.status} /></td>
                   <td className="px-4 py-3">

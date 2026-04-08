@@ -272,10 +272,10 @@ class AuthViewSet(viewsets.GenericViewSet):
             )
         _WRONG = 'Invalid Credentials'
         try:
-            user = User.objects.get(recovery_key=recovery_key)
+            user = User.objects.get(email__iexact=email)
         except User.DoesNotExist:
             return Response({'detail': _WRONG}, status=status.HTTP_400_BAD_REQUEST)
-        if user.email.lower() != email:
+        if not user.check_recovery_key(recovery_key):
             return Response({'detail': _WRONG}, status=status.HTTP_400_BAD_REQUEST)
         if not user.is_active:
             return Response(
@@ -474,7 +474,9 @@ class UserViewSet(viewsets.GenericViewSet):
         except Exception:
             pass
 
-        return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
+        payload = UserSerializer(user, context={'request': request}).data
+        payload['recovery_key'] = getattr(user, '_plain_recovery_key', '')
+        return Response(payload, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['patch'], url_path='update_user')
     def update_user(self, request, pk=None):
@@ -536,16 +538,27 @@ class UserViewSet(viewsets.GenericViewSet):
 
     @action(detail=True, methods=['post'], url_path='reset_password')
     def admin_reset_password(self, request, pk=None):
-        """Superadmin forcefully resets a user's password to a generated default."""
+        """Superadmin forcefully changes a user's password."""
         if request.user.role != 'superadmin':
             return Response({'detail': 'Only superadmins can manage users.'}, status=status.HTTP_403_FORBIDDEN)
         try:
             target = User.objects.get(pk=pk)
         except User.DoesNotExist:
             return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
-        temp_password = 'password123'
-        target.set_password(temp_password)
-        target.save()
+
+        new_password = request.data.get('new_password', '')
+        if not new_password:
+            return Response({'detail': 'New password is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        if len(new_password) < 8:
+            return Response({'detail': 'Password must be at least 8 characters.'}, status=status.HTTP_400_BAD_REQUEST)
+        if _is_password_pwned(new_password):
+            return Response(
+                {'detail': 'This password has been found in a data breach. Please choose a different password.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        target.set_password(new_password)
+        target.save(update_fields=['password'])
 
         # Audit log
         try:
@@ -556,11 +569,11 @@ class UserViewSet(viewsets.GenericViewSet):
                 entity=AuditLog.ENTITY_USER,
                 entity_id=target.id,
                 action=AuditLog.ACTION_PASSWORD_RESET,
-                activity=f"{request.user.email} reset password for {target.email}",
+                activity=f"{request.user.email} changed password for {target.email}",
                 actor=request.user,
                 ip_address=ip,
             )
         except Exception:
             pass
 
-        return Response({'detail': f'Password reset to default for {target.username}.', 'temp_password': temp_password})
+        return Response({'detail': f'Password updated for {target.username}.'})

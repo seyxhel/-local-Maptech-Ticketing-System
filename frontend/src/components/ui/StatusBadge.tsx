@@ -5,8 +5,6 @@ interface StatusBadgeProps {
 
 // Maps backend values (lowercase/underscore) and UI values (Title Case) to styles
 const statusStyles: Record<string, string> = {
-  'new':                'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-700',
-  'open':               'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-700',
   'assigned':           'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/40 dark:text-yellow-300 dark:border-yellow-700',
   'in_progress':        'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-700',
   'in progress':        'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-700',
@@ -23,15 +21,25 @@ const statusStyles: Record<string, string> = {
   'unresolved':         'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900/40 dark:text-rose-300 dark:border-rose-700',
 };
 
+function normalizeStatus(status: string): string {
+  const key = status.toLowerCase();
+  if (key === 'new' || key === 'open') return 'pending';
+  return key;
+}
+
 /** Normalize backend statuses for display */
 function formatStatus(status: string): string {
+  if (status.toLowerCase() === 'new' || status.toLowerCase() === 'open') {
+    return 'Pending';
+  }
+
   return status
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 export function StatusBadge({ status }: StatusBadgeProps) {
-  const key = status.toLowerCase();
+  const key = normalizeStatus(status);
   const style =
     statusStyles[key] ??
     'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600';

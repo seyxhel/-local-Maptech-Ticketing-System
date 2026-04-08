@@ -25,6 +25,7 @@ import AdminTickets from './pages/admin/tickets';
 import AdminEscalatedTickets from './pages/admin/escalated-tickets';
 import AdminPendingTickets from './pages/admin/pending-tickets';
 import AdminToBeClosedTickets from './pages/admin/to-be-closed-tickets';
+import AdminCompletedTickets from './pages/admin/completed-tickets';
 import AdminEscalation from './pages/admin/escalation';
 import AdminReports from './pages/admin/reports';
 import AdminCreateTicket from './pages/admin/create-ticket';
@@ -108,6 +109,7 @@ export function App() {
               <Route path="tickets/escalated" element={<AdminEscalatedTickets />} />
               <Route path="tickets/pending" element={<AdminPendingTickets />} />
               <Route path="tickets/to-be-closed" element={<AdminToBeClosedTickets />} />
+              <Route path="tickets/completed" element={<AdminCompletedTickets />} />
               <Route path="tickets/on-hold" element={<Navigate to="/admin/tickets/pending" replace />} />
               <Route path="escalation" element={<AdminEscalation />} />
               <Route path="reports" element={<AdminReports />} />

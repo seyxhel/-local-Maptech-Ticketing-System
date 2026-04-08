@@ -6,7 +6,7 @@ import type { BackendTicket } from './api';
 // ── Status mapping (backend → UI) ──
 
 const STATUS_MAP: Record<string, string> = {
-  open: 'New',
+  open: 'Pending',
   in_progress: 'In Progress',
   closed: 'Closed',
   escalated: 'Escalated',
@@ -18,6 +18,7 @@ const STATUS_MAP: Record<string, string> = {
 
 const STATUS_REVERSE_MAP: Record<string, string> = {
   New: 'open',
+  Pending: 'open',
   Assigned: 'open',        // 'Assigned' isn't a real backend status; open + assigned_to != null
   'In Progress': 'in_progress',
   Escalated: 'escalated',
@@ -47,6 +48,15 @@ export function reverseMapPriority(p: string): string {
   return p.toLowerCase();
 }
 
+export function getUserDisplayName(user: { first_name?: string; last_name?: string; username?: string } | null | undefined): string {
+  if (!user) return 'N/A';
+  const firstName = String(user.first_name || '').trim();
+  const lastName = String(user.last_name || '').trim();
+  const username = String(user.username || '').trim();
+  const fullName = `${firstName} ${lastName}`.trim();
+  return fullName || username || 'N/A';
+}
+
 // ── Assignee name ──
 
 export function getAssigneeName(ticket: BackendTicket): string | null {
@@ -73,6 +83,7 @@ export interface UITicket {
   totalSla: number;
   assignee: string | null;
   assigneeId: number | null;
+  createdBy: string;
   created: string;
 }
 
@@ -103,6 +114,7 @@ export function mapBackendTicketToUI(bt: BackendTicket): UITicket {
     totalSla,
     assignee: getAssigneeName(bt),
     assigneeId: bt.assigned_to?.id ?? null,
+    createdBy: getUserDisplayName(bt.created_by),
     created: new Date(bt.created_at).toLocaleDateString(),
   };
 }
@@ -118,6 +130,7 @@ export interface UITechnicalStaffTicket {
   status: 'In Progress' | 'Assigned' | 'Resolved' | 'Closed' | 'Pending';
   sla: number;
   total: number;
+  createdBy: string;
   created: string;
   contact: string;
   description: string;
@@ -136,6 +149,7 @@ export function mapBackendTicketToTechnicalStaff(bt: BackendTicket): UITechnical
     status,
     sla,
     total: totalSla,
+    createdBy: getUserDisplayName(bt.created_by),
     created: new Date(bt.created_at).toLocaleDateString(),
     contact: bt.contact_person || 'N/A',
     description: bt.description_of_problem || '',

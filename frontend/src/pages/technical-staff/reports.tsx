@@ -115,12 +115,14 @@ export default function TechnicalStaffReports() {
     <div className="space-y-2">
       {items.length === 0 && <div className="text-sm text-gray-500">No tickets</div>}
       {items.slice(0, 6).map((t) => (
-        <div key={t.id} className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-md border border-gray-100 dark:border-gray-700">
-          <div className="flex-1">
+        <div key={t.id} className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 p-3 bg-white dark:bg-gray-800 rounded-md border border-gray-100 dark:border-gray-700">
+          <div className="min-w-0 flex-1">
             <div className="font-mono text-xs font-bold text-gray-900 dark:text-white">{t.stf_no}</div>
-            <div className="text-sm text-gray-600 dark:text-gray-300 truncate">{t.description_of_problem || t.type_of_service_detail?.name || 'No description'}</div>
+            <div className="text-sm text-gray-600 dark:text-gray-300 whitespace-normal break-words leading-snug">
+              {t.description_of_problem || t.type_of_service_detail?.name || 'No description'}
+            </div>
           </div>
-          <div className="ml-4 text-xs text-gray-500">{new Date(t.created_at).toLocaleDateString()}</div>
+          <div className="text-xs text-gray-500 whitespace-nowrap sm:ml-4 sm:text-right">{new Date(t.created_at).toLocaleDateString()}</div>
         </div>
       ))}
     </div>
