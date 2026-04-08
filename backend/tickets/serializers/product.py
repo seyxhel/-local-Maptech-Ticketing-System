@@ -15,5 +15,8 @@ class ProductSerializer(serializers.ModelSerializer):
             'project_title', 'client', 'client_detail',
             'device_equipment', 'version_no',
             'serial_no', 'has_warranty', 'product_name', 'brand',
-            'model_name', 'sales_no', 'date_purchased', 'is_active', 'created_at', 'updated_at',
+            'model_name', 'sales_no',
+            'client_purchase_no', 'maptech_dr', 'maptech_sales_invoice', 'maptech_sales_order_no',
+            'supplier_purchase_no', 'supplier_sales_invoice', 'supplier_delivery_receipt',
+            'date_purchased', 'is_active', 'created_at', 'updated_at',
         ]

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Bell, Sun, Moon, Menu, Settings } from 'lucide-react';
 import { NotificationPanel, backendToNotificationItem } from '../NotificationPanel';
 import type { NotificationItem } from '../NotificationPanel';
@@ -25,7 +25,7 @@ interface TopNavUser {
 }
 
 interface TopNavProps {
-  role: 'SuperAdmin' | 'Admin' | 'Employee' | 'Technical' | 'Technical Staff' | 'Client';
+  role: 'SuperAdmin' | 'Admin' | 'Employee' | 'Technical' | 'Technical Staff' | 'Client' | 'Sales';
   isDark: boolean;
   onToggleDark: () => void;
   onMenuClick?: () => void;
@@ -36,12 +36,13 @@ interface TopNavProps {
 const ROLE_LABELS: Record<string, string> = {
   SuperAdmin: 'Super Administrator',
   Admin: 'Supervisor',
-  Employee: 'Technical',
+  Employee: 'Technical Staff',
   Client: 'Client Portal',
   // Also support lowercase backend role values
   superadmin: 'Super Administrator',
   admin: 'Supervisor',
-  employee: 'Technical',
+  employee: 'Technical Staff',
+  sales: 'Sales',
 };
 
 function getRoleLabel(user?: TopNavUser | null, layoutRole?: string): string {
@@ -141,8 +142,9 @@ export function TopNav({
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
   const badgeLabel = unreadCount > 99 ? '99+' : unreadCount > 0 ? String(unreadCount) : null;
+  const showSettings = role !== 'Sales';
   const goToSettings = () => {
-    const rolePathMap: Record<string, string> = { 'Technical Staff': 'employee', SuperAdmin: 'superadmin', Admin: 'admin', Employee: 'employee', Client: 'client' };
+    const rolePathMap: Record<string, string> = { 'Technical Staff': 'technical-staff', SuperAdmin: 'superadmin', Admin: 'admin', Employee: 'technical-staff', Client: 'client', Sales: 'sales' };
     const segment = rolePathMap[role] || role.toLowerCase();
     onNavigate?.(`/${segment}/settings`);
   };
@@ -212,11 +214,9 @@ export function TopNav({
             </p>
           </div>
           <div className="flex items-center gap-1 sm:gap-1.5">
-            <button
-              onClick={goToSettings}
-              className="w-9 h-9 rounded-full overflow-hidden bg-gradient-to-br from-[#63D44A] to-[#0E8F79] flex items-center justify-center text-white text-xs font-bold flex-shrink-0 relative hover:opacity-90"
-              title="Profile settings"
-              aria-label="Profile settings"
+            <div
+              className="w-9 h-9 rounded-full overflow-hidden bg-gradient-to-br from-[#63D44A] to-[#0E8F79] flex items-center justify-center text-white text-xs font-bold flex-shrink-0 relative"
+              title={showSettings ? 'Profile settings' : undefined}
             >
               {getInitials(authUser, role)}
               {authUser?.profile_picture_url && (
@@ -228,14 +228,16 @@ export function TopNav({
                   onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                 />
               )}
-            </button>
-            <button
-              onClick={goToSettings}
-              className="inline-flex p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-              title="Settings"
-            >
-              <Settings className="w-4 h-4" />
-            </button>
+            </div>
+            {showSettings && (
+              <button
+                onClick={goToSettings}
+                className="inline-flex p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                title="Settings"
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
       </div>

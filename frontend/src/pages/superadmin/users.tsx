@@ -87,7 +87,7 @@ const ROLE_LABELS: Record<string, string> = {
   sales: 'Sales',
   superadmin: 'Superadmin',
   admin: 'Admin',
-  employee: 'Employee',
+  employee: 'Technical Staff',
 };
 
 function roleLabel(role: string): string {
@@ -589,7 +589,7 @@ export default function UserManagement() {
                 >
                   <option value="admin">Supervisor</option>
                   <option value="sales">Sales</option>
-                  <option value="employee">Technical</option>
+                  <option value="employee">Technical Staff</option>
                 </select>
               </div>
 

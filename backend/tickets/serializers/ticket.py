@@ -6,7 +6,7 @@ from users.serializers import UserSerializer
 from .lookup import TypeOfServiceSerializer
 from .client import ClientSerializer
 from .product import ProductSerializer
-from .support import CSATFeedbackSerializer
+from .support import FeedbackRatingSerializer
 from .audit import EscalationLogSerializer
 
 
@@ -37,7 +37,7 @@ class TicketSerializer(serializers.ModelSerializer):
     product_record_detail = ProductSerializer(source='product_record', read_only=True)
     progress_percentage = serializers.ReadOnlyField()
     sla_estimated_days = serializers.ReadOnlyField()
-    csat_feedback = CSATFeedbackSerializer(read_only=True)
+    feedback_rating = FeedbackRatingSerializer(read_only=True)
     linked_ticket_ids = serializers.PrimaryKeyRelatedField(
         source='linked_tickets', many=True, read_only=True,
     )
@@ -89,6 +89,13 @@ class TicketSerializer(serializers.ModelSerializer):
     serial_no = serializers.SerializerMethodField()
     sales_no = serializers.SerializerMethodField()
     others = serializers.SerializerMethodField()
+    client_purchase_no = serializers.SerializerMethodField()
+    maptech_dr = serializers.SerializerMethodField()
+    maptech_sales_invoice = serializers.SerializerMethodField()
+    maptech_sales_order_no = serializers.SerializerMethodField()
+    supplier_purchase_no = serializers.SerializerMethodField()
+    supplier_sales_invoice = serializers.SerializerMethodField()
+    supplier_delivery_receipt = serializers.SerializerMethodField()
 
     # Role-based writable fields
     TICKET_FIELDS = {
@@ -120,6 +127,8 @@ class TicketSerializer(serializers.ModelSerializer):
             'type_of_service', 'type_of_service_detail', 'type_of_service_others',
             'priority', 'confirmed_by_admin',
             'preferred_support_type', 'description_of_problem',
+            'client_purchase_no', 'maptech_dr', 'maptech_sales_invoice', 'maptech_sales_order_no',
+            'supplier_purchase_no', 'supplier_sales_invoice', 'supplier_delivery_receipt',
             'product', 'brand', 'model_name',
             'device_equipment', 'version_no', 'date_purchased', 'serial_no', 'sales_no', 'others',
             'action_taken', 'remarks',
@@ -134,7 +143,7 @@ class TicketSerializer(serializers.ModelSerializer):
             'signature', 'signed_by_name',
             'estimated_resolution_days_override',
             'progress_percentage', 'sla_estimated_days',
-            'csat_feedback',
+            'feedback_rating',
             'linked_ticket_ids', 'linked_ticket_stfs',
             'was_for_observation',
         ]
@@ -181,6 +190,27 @@ class TicketSerializer(serializers.ModelSerializer):
 
     def get_others(self, obj):
         return self._product_field(obj, 'others')
+
+    def get_client_purchase_no(self, obj):
+        return self._product_field(obj, 'client_purchase_no')
+
+    def get_maptech_dr(self, obj):
+        return self._product_field(obj, 'maptech_dr')
+
+    def get_maptech_sales_invoice(self, obj):
+        return self._product_field(obj, 'maptech_sales_invoice')
+
+    def get_maptech_sales_order_no(self, obj):
+        return self._product_field(obj, 'maptech_sales_order_no')
+
+    def get_supplier_purchase_no(self, obj):
+        return self._product_field(obj, 'supplier_purchase_no')
+
+    def get_supplier_sales_invoice(self, obj):
+        return self._product_field(obj, 'supplier_sales_invoice')
+
+    def get_supplier_delivery_receipt(self, obj):
+        return self._product_field(obj, 'supplier_delivery_receipt')
 
     def get_was_for_observation(self, obj):
         if obj.status == Ticket.STATUS_FOR_OBSERVATION:
@@ -267,6 +297,13 @@ class AdminCreateTicketSerializer(serializers.ModelSerializer):
     serial_no = serializers.CharField(required=False, allow_blank=True, write_only=True)
     sales_no = serializers.CharField(required=False, allow_blank=True, write_only=True)
     others = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    client_purchase_no = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    maptech_dr = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    maptech_sales_invoice = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    maptech_sales_order_no = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    supplier_purchase_no = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    supplier_sales_invoice = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    supplier_delivery_receipt = serializers.CharField(required=False, allow_blank=True, write_only=True)
     type_of_service_others = serializers.CharField(required=False, allow_blank=True, write_only=True)
     project_title = serializers.CharField(required=False, allow_blank=True, write_only=True)
     client_unavailable_for_call = serializers.BooleanField(required=False, default=False, write_only=True)
@@ -289,6 +326,9 @@ class AdminCreateTicketSerializer(serializers.ModelSerializer):
             'has_warranty', 'product', 'brand', 'model_name',
             'device_equipment', 'version_no', 'date_purchased', 'serial_no', 'sales_no', 'others',
             'project_title',
+            # Additional product detail fields (stored on Product)
+            'client_purchase_no', 'maptech_dr', 'maptech_sales_invoice', 'maptech_sales_order_no',
+            'supplier_purchase_no', 'supplier_sales_invoice', 'supplier_delivery_receipt',
         ]
         extra_kwargs = {
             'email_address': {'required': False, 'allow_blank': True, 'default': ''},

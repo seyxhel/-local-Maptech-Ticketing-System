@@ -8,15 +8,15 @@ import { LayoutDashboard, Ticket, BookOpen, ArrowUpRight, BarChart3 } from 'luci
 import { NetworkErrorModal, useNetworkStatus } from '../shared';
 
 const NAV_ITEMS: NavItem[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/employee/dashboard' },
-  { id: 'assigned-tickets', label: 'Assigned Tickets', icon: Ticket, path: '/employee/my-tickets' },
-  { id: 'reports', label: 'Reports', icon: BarChart3, path: '/employee/reports' },
-  { id: 'escalation', label: 'Escalation', icon: ArrowUpRight, path: '/employee/escalation' },
-  { id: 'knowledge-hub', label: 'Knowledge Hub', icon: BookOpen, path: '/employee/knowledge-hub' },
+  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/technical-staff/dashboard' },
+  { id: 'assigned-tickets', label: 'Assigned Tickets', icon: Ticket, path: '/technical-staff/my-tickets' },
+  { id: 'reports', label: 'Reports', icon: BarChart3, path: '/technical-staff/reports' },
+  { id: 'escalation', label: 'Escalation', icon: ArrowUpRight, path: '/technical-staff/escalation' },
+  { id: 'knowledge-hub', label: 'Knowledge Hub', icon: BookOpen, path: '/technical-staff/knowledge-hub' },
 ];
 
 
-export function EmployeeLayout() {
+export function TechnicalStaffLayout() {
   const { user, logout } = useAuth();
   const { isDark, toggleDark } = useTheme();
   const navigate = useNavigate();

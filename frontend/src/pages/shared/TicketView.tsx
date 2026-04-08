@@ -16,7 +16,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { TicketChatSocket } from '../../services/chatService';
 import type { ChatMessage, ChatEvent, ChatAttachment } from '../../services/chatService';
-import { fetchTicketByStf, fetchTicketById, uploadResolutionProof, deleteAttachment, closeTicket, updateEmployeeFields, saveProductDetails, escalateTicket, escalateExternal, startWork, createCSATFeedback, updateTicket, deleteTicket as apiDeleteTicket, fetchProducts, submitForObservation, assignTicket, fetchEmployees, fetchTickets, createCallLog, endCallLog, reviewTicket, confirmTicket } from '../../services/api';
+import { fetchTicketByStf, fetchTicketById, uploadResolutionProof, deleteAttachment, closeTicket, updateEmployeeFields, saveProductDetails, escalateTicket, escalateExternal, startWork, createFeedbackRating, updateTicket, deleteTicket as apiDeleteTicket, fetchProducts, submitForObservation, assignTicket, fetchEmployees, fetchTickets, createCallLog, endCallLog, reviewTicket, confirmTicket } from '../../services/api';
 import type { Product } from '../../services/api';
 import { toast } from 'sonner';
 import type { BackendTicket } from '../../services/api';
@@ -226,6 +226,13 @@ function resolveTicketProductSnapshot(btData: BackendTicket): {
   brand: string;
   model: string;
   salesNo: string;
+  clientPurchaseNo: string;
+  maptechDr: string;
+  maptechSalesInvoice: string;
+  maptechSalesOrderNo: string;
+  supplierPurchaseNo: string;
+  supplierSalesInvoice: string;
+  supplierDeliveryReceipt: string;
   others: string;
   hasAnyValue: boolean;
 } {
@@ -243,6 +250,13 @@ function resolveTicketProductSnapshot(btData: BackendTicket): {
     brand: readText(btData.brand) || readText(linkedProduct?.brand),
     model: readText(btData.model_name) || readText(linkedProduct?.model_name),
     salesNo: readText(btData.sales_no) || readText(linkedProduct?.sales_no),
+    clientPurchaseNo: readText(btData.client_purchase_no) || readText(linkedProduct?.client_purchase_no),
+    maptechDr: readText(btData.maptech_dr) || readText(linkedProduct?.maptech_dr),
+    maptechSalesInvoice: readText(btData.maptech_sales_invoice) || readText(linkedProduct?.maptech_sales_invoice),
+    maptechSalesOrderNo: readText(btData.maptech_sales_order_no) || readText(linkedProduct?.maptech_sales_order_no),
+    supplierPurchaseNo: readText(btData.supplier_purchase_no) || readText(linkedProduct?.supplier_purchase_no),
+    supplierSalesInvoice: readText(btData.supplier_sales_invoice) || readText(linkedProduct?.supplier_sales_invoice),
+    supplierDeliveryReceipt: readText(btData.supplier_delivery_receipt) || readText(linkedProduct?.supplier_delivery_receipt),
     others: readText(btData.others) || readText(linkedProduct?.others),
     hasAnyValue: Boolean(
       readText(btData.device_equipment) || readText(linkedProduct?.device_equipment) ||
@@ -254,6 +268,13 @@ function resolveTicketProductSnapshot(btData: BackendTicket): {
       readText(btData.serial_no) || readText(linkedProduct?.serial_no) ||
       readBool(btData.has_warranty) || readBool(linkedProduct?.has_warranty) ||
       readText(btData.sales_no) || readText(linkedProduct?.sales_no) ||
+      readText(btData.client_purchase_no) || readText(linkedProduct?.client_purchase_no) ||
+      readText(btData.maptech_dr) || readText(linkedProduct?.maptech_dr) ||
+      readText(btData.maptech_sales_invoice) || readText(linkedProduct?.maptech_sales_invoice) ||
+      readText(btData.maptech_sales_order_no) || readText(linkedProduct?.maptech_sales_order_no) ||
+      readText(btData.supplier_purchase_no) || readText(linkedProduct?.supplier_purchase_no) ||
+      readText(btData.supplier_sales_invoice) || readText(linkedProduct?.supplier_sales_invoice) ||
+      readText(btData.supplier_delivery_receipt) || readText(linkedProduct?.supplier_delivery_receipt) ||
       readText(btData.others) || readText(linkedProduct?.others)
     ),
   };
@@ -263,6 +284,7 @@ export function TicketView() {
   const { user } = useAuth();
   const isEmployee = user?.role === 'employee';
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+  const routeBase = user?.role === 'sales' ? '/sales' : '/admin';
   const isRoleEditable = isEmployee || isAdmin;
   const { search, pathname } = useLocation();
   const params = new URLSearchParams(search);
@@ -276,8 +298,8 @@ export function TicketView() {
   function computeSla(bt: BackendTicket) {
     const prioritySlaHours: Record<string, number> = { critical: 4, high: 8, medium: 24, low: 48 };
     const totalSla = prioritySlaHours[bt.priority] || 24;
-    const created = new Date(bt.created_at).getTime();
-    const elapsed = (Date.now() - created) / (1000 * 60 * 60);
+    const startedAt = bt.time_in ? new Date(bt.time_in).getTime() : null;
+    const elapsed = startedAt ? (Date.now() - startedAt) / (1000 * 60 * 60) : 0;
     return { sla: Math.max(0, Math.round(totalSla - elapsed)), total: totalSla };
   }
 
@@ -286,6 +308,11 @@ export function TicketView() {
     ? (() => {
         const { sla, total } = computeSla(btData);
         const productSnapshot = resolveTicketProductSnapshot(btData);
+        const assignedToLabel =
+          getAssigneeName(btData) ||
+          String(btData?.feedback_rating?.employee_name || '').trim() ||
+          String((btData as any)?.assigned_to_name || '').trim() ||
+          'Unassigned';
         return {
           id: btData.stf_no,
           priority: mapPriority(btData.priority) as 'Critical' | 'High' | 'Medium' | 'Low',
@@ -296,7 +323,7 @@ export function TicketView() {
           created: new Date(btData.created_at).toLocaleDateString(),
           description: btData.description_of_problem || 'No description provided.',
           contact: btData.contact_person || 'N/A',
-          assignedTo: getAssigneeName(btData) || 'unassigned',
+          assignedTo: assignedToLabel,
           issue: btData.description_of_problem || btData.type_of_service_detail?.name || 'No description',
           department: btData.department_organization || 'N/A',
           landline: btData.landline || 'N/A',
@@ -304,6 +331,7 @@ export function TicketView() {
           emailAddress: btData.email_address || 'N/A',
           fullAddress: btData.address || 'N/A',
           designation: btData.designation || 'N/A',
+          projectTitle: String(btData.project_title || 'N/A'),
           preferredSupport: ({'remote_online':'Remote / Online','onsite':'Onsite','chat':'Chat','call':'Call'} as Record<string,string>)[btData.preferred_support_type] || btData.preferred_support_type || 'N/A',
           typeOfService: btData.type_of_service_detail?.name || btData.type_of_service_others || 'N/A',
           productDetails: productSnapshot.hasAnyValue ? {
@@ -316,6 +344,13 @@ export function TicketView() {
             brand: productSnapshot.brand,
             model: productSnapshot.model,
             salesNo: productSnapshot.salesNo,
+            clientPurchaseNo: productSnapshot.clientPurchaseNo,
+            maptechDr: productSnapshot.maptechDr,
+            maptechSalesInvoice: productSnapshot.maptechSalesInvoice,
+            maptechSalesOrderNo: productSnapshot.maptechSalesOrderNo,
+            supplierPurchaseNo: productSnapshot.supplierPurchaseNo,
+            supplierSalesInvoice: productSnapshot.supplierSalesInvoice,
+            supplierDeliveryReceipt: productSnapshot.supplierDeliveryReceipt,
             others: productSnapshot.others,
           } : null,
           actionTaken: btData.action_taken || '',
@@ -333,7 +368,7 @@ export function TicketView() {
           observation: btData.observation || '',
           signature: btData.signature || null,
           signedByName: btData.signed_by_name || '',
-          csatFeedback: btData.csat_feedback || null,
+          feedbackRating: btData.feedback_rating || null,
         };
       })()
     : {
@@ -346,7 +381,7 @@ export function TicketView() {
         created: '',
         description: 'Loading...',
         contact: '',
-        assignedTo: '',
+        assignedTo: 'Unassigned',
         issue: 'Loading...',
         department: '',
         landline: '',
@@ -354,9 +389,28 @@ export function TicketView() {
         emailAddress: '',
         fullAddress: '',
         designation: '',
+        projectTitle: '',
         preferredSupport: '',
         typeOfService: '',
-        productDetails: null as { deviceEquipment: string; versionNo: string; datePurchased: string; serialNo: string; warranty: string; product?: string; brand?: string; model?: string; salesNo?: string; others?: string } | null,
+        productDetails: null as {
+          deviceEquipment: string;
+          versionNo: string;
+          datePurchased: string;
+          serialNo: string;
+          warranty: string;
+          product?: string;
+          brand?: string;
+          model?: string;
+          salesNo?: string;
+          clientPurchaseNo?: string;
+          maptechDr?: string;
+          maptechSalesInvoice?: string;
+          maptechSalesOrderNo?: string;
+          supplierPurchaseNo?: string;
+          supplierSalesInvoice?: string;
+          supplierDeliveryReceipt?: string;
+          others?: string;
+        } | null,
         actionTaken: '',
         remarks: '',
         jobStatus: '',
@@ -369,7 +423,7 @@ export function TicketView() {
         observation: '',
         signature: null as string | null,
         signedByName: '',
-        csatFeedback: null as any,
+        feedbackRating: null as any,
       };
 
   const navigate = useNavigate();
@@ -703,10 +757,10 @@ export function TicketView() {
   const [signatureData, setSignatureData] = useState<string | null>(null);
   const [signedByName, setSignedByName] = useState('');
   const [startingWork, setStartingWork] = useState(false);
-  const [showCsatModal, setShowCsatModal] = useState(false);
-  const [csatRating, setCsatRating] = useState(0);
-  const [csatComments, setCsatComments] = useState('');
-  const [submittingCsat, setSubmittingCsat] = useState(false);
+  const [showFeedbackRatingModal, setShowFeedbackRatingModal] = useState(false);
+  const [feedbackRatingValue, setFeedbackRatingValue] = useState(0);
+  const [feedbackComments, setFeedbackComments] = useState('');
+  const [submittingFeedbackRating, setSubmittingFeedbackRating] = useState(false);
 
   // ── Admin reassign (for escalated tickets) ──
   const [employees, setEmployees] = useState<{ id: number; first_name: string; last_name: string; username: string; active_ticket_count: number }[]>([]);
@@ -1207,7 +1261,7 @@ export function TicketView() {
     try {
       await apiDeleteTicket(backendTicketId);
       toast.success('Ticket deleted.');
-      navigate('/admin/tickets');
+      navigate(`${routeBase}/tickets`);
     } catch (err: any) {
       toast.error(err?.message || 'Failed to delete ticket.');
     } finally {
@@ -1216,28 +1270,32 @@ export function TicketView() {
     }
   };
 
-  /** Admin submits CSAT feedback then closes ticket */
-  const handleCsatClose = async () => {
+  /** Admin submits feedback ratings then closes ticket */
+  const handleFeedbackRatingClose = async () => {
     if (!backendTicketId || !btData) return;
-    if (csatRating < 1) { toast.error('Please rate the technical (1-5 stars).'); return; }
-    setSubmittingCsat(true);
+    if (feedbackRatingValue < 1) { toast.error('Please provide a feedback rating (1-5 stars).'); return; }
+    if (!btData.assigned_to?.id) {
+      toast.error('No assignee found for this ticket, so feedback cannot be saved.');
+      return;
+    }
+    setSubmittingFeedbackRating(true);
     try {
-      await createCSATFeedback({
+      await createFeedbackRating({
         ticket: backendTicketId,
-        employee: btData.assigned_to?.id ?? 0,
-        rating: csatRating,
-        comments: csatComments || undefined,
+        employee: btData.assigned_to.id,
+        rating: feedbackRatingValue,
+        comments: feedbackComments || undefined,
       });
       const updated = await closeTicket(backendTicketId);
       setBtData(updated);
-      setShowCsatModal(false);
-      setCsatRating(0);
-      setCsatComments('');
-      toast.success('CSAT submitted and ticket closed.');
+      setShowFeedbackRatingModal(false);
+      setFeedbackRatingValue(0);
+      setFeedbackComments('');
+      toast.success('Feedback ratings submitted and ticket closed.');
     } catch (err: any) {
-      toast.error(err?.message || 'Failed to submit CSAT or close ticket.');
+      toast.error(err?.message || 'Failed to submit feedback ratings or close ticket.');
     } finally {
-      setSubmittingCsat(false);
+      setSubmittingFeedbackRating(false);
     }
   };
 
@@ -1360,15 +1418,23 @@ export function TicketView() {
       <div class="desc">${ticket.description}</div>
       ${pd ? `<h2>Product Details</h2>
       <div class="info-grid">
+        <div class="info-row"><span class="info-label">Project Title:</span><span class="info-value">${ticket.projectTitle || 'N/A'}</span></div>
         <div class="info-row"><span class="info-label">Device/Equipment (Category):</span><span class="info-value">${pd.deviceEquipment}</span></div>
-        <div class="info-row"><span class="info-label">Brand:</span><span class="info-value">${pd.brand || ''}</span></div>
         <div class="info-row"><span class="info-label">Product:</span><span class="info-value">${pd.product || ''}</span></div>
+        <div class="info-row"><span class="info-label">Brand:</span><span class="info-value">${pd.brand || ''}</span></div>
         <div class="info-row"><span class="info-label">Model:</span><span class="info-value">${pd.model || ''}</span></div>
-        <div class="info-row"><span class="info-label">Version No:</span><span class="info-value">${pd.versionNo}</span></div>
         <div class="info-row"><span class="info-label">Serial No:</span><span class="info-value">${pd.serialNo}</span></div>
-        <div class="info-row"><span class="info-label">Warranty:</span><span class="info-value">${pd.warranty}</span></div>
-        <div class="info-row"><span class="info-label">Date Purchased:</span><span class="info-value">${pd.datePurchased}</span></div>
+        <div class="info-row"><span class="info-label">Version No:</span><span class="info-value">${pd.versionNo}</span></div>
         <div class="info-row"><span class="info-label">Sales / Invoice No:</span><span class="info-value">${pd.salesNo || 'N/A'}</span></div>
+        <div class="info-row"><span class="info-label">Date Purchased:</span><span class="info-value">${pd.datePurchased}</span></div>
+        <div class="info-row"><span class="info-label">Warranty:</span><span class="info-value">${pd.warranty}</span></div>
+        <div class="info-row"><span class="info-label">Client Purchase No:</span><span class="info-value">${pd.clientPurchaseNo || 'N/A'}</span></div>
+        <div class="info-row"><span class="info-label">Maptech Delivery Receipt:</span><span class="info-value">${pd.maptechDr || 'N/A'}</span></div>
+        <div class="info-row"><span class="info-label">Maptech Sales Invoice:</span><span class="info-value">${pd.maptechSalesInvoice || 'N/A'}</span></div>
+        <div class="info-row"><span class="info-label">Maptech Sales Order No:</span><span class="info-value">${pd.maptechSalesOrderNo || 'N/A'}</span></div>
+        <div class="info-row"><span class="info-label">Supplier Purchase No:</span><span class="info-value">${pd.supplierPurchaseNo || 'N/A'}</span></div>
+        <div class="info-row"><span class="info-label">Supplier Sales Invoice:</span><span class="info-value">${pd.supplierSalesInvoice || 'N/A'}</span></div>
+        <div class="info-row"><span class="info-label">Supplier Delivery Receipt:</span><span class="info-value">${pd.supplierDeliveryReceipt || 'N/A'}</span></div>
         <div class="info-row"><span class="info-label">Others:</span><span class="info-value">${pd.others || 'N/A'}</span></div>
       </div>` : ''}
       <h2>Work Details</h2>
@@ -1399,17 +1465,18 @@ export function TicketView() {
       ${atts.length > 0 ? `<h2>Attachments</h2>
       <table><thead><tr><th>#</th><th>File Name</th><th>Type</th></tr></thead>
       <tbody>${atts.map((att: any, i: number) => { const fname = att.file?.split('/').pop() || 'file'; const ftype = fname.match(/\\.(mp4|webm)$/i) ? 'Recording' : fname.match(/\\.(jpg|jpeg|png|gif)$/i) ? 'Screenshot' : 'Document'; return `<tr><td>${i+1}</td><td>${fname}</td><td>${ftype}</td></tr>`; }).join('')}</tbody></table>` : ''}
-      ${ticket.csatFeedback ? `<h2>CSAT Feedback</h2>
+      ${ticket.feedbackRating ? `<h2>Feedback Ratings</h2>
       <div class="info-grid">
-        <div class="info-row"><span class="info-label">Rating:</span><span class="info-value">${ticket.csatFeedback.rating} / 5</span></div>
-        ${ticket.csatFeedback.comments ? `<div class="info-row"><span class="info-label">Comments:</span><span class="info-value">${ticket.csatFeedback.comments}</span></div>` : ''}
+        <div class="info-row"><span class="info-label">Assignee:</span><span class="info-value">${ticket.assignedTo || 'Unassigned'}</span></div>
+        <div class="info-row"><span class="info-label">Rating:</span><span class="info-value">${ticket.feedbackRating.rating} / 5</span></div>
+        ${ticket.feedbackRating.comments ? `<div class="info-row"><span class="info-label">Comments:</span><span class="info-value">${ticket.feedbackRating.comments}</span></div>` : ''}
       </div>` : ''}`;
     const html = buildPdfDocument(
       `Ticket ${ticket.id} - Maptech Ticketing System`,
       'Ticket Detail Report',
       body,
       `Service Ticket ${ticket.id}`,
-      ticket.signature,
+      ticket.signature ?? undefined,
       ticket.signedByName,
     );
     void openPrintWindow(html, `ticket_${ticket.id}_${dateTag}.pdf`)
@@ -1562,11 +1629,15 @@ export function TicketView() {
       if (ticket.productDetails) {
         sectionHeader(R, 'PRODUCT DETAILS'); R++;
         const pd = ticket.productDetails;
-        detailRow(R, 'Device/Equipment (Category)', pd.deviceEquipment, 'Brand', pd.brand ?? ''); rowHeights[R] = { hpt: 22 }; R++;
-        detailRow(R, 'Product', pd.product ?? '', 'Model', pd.model ?? ''); rowHeights[R] = { hpt: 22 }; R++;
-        detailRow(R, 'Version No', pd.versionNo, 'Serial No', pd.serialNo); rowHeights[R] = { hpt: 22 }; R++;
-        detailRow(R, 'Warranty', pd.warranty, 'Date Purchased', pd.datePurchased); rowHeights[R] = { hpt: 22 }; R++;
-        detailRow(R, 'Sales / Invoice No', pd.salesNo || 'N/A', 'Others', pd.others || 'N/A');
+        detailRow(R, 'Project Title', ticket.projectTitle || 'N/A', 'Device/Equipment (Category)', pd.deviceEquipment); rowHeights[R] = { hpt: 22 }; R++;
+        detailRow(R, 'Product', pd.product ?? '', 'Brand', pd.brand ?? ''); rowHeights[R] = { hpt: 22 }; R++;
+        detailRow(R, 'Model', pd.model ?? '', 'Serial No', pd.serialNo); rowHeights[R] = { hpt: 22 }; R++;
+        detailRow(R, 'Version No', pd.versionNo, 'Sales / Invoice No', pd.salesNo || 'N/A'); rowHeights[R] = { hpt: 22 }; R++;
+        detailRow(R, 'Date Purchased', pd.datePurchased, 'Warranty', pd.warranty); rowHeights[R] = { hpt: 22 }; R++;
+        detailRow(R, 'Client Purchase No', pd.clientPurchaseNo || 'N/A', 'Maptech Delivery Receipt', pd.maptechDr || 'N/A'); rowHeights[R] = { hpt: 22 }; R++;
+        detailRow(R, 'Maptech Sales Invoice', pd.maptechSalesInvoice || 'N/A', 'Maptech Sales Order No', pd.maptechSalesOrderNo || 'N/A'); rowHeights[R] = { hpt: 22 }; R++;
+        detailRow(R, 'Supplier Purchase No', pd.supplierPurchaseNo || 'N/A', 'Supplier Sales Invoice', pd.supplierSalesInvoice || 'N/A'); rowHeights[R] = { hpt: 22 }; R++;
+        detailRow(R, 'Supplier Delivery Receipt', pd.supplierDeliveryReceipt || 'N/A', 'Others', pd.others || 'N/A');
         rowHeights[R] = { hpt: Math.max(22, Math.ceil((pd.others || '').length / 40) * 14) }; R++;
         mergeAll(R, '', C.WHITE, C.WHITE, { border: false }); rowHeights[R] = { hpt: 14 }; R++;
       }
@@ -1630,14 +1701,16 @@ export function TicketView() {
         mergeAll(R, '', C.WHITE, C.WHITE, { border: false }); rowHeights[R] = { hpt: 14 }; R++;
       }
 
-      // ─── CSAT Feedback ───
-      if (ticket.csatFeedback) {
-        sectionHeader(R, 'CSAT FEEDBACK'); R++;
-        detailRow(R, 'Rating', `${ticket.csatFeedback.rating} / 5`, 'Date', ticket.csatFeedback.created_at ? new Date(ticket.csatFeedback.created_at).toLocaleString() : '');
+      // ─── Feedback Ratings ───
+      if (ticket.feedbackRating) {
+        sectionHeader(R, 'FEEDBACK RATINGS'); R++;
+        detailRow(R, 'Assignee', ticket.assignedTo || 'Unassigned');
         rowHeights[R] = { hpt: 22 }; R++;
-        if (ticket.csatFeedback.comments) {
-          detailRow(R, 'Comments', ticket.csatFeedback.comments);
-          rowHeights[R] = { hpt: Math.max(22, Math.ceil((ticket.csatFeedback.comments || '').length / 40) * 14) }; R++;
+        detailRow(R, 'Rating', `${ticket.feedbackRating.rating} / 5`, 'Date', ticket.feedbackRating.created_at ? new Date(ticket.feedbackRating.created_at).toLocaleString() : '');
+        rowHeights[R] = { hpt: 22 }; R++;
+        if (ticket.feedbackRating.comments) {
+          detailRow(R, 'Comments', ticket.feedbackRating.comments);
+          rowHeights[R] = { hpt: Math.max(22, Math.ceil((ticket.feedbackRating.comments || '').length / 40) * 14) }; R++;
         }
         mergeAll(R, '', C.WHITE, C.WHITE, { border: false }); rowHeights[R] = { hpt: 14 }; R++;
       }
@@ -1924,6 +1997,11 @@ export function TicketView() {
                 </div>
               )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 text-sm">
+                {/* Project Title */}
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">Project Title</div>
+                  <div className="text-gray-900 dark:text-gray-100">{ticket.projectTitle || <span className="text-gray-400 italic">Not yet filled</span>}</div>
+                </div>
                 {/* Device / Equipment */}
                 <div>
                   <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">Device / Equipment</div>
@@ -2028,6 +2106,11 @@ export function TicketView() {
                     <div className="text-gray-900 dark:text-gray-100">{pdHasWarranty ? 'With Warranty' : 'Without Warranty'}</div>
                   )}
                 </div>
+                {/* Client Purchase No. */}
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">Client Purchase No.</div>
+                  <div className="text-gray-900 dark:text-gray-100">{btData?.client_purchase_no || btData?.product_record_detail?.client_purchase_no || <span className="text-gray-400 italic">Not yet filled</span>}</div>
+                </div>
                 {/* Others */}
                 <div className="col-span-2">
                   <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">Others</div>
@@ -2036,6 +2119,32 @@ export function TicketView() {
                   ) : (
                     <div className="text-gray-900 dark:text-gray-100">{pdOthers || <span className="text-gray-400 italic">Not yet filled</span>}</div>
                   )}
+                </div>
+
+                {/* Additional product detail fields */}
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">Maptech Delivery Receipt</div>
+                  <div className="text-gray-900 dark:text-gray-100">{btData?.maptech_dr || btData?.product_record_detail?.maptech_dr || <span className="text-gray-400 italic">Not yet filled</span>}</div>
+                </div>
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">Maptech Sales Invoice</div>
+                  <div className="text-gray-900 dark:text-gray-100">{btData?.maptech_sales_invoice || btData?.product_record_detail?.maptech_sales_invoice || <span className="text-gray-400 italic">Not yet filled</span>}</div>
+                </div>
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">Maptech Sales Order No.</div>
+                  <div className="text-gray-900 dark:text-gray-100">{btData?.maptech_sales_order_no || btData?.product_record_detail?.maptech_sales_order_no || <span className="text-gray-400 italic">Not yet filled</span>}</div>
+                </div>
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">Supplier Purchase No.</div>
+                  <div className="text-gray-900 dark:text-gray-100">{btData?.supplier_purchase_no || btData?.product_record_detail?.supplier_purchase_no || <span className="text-gray-400 italic">Not yet filled</span>}</div>
+                </div>
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">Supplier Sales Invoice</div>
+                  <div className="text-gray-900 dark:text-gray-100">{btData?.supplier_sales_invoice || btData?.product_record_detail?.supplier_sales_invoice || <span className="text-gray-400 italic">Not yet filled</span>}</div>
+                </div>
+                <div className="sm:col-span-2">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">Supplier Delivery Receipt</div>
+                  <div className="text-gray-900 dark:text-gray-100">{btData?.supplier_delivery_receipt || btData?.product_record_detail?.supplier_delivery_receipt || <span className="text-gray-400 italic">Not yet filled</span>}</div>
                 </div>
               </div>
               {/* Save Product Details button (employee only) */}
@@ -2352,12 +2461,12 @@ export function TicketView() {
           </Card>
           </>}
 
-          {/* Employee Performance Rating (visible to admin only, hidden when admin is processing their own escalated ticket) */}
+          {/* Feedback Ratings (visible to admin only, hidden when admin is processing their own escalated ticket) */}
           {isAdmin && !isAdminProcessingEscalated && <Card>
             <h3 className="text-xs font-bold uppercase tracking-wider text-[#0E8F79] mb-3 flex items-center gap-2">
-              <Star className="w-4 h-4" /> Technical Performance Rating
+              <Star className="w-4 h-4" /> Feedback Ratings
             </h3>
-            {ticket.csatFeedback ? (
+            {ticket.feedbackRating ? (
               <div className="space-y-3">
                 <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
                   <div className="w-10 h-10 rounded-full bg-[#0E8F79] flex items-center justify-center text-white font-bold text-sm shrink-0">
@@ -2370,17 +2479,17 @@ export function TicketView() {
                 </div>
                 <div className="flex items-center gap-1">
                   {[1, 2, 3, 4, 5].map((s) => (
-                    <Star key={s} className={`w-5 h-5 ${s <= ticket.csatFeedback.rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300 dark:text-gray-600'}`} />
+                    <Star key={s} className={`w-5 h-5 ${s <= ticket.feedbackRating.rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300 dark:text-gray-600'}`} />
                   ))}
-                  <span className="ml-2 text-sm font-bold text-gray-700 dark:text-gray-300">{ticket.csatFeedback.rating}/5</span>
+                  <span className="ml-2 text-sm font-bold text-gray-700 dark:text-gray-300">{ticket.feedbackRating.rating}/5</span>
                   <span className="ml-1 text-xs text-gray-400">
-                    {ticket.csatFeedback.rating <= 2 ? 'Needs Improvement' : ticket.csatFeedback.rating <= 3 ? 'Satisfactory' : ticket.csatFeedback.rating <= 4 ? 'Good' : 'Excellent'}
+                    {ticket.feedbackRating.rating <= 2 ? 'Needs Improvement' : ticket.feedbackRating.rating <= 3 ? 'Satisfactory' : ticket.feedbackRating.rating <= 4 ? 'Good' : 'Excellent'}
                   </span>
                 </div>
-                {ticket.csatFeedback.comments && (
+                {ticket.feedbackRating.comments && (
                   <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border-l-4 border-yellow-400">
-                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Feedback</p>
-                    <p className="text-sm text-gray-700 dark:text-gray-300">{ticket.csatFeedback.comments}</p>
+                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Comments</p>
+                    <p className="text-sm text-gray-700 dark:text-gray-300">{ticket.feedbackRating.comments}</p>
                   </div>
                 )}
               </div>
@@ -2402,7 +2511,7 @@ export function TicketView() {
                   <span className="ml-2 text-sm text-gray-400 dark:text-gray-500">—/5</span>
                 </div>
                 <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border-l-4 border-gray-200 dark:border-gray-700">
-                  <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">Feedback</p>
+                  <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">Comments</p>
                   <p className="text-sm text-gray-300 dark:text-gray-600 italic">Will be provided upon ticket closure</p>
                 </div>
               </div>
@@ -2481,7 +2590,13 @@ export function TicketView() {
               {isAdmin && ticket.status === 'Resolved' && (
                 <button
                   type="button"
-                  onClick={() => isAdminProcessingEscalated ? setShowCloseConfirmModal(true) : setShowCsatModal(true)}
+                  onClick={() => {
+                    if (btData?.assigned_to?.id) {
+                      setShowFeedbackRatingModal(true);
+                      return;
+                    }
+                    setShowCloseConfirmModal(true);
+                  }}
                   className="w-full py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-red-500 to-red-600 hover:shadow-lg hover:shadow-red-500/20 flex items-center justify-center gap-2 transition-all text-sm"
                 >
                   <X className="w-4 h-4" /> Close Ticket
@@ -2494,7 +2609,7 @@ export function TicketView() {
             <div className="space-y-3">
               <button
                 type="button"
-                onClick={() => navigate(`/admin/create-ticket?linkedTicketId=${btData?.id}&linkedStf=${encodeURIComponent(btData?.stf_no || '')}`)}
+                onClick={() => navigate(`${routeBase}/create-ticket?linkedTicketId=${btData?.id}&linkedStf=${encodeURIComponent(btData?.stf_no || '')}`)}
                 className="w-full py-3 rounded-xl font-semibold text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center justify-center gap-2 transition-all text-sm"
               >
                 <Link2 className="w-4 h-4" /> Link Ticket / Same Problem
@@ -3263,8 +3378,8 @@ export function TicketView() {
         document.body
       )}
 
-      {/* ── CSAT Rating Modal (Admin – before closing) ── */}
-      {showCsatModal && createPortal(
+      {/* ── Feedback Ratings Modal (Admin – before closing) ── */}
+      {showFeedbackRatingModal && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-white dark:bg-[#0f172a] border border-gray-200 dark:border-white/10 rounded-2xl w-full max-w-md shadow-2xl">
             {/* Header */}
@@ -3274,11 +3389,11 @@ export function TicketView() {
                   <Star className="w-4 h-4 text-yellow-500" />
                 </div>
                 <div>
-                  <h3 className="text-gray-900 dark:text-white font-semibold text-sm">Rate Technical Performance</h3>
-                  <p className="text-gray-400 dark:text-white/40 text-xs">Submit CSAT before closing this ticket</p>
+                  <h3 className="text-gray-900 dark:text-white font-semibold text-sm">Feedback Ratings</h3>
+                  <p className="text-gray-400 dark:text-white/40 text-xs">Submit feedback ratings before closing this ticket</p>
                 </div>
               </div>
-              <button onClick={() => setShowCsatModal(false)} className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 flex items-center justify-center text-gray-400 dark:text-white/50 hover:text-gray-600 dark:hover:text-white transition-all">
+              <button onClick={() => setShowFeedbackRatingModal(false)} className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 flex items-center justify-center text-gray-400 dark:text-white/50 hover:text-gray-600 dark:hover:text-white transition-all">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -3288,31 +3403,31 @@ export function TicketView() {
               {/* Employee info */}
               <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-white/5 rounded-xl">
                 <div className="w-10 h-10 rounded-full bg-[#0E8F79] flex items-center justify-center text-white font-bold text-sm">
-                  {getAssigneeName(btData!)?.charAt(0)?.toUpperCase() || '?'}
+                  {ticket.assignedTo?.charAt(0)?.toUpperCase() || '?'}
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">{getAssigneeName(btData!) || 'Technical'}</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">{ticket.assignedTo || 'Technical'}</p>
                   <p className="text-xs text-gray-400">Assigned Technical</p>
                 </div>
               </div>
 
               {/* Star Rating */}
               <div>
-                <label className="block text-xs text-gray-500 dark:text-white/50 font-medium mb-3 uppercase tracking-wider">Rating</label>
+                <label className="block text-xs text-gray-500 dark:text-white/50 font-medium mb-3 uppercase tracking-wider">Feedback Rating</label>
                 <div className="flex items-center justify-center gap-2">
                   {[1, 2, 3, 4, 5].map((s) => (
                     <button
                       key={s}
                       type="button"
-                      onClick={() => setCsatRating(s)}
+                      onClick={() => setFeedbackRatingValue(s)}
                       className="p-1 transition-transform hover:scale-110"
                     >
-                      <Star className={`w-8 h-8 transition-colors ${s <= csatRating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300 dark:text-gray-600 hover:text-yellow-300'}`} />
+                      <Star className={`w-8 h-8 transition-colors ${s <= feedbackRatingValue ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300 dark:text-gray-600 hover:text-yellow-300'}`} />
                     </button>
                   ))}
                 </div>
                 <p className="text-center text-xs text-gray-400 mt-1.5">
-                  {csatRating === 0 ? 'Click a star to rate' : csatRating <= 2 ? 'Needs Improvement' : csatRating <= 3 ? 'Satisfactory' : csatRating <= 4 ? 'Good' : 'Excellent'}
+                  {feedbackRatingValue === 0 ? 'Click a star to rate' : feedbackRatingValue <= 2 ? 'Needs Improvement' : feedbackRatingValue <= 3 ? 'Satisfactory' : feedbackRatingValue <= 4 ? 'Good' : 'Excellent'}
                 </p>
               </div>
 
@@ -3320,10 +3435,10 @@ export function TicketView() {
               <div>
                 <label className="block text-xs text-gray-500 dark:text-white/50 font-medium mb-1.5 uppercase tracking-wider">Comments (Optional)</label>
                 <textarea
-                  value={csatComments}
-                  onChange={(e) => setCsatComments(e.target.value)}
+                  value={feedbackComments}
+                  onChange={(e) => setFeedbackComments(e.target.value)}
                   rows={3}
-                  placeholder="Additional feedback about the technical's performance..."
+                  placeholder="Add optional comments about the service provided..."
                   className="w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white text-sm placeholder-gray-300 dark:placeholder-white/20 focus:outline-none focus:border-yellow-500/60 resize-none transition-colors"
                 />
               </div>
@@ -3333,18 +3448,18 @@ export function TicketView() {
             <div className="flex items-center gap-3 px-6 pb-6">
               <button
                 type="button"
-                onClick={() => { setShowCsatModal(false); setCsatRating(0); setCsatComments(''); }}
+                onClick={() => { setShowFeedbackRatingModal(false); setFeedbackRatingValue(0); setFeedbackComments(''); }}
                 className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-white/10 text-gray-500 dark:text-white/60 hover:text-gray-700 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-white/5 text-sm font-medium transition-all"
               >
                 Cancel
               </button>
               <button
                 type="button"
-                disabled={submittingCsat || csatRating < 1}
-                onClick={handleCsatClose}
+                disabled={submittingFeedbackRating || feedbackRatingValue < 1}
+                onClick={handleFeedbackRatingClose}
                 className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-red-500 to-red-600 text-white text-sm font-semibold hover:shadow-lg hover:shadow-red-500/20 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all"
               >
-                {submittingCsat ? (
+                {submittingFeedbackRating ? (
                   <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Submitting...</>
                 ) : (
                   <><Star className="w-3.5 h-3.5" /> Submit & Close</>

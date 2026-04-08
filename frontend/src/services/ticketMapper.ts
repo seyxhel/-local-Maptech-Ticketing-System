@@ -76,7 +76,7 @@ export interface UITicket {
   created: string;
 }
 
-/** Compute SLA hours remaining based on estimated_resolution days from the backend. */
+/** Compute SLA hours remaining based on estimated resolution days from the backend. */
 function computeSla(ticket: BackendTicket): { sla: number; totalSla: number } {
   // SLA should only run after call verification is confirmed and priority is identified.
   if (!ticket.confirmed_by_admin || !String(ticket.priority || '').trim()) {
@@ -84,8 +84,8 @@ function computeSla(ticket: BackendTicket): { sla: number; totalSla: number } {
   }
   const totalSla = (ticket.sla_estimated_days || 0) * 24;
   if (totalSla === 0) return { sla: 0, totalSla: 0 };
-  const created = new Date(ticket.created_at).getTime();
-  const elapsed = (Date.now() - created) / (1000 * 60 * 60);
+  const startedAt = ticket.time_in ? new Date(ticket.time_in).getTime() : null;
+  const elapsed = startedAt ? (Date.now() - startedAt) / (1000 * 60 * 60) : 0;
   const remaining = Math.max(0, Math.round(totalSla - elapsed));
   return { sla: remaining, totalSla };
 }
@@ -107,9 +107,9 @@ export function mapBackendTicketToUI(bt: BackendTicket): UITicket {
   };
 }
 
-// ── Map for employee ticket list (uses slightly different field names) ──
+// ── Map for technical staff ticket list (uses slightly different field names) ──
 
-export interface UIEmployeeTicket {
+export interface UITechnicalStaffTicket {
   backendId: number;
   id: string;
   issue: string;
@@ -124,15 +124,15 @@ export interface UIEmployeeTicket {
   assignedTo: string;
 }
 
-export function mapBackendTicketToEmployee(bt: BackendTicket): UIEmployeeTicket {
+export function mapBackendTicketToTechnicalStaff(bt: BackendTicket): UITechnicalStaffTicket {
   const { sla, totalSla } = computeSla(bt);
-  const status = mapStatus(bt.status, bt.assigned_to) as UIEmployeeTicket['status'];
+  const status = mapStatus(bt.status, bt.assigned_to) as UITechnicalStaffTicket['status'];
   return {
     backendId: bt.id,
     id: bt.stf_no,
     issue: bt.description_of_problem || bt.type_of_service_others || bt.type_of_service_detail?.name || 'No description',
     client: bt.client || 'N/A',
-    priority: mapPriority(bt.priority) as UIEmployeeTicket['priority'],
+    priority: mapPriority(bt.priority) as UITechnicalStaffTicket['priority'],
     status,
     sla,
     total: totalSla,

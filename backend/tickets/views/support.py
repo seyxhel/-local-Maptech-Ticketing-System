@@ -5,8 +5,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.utils import timezone
 
-from ..models import CallLog, CSATFeedback
-from ..serializers import CallLogSerializer, CSATFeedbackSerializer
+from ..models import CallLog, FeedbackRating
+from ..serializers import CallLogSerializer, FeedbackRatingSerializer
 from ..permissions import IsAdminLevel, IsSupervisorLevel
 
 
@@ -52,17 +52,17 @@ class CallLogViewSet(viewsets.ModelViewSet):
         return Response(CallLogSerializer(call_log).data)
 
 
-class CSATFeedbackViewSet(viewsets.ModelViewSet):
-    """Admin submits CSAT feedback on employee performance before closing a ticket."""
-    queryset = CSATFeedback.objects.all().order_by('-created_at')
-    serializer_class = CSATFeedbackSerializer
+class FeedbackRatingViewSet(viewsets.ModelViewSet):
+    """Admin submits feedback ratings on employee performance before closing a ticket."""
+    queryset = FeedbackRating.objects.all().order_by('-created_at')
+    serializer_class = FeedbackRatingSerializer
     permission_classes = [IsAuthenticated, IsAdminLevel]
-    swagger_tags = ['CSAT Feedback']
+    swagger_tags = ['Feedback Ratings']
 
     def get_queryset(self):
         if getattr(self, 'swagger_fake_view', False):
-            return CSATFeedback.objects.none()
-        qs = CSATFeedback.objects.all().order_by('-created_at')
+            return FeedbackRating.objects.none()
+        qs = FeedbackRating.objects.all().order_by('-created_at')
 
         ticket_id = self.request.query_params.get('ticket')
         if ticket_id:

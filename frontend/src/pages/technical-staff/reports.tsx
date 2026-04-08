@@ -9,7 +9,7 @@ import { PieChart, Pie, Cell, Tooltip as ReTooltip, ResponsiveContainer, BarChar
 import { toast } from 'sonner';
 import { buildPdfDocument, openPrintWindow } from '../../utils/pdfTemplate';
 
-export default function EmployeeReports() {
+export default function TechnicalStaffReports() {
   const { user } = useAuth();
   const [tickets, setTickets] = useState<BackendTicket[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -81,7 +81,7 @@ export default function EmployeeReports() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `employee_${user?.id ?? 'me'}_tickets_${new Date().toISOString().slice(0,10)}.csv`;
+    a.download = `technical_staff_${user?.id ?? 'me'}_tickets_${new Date().toISOString().slice(0,10)}.csv`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -107,8 +107,8 @@ export default function EmployeeReports() {
         </tbody>
       </table>
     `;
-    const html = buildPdfDocument('Employee Reports - Maptech Ticketing System', 'Employee Reports', body, `${myTickets.length} tickets`);
-    void openPrintWindow(html, `employee_reports_${dateTag}.pdf`).then(() => toast.success('PDF downloaded')).catch(() => toast.error('PDF export failed'));
+    const html = buildPdfDocument('Technical Staff Reports - Maptech Ticketing System', 'Technical Staff Reports', body, `${myTickets.length} tickets`);
+    void openPrintWindow(html, `technical_staff_reports_${dateTag}.pdf`).then(() => toast.success('PDF downloaded')).catch(() => toast.error('PDF export failed'));
   };
 
   const renderList = (items: BackendTicket[]) => (
@@ -160,7 +160,7 @@ export default function EmployeeReports() {
         <Card>
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-bold text-gray-900 dark:text-white">Tickets by Status</h3>
-            <span className="text-xs text-gray-400 dark:text-gray-500">Employee overview</span>
+            <span className="text-xs text-gray-400 dark:text-gray-500">Technical staff overview</span>
           </div>
           <div className="h-72">
             {pieData.length === 0 ? (

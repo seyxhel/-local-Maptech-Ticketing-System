@@ -31,6 +31,7 @@ import {
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { PriorityBadge } from '../../components/ui/PriorityBadge';
 import { mapStatus, mapPriority } from '../../services/ticketMapper';
+import { useAuth } from '../../context/AuthContext';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -50,6 +51,8 @@ const EMPTY_FORM = {
 
 export default function Clients() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const routeBase = user?.role === 'sales' ? '/sales' : '/admin';
   const [clients, setClients] = useState<ClientRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -413,7 +416,7 @@ export default function Clients() {
                       </td>
                       <td className="py-3 text-right">
                         <button
-                          onClick={() => navigate(`/admin/ticket-details?stf=${encodeURIComponent(t.stf_no)}`)}
+                          onClick={() => navigate(`${routeBase}/ticket-details?stf=${encodeURIComponent(t.stf_no)}`)}
                           className="inline-flex items-center justify-center p-1.5 rounded-lg text-gray-400 hover:text-[#0E8F79] hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
                           title="View full ticket"
                           aria-label={`View ${t.stf_no}`}

@@ -27,6 +27,7 @@ import {
 import type { BackendTicket } from '../../services/api';
 import { mapBackendTicketToUI, reverseMapStatus, reverseMapPriority } from '../../services/ticketMapper';
 import type { UITicket } from '../../services/ticketMapper';
+import { useAuth } from '../../context/AuthContext';
 
 const ITEMS_PER_PAGE = 5;
 const PRIORITIES = ['Critical', 'High', 'Medium', 'Low'];
@@ -39,6 +40,8 @@ function truncateText(value: string, maxLength: number): string {
 
 export default function AdminTickets() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const routeBase = user?.role === 'sales' ? '/sales' : '/admin';
   const [search, setSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [showFilter, setShowFilter] = useState(false);
@@ -219,7 +222,7 @@ export default function AdminTickets() {
                   </td>
                   <td className="px-6 py-4 text-gray-500 dark:text-gray-400 text-xs">{ticket.created}</td>
                   <td className="px-6 py-4 text-right">
-                    <button onClick={() => navigate(`/admin/ticket-details?stf=${ticket.id}`)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"><Eye className="w-5 h-5" /></button>
+                    <button onClick={() => navigate(`${routeBase}/ticket-details?stf=${ticket.id}`)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"><Eye className="w-5 h-5" /></button>
                   </td>
                 </tr>
               ))}

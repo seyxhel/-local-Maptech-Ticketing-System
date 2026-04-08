@@ -71,7 +71,7 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
   );
 }
 
-export default function EmployeeKnowledgeBase() {
+export default function TechnicalStaffKnowledgeBase() {
   const [search, setSearch] = useState('');
   const [selectedTag, setSelectedTag] = useState('All');
   const [selected, setSelected] = useState<PublishedArticle | null>(null);

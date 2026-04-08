@@ -52,12 +52,9 @@ export const PDF_CSS = `
   }
   .stat-card {
     background: #ffffff; border: 1px solid #d1fae5; border-radius: 8px;
-    padding: 12px 14px; position: relative; overflow: hidden;
+    border-left: 4px solid #154734;
+    padding: 12px 14px; overflow: hidden;
     min-height: 70px;
-  }
-  .stat-card::before {
-    content: ''; position: absolute; left: 0; top: 0; bottom: 0;
-    width: 4px; background: #154734; border-radius: 8px 0 0 8px;
   }
   .stat-label {
     font-size: 9px; color: #6b7280; text-transform: uppercase;
@@ -75,6 +72,13 @@ export const PDF_CSS = `
     border-radius: 0 6px 6px 0; letter-spacing: 0.2px;
   }
   h2:first-child { margin-top: 0; }
+  h3 {
+    font-size: 13px;
+    font-weight: 700;
+    color: #154734;
+    margin: 18px 0 10px;
+    line-height: 1.3;
+  }
   /* ── Tables ── */
   table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 10px; }
   thead tr {

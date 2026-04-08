@@ -6,7 +6,7 @@ import type { NavItem } from './Sidebar';
 
 interface LayoutProps {
   children: React.ReactNode;
-  role: 'SuperAdmin' | 'Admin' | 'Employee' | 'Technical' | 'Technical Staff' | 'Client';
+  role: 'SuperAdmin' | 'Admin' | 'Employee' | 'Technical' | 'Technical Staff' | 'Client' | 'Sales';
   currentPage: string;
   onNavigate: (page: string) => void;
   isDark: boolean;

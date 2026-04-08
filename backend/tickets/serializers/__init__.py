@@ -1,7 +1,7 @@
 from .lookup import TypeOfServiceSerializer, CategorySerializer
 from .client import ClientSerializer
 from .product import ProductSerializer
-from .support import CallLogSerializer, CSATFeedbackSerializer
+from .support import CallLogSerializer, FeedbackRatingSerializer
 from .messaging import (
     AssignmentSessionSerializer, MessageSerializer,
     MessageReactionSerializer, MessageReadReceiptSerializer,
@@ -19,7 +19,7 @@ __all__ = [
     'TypeOfServiceSerializer', 'CategorySerializer',
     'ClientSerializer',
     'ProductSerializer',
-    'CallLogSerializer', 'CSATFeedbackSerializer',
+    'CallLogSerializer', 'FeedbackRatingSerializer',
     'AssignmentSessionSerializer', 'MessageSerializer',
     'MessageReactionSerializer', 'MessageReadReceiptSerializer',
     'EscalationLogSerializer', 'AuditLogSerializer',

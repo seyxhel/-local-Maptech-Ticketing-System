@@ -121,6 +121,13 @@ export interface BackendTicket {
   type_of_service_others: string;
   preferred_support_type: string;
   description_of_problem: string;
+  client_purchase_no: string;
+  maptech_dr: string;
+  maptech_sales_invoice: string;
+  maptech_sales_order_no: string;
+  supplier_purchase_no: string;
+  supplier_sales_invoice: string;
+  supplier_delivery_receipt: string;
   date: string;
   time_in: string | null;
   time_out: string | null;
@@ -163,7 +170,7 @@ export interface BackendTicket {
   estimated_resolution_days_override: number | null;
   progress_percentage: number;
   sla_estimated_days: number;
-  csat_feedback: CSATFeedback | null;
+  feedback_rating: FeedbackRating | null;
   [key: string]: unknown;
 }
 
@@ -202,6 +209,13 @@ export interface Product {
   brand: string;
   model_name: string;
   sales_no: string;
+  client_purchase_no: string;
+  maptech_dr: string;
+  maptech_sales_invoice: string;
+  maptech_sales_order_no: string;
+  supplier_purchase_no: string;
+  supplier_sales_invoice: string;
+  supplier_delivery_receipt: string;
   others: string;
   is_active: boolean;
   created_at: string;
@@ -239,7 +253,7 @@ export interface CallLog {
   created_at: string;
 }
 
-export interface CSATFeedback {
+export interface FeedbackRating {
   id: number;
   ticket: number;
   stf_no: string;
@@ -368,7 +382,7 @@ export async function confirmTicket(ticketId: number): Promise<BackendTicket> {
   return handleResponse<BackendTicket>(res);
 }
 
-/** Close a ticket (admin). Requires CSAT to be submitted first if ticket has an assignee. */
+/** Close a ticket (admin). Requires feedback ratings to be submitted first if ticket has an assignee. */
 export async function closeTicket(ticketId: number): Promise<BackendTicket> {
   const res = await apiFetch(`${API_BASE}/tickets/${ticketId}/close_ticket/`, {
     method: 'POST',
@@ -1057,22 +1071,28 @@ export async function updateRetentionPolicy(data: { audit_log_retention_days?: n
   return handleResponse<RetentionPolicyData>(res);
 }
 
-// ── CSAT Feedback endpoints ──
+// ── Feedback Ratings endpoints ──
 
-/** Submit CSAT feedback (admin rates employee before closing). */
-export async function createCSATFeedback(data: { ticket: number; employee: number; rating: number; comments?: string }): Promise<CSATFeedback> {
-  const res = await apiFetch(`${API_BASE}/csat-feedback/`, {
+/** Submit feedback ratings (admin rates employee before closing). */
+export async function createFeedbackRating(data: { ticket: number; employee: number; rating: number; comments?: string }): Promise<FeedbackRating> {
+  const res = await apiFetch(`${API_BASE}/feedback-ratings/`, {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify(data),
   });
-  return handleResponse<CSATFeedback>(res);
+  return handleResponse<FeedbackRating>(res);
 }
 
-/** Fetch CSAT feedback entries. */
-export async function fetchCSATFeedbacks(): Promise<CSATFeedback[]> {
-  const res = await apiFetch(`${API_BASE}/csat-feedback/`, { headers: authHeaders() });
-  return handleResponse<CSATFeedback[]>(res);
+/** Fetch feedback rating entries. */
+export async function fetchFeedbackRatings(): Promise<FeedbackRating[]> {
+  const res = await apiFetch(`${API_BASE}/feedback-ratings/`, { headers: authHeaders() });
+  return handleResponse<FeedbackRating[]>(res);
+}
+
+/** Fetch feedback ratings for a specific employee. */
+export async function fetchEmployeeRatings(employeeId: number): Promise<FeedbackRating[]> {
+  const res = await apiFetch(`${API_BASE}/feedback-ratings/?employee=${employeeId}`, { headers: authHeaders() });
+  return handleResponse<FeedbackRating[]>(res);
 }
 
 // ── Notification types & endpoints ──

@@ -1,22 +1,20 @@
-import React from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { Layout } from '../components/layout/Layout';
-import { Sidebar, type NavItem } from '../components/layout/Sidebar';
-import { LayoutDashboard, Users, BarChart3, Settings, ScrollText, Award } from 'lucide-react';
+import type { NavItem } from '../components/layout/Sidebar';
+import { Ticket, PlusCircle, Package, Users, Monitor } from 'lucide-react';
 import { NetworkErrorModal, useNetworkStatus } from '../shared';
 
 const NAV_ITEMS: NavItem[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/superadmin/dashboard' },
-  { id: 'users', label: 'User Management', icon: Users, path: '/superadmin/users' },
-  { id: 'audit-logs', label: 'Audit Logs', icon: ScrollText, path: '/superadmin/audit-logs' },
-  { id: 'reports', label: 'Reports', icon: BarChart3, path: '/superadmin/reports' },
-  { id: 'technical-staff-ratings', label: 'Technical Staff Ratings', icon: Award, path: '/superadmin/technical-staff-ratings' },
-  { id: 'settings', label: 'Settings', icon: Settings, path: '/superadmin/settings' },
+  { id: 'tickets', label: 'Tickets', icon: Ticket, path: '/sales/tickets' },
+  { id: 'create-ticket', label: 'Create Ticket', icon: PlusCircle, path: '/sales/create-ticket' },
+  { id: 'clients', label: 'Clients', icon: Users, path: '/sales/clients' },
+  { id: 'products', label: 'Products', icon: Package, path: '/sales/products' },
+  { id: 'categories', label: 'Categories', icon: Monitor, path: '/sales/categories' },
 ];
 
-export function SuperAdminLayout() {
+export function SalesLayout() {
   const { user, logout } = useAuth();
   const { isDark, toggleDark } = useTheme();
   const navigate = useNavigate();
@@ -34,11 +32,10 @@ export function SuperAdminLayout() {
   const { isOffline, retry, dismiss, retrying } = useNetworkStatus();
 
   if (!user) return null;
-  const layoutRole = 'SuperAdmin' as const;
 
   return (
     <Layout
-      role={layoutRole}
+      role="Sales"
       currentPage={location.pathname}
       onNavigate={handleNavigate}
       isDark={isDark}

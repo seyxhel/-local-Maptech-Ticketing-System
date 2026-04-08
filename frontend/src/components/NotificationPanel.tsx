@@ -16,7 +16,7 @@ import {
   X,
 } from 'lucide-react';
 
-type Role = 'SuperAdmin' | 'Admin' | 'Employee' | 'Technical' | 'Technical Staff';
+type Role = 'SuperAdmin' | 'Admin' | 'Employee' | 'Technical' | 'Technical Staff' | 'Sales' | 'Client';
 
 export type NotificationType =
   | 'assignment'
@@ -71,10 +71,15 @@ function getNotificationPath(role: Role, type: NotificationType): string {
         case 'new_ticket':  return '/admin/tickets';
         default:            return '/admin/ticket-details';
       }
+    case 'Sales':
+      switch (type) {
+        case 'new_ticket':  return '/sales/tickets';
+        default:            return '/sales/ticket-details';
+      }
     case 'Employee':
     case 'Technical':
     case 'Technical Staff':
-      return '/employee/ticket-details';
+      return '/technical-staff/ticket-details';
     case 'SuperAdmin':
       switch (type) {
         case 'escalation': return '/superadmin/dashboard';

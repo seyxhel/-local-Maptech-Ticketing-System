@@ -1,11 +1,11 @@
-﻿import { useState, useEffect, useCallback } from 'react';
+﻿import { useState, useEffect, useCallback, type ReactNode } from 'react';
 import Stepper from '@mui/material/Stepper';
 import Step from '@mui/material/Step';
 import StepLabel, { stepLabelClasses } from '@mui/material/StepLabel';
 import StepConnector, { stepConnectorClasses } from '@mui/material/StepConnector';
 import { styled } from '@mui/material/styles';
 // Custom connector: green gradient for completed and active, gray for others
-const GradientConnector = styled(StepConnector)(({ theme }) => ({
+const GradientConnector = styled(StepConnector)(() => ({
   [`&.${stepConnectorClasses.alternativeLabel}`]: {
     top: 22,
   },
@@ -27,7 +27,7 @@ const GradientConnector = styled(StepConnector)(({ theme }) => ({
 // Custom icon with gradient background for active/completed
 const GradientStepIconRoot = styled('div', {
   shouldForwardProp: (prop) => prop !== 'ownerState',
-})(({ ownerState }) => ({
+})(({ ownerState }: { ownerState: { active?: boolean; completed?: boolean } }) => ({
   background: ownerState.active || ownerState.completed
     ? 'linear-gradient(135deg, #3BC25B 0%, #0E8F79 100%)'
     : '#e0e0e0',
@@ -45,7 +45,7 @@ const GradientStepIconRoot = styled('div', {
   transition: 'background 0.3s',
 }));
 
-function GradientStepIcon(props) {
+function GradientStepIcon(props: { active?: boolean; completed?: boolean; className?: string; icon?: ReactNode }) {
   const { active, completed, className, icon } = props;
   return (
     <GradientStepIconRoot ownerState={{ active, completed }} className={className}>
@@ -135,14 +135,24 @@ function getServiceIcon(name: string): LucideIcon {
   return Wrench;
 }
 
-const CONTACT_FIELDS = [
-  { name: 'client', label: 'Client', placeholder: 'e.g. Maptech Inc.', required: true },
-  { name: 'contactPerson', label: 'Contact Person', placeholder: 'e.g. Juan Dela Cruz', required: true },
-  { name: 'landline', label: 'Landline No.', placeholder: 'e.g. (02) 1234-5678', required: false },
-  { name: 'mobile', label: 'Mobile No.', placeholder: 'e.g. 09171234567', required: true },
-  { name: 'designation', label: 'Designation', placeholder: 'e.g. IT Manager', required: true },
-  { name: 'department', label: 'Department / Organization', placeholder: 'e.g. Information Technology', required: true },
-] as const;
+type AdditionalContact = {
+  contact_person: string;
+  designation: string;
+  department: string;
+  telephone: string;
+  mobile: string;
+  email: string;
+};
+
+type AdditionalProductDetails = {
+  client_purchase_no: string;
+  maptech_dr: string;
+  maptech_sales_invoice: string;
+  maptech_sales_order_no: string;
+  supplier_purchase_no: string;
+  supplier_sales_invoice: string;
+  supplier_delivery_receipt: string;
+};
 
 /* Flow: form → stf-details (with Call Client + Priority) → ongoing → stf-details (priority enabled) → assign employee → redirect */
 type ModalStep = 'none' | 'stf-details' | 'ongoing' | 'assign';
@@ -151,6 +161,7 @@ type ClientAvailabilityChoice = '' | 'available' | 'unavailable';
 type AdminCreateTicketDraft = {
   currentStep: number;
   contactValues: Record<string, string>;
+  additionalContacts: AdditionalContact[];
   email: string;
   address: string;
   serviceType: string;
@@ -161,8 +172,8 @@ type AdminCreateTicketDraft = {
   additionalSalesReps: string[];
   isExistingClient: boolean;
   selectedClientId: number | null;
-  salesNo: string;
   projectTitle: string;
+  additionalProductDetails: AdditionalProductDetails;
   isExistingProduct: boolean;
   selectedProductId: number | null;
   newProductInfo: {
@@ -199,6 +210,7 @@ export default function AdminCreateTicket() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const isSalesUser = user?.role === 'sales';
+  const routeBase = isSalesUser ? '/sales' : '/admin';
   const [searchParams] = useSearchParams();
   const linkedTicketId = searchParams.get('linkedTicketId') ? Number(searchParams.get('linkedTicketId')) : null;
   const linkedStf = searchParams.get('linkedStf') || null;
@@ -213,6 +225,7 @@ export default function AdminCreateTicket() {
   const [contactValues, setContactValues] = useState<Record<string, string>>({
     client: '', contactPerson: '', landline: '', mobile: '', designation: '', department: '',
   });
+  const [additionalContacts, setAdditionalContacts] = useState<AdditionalContact[]>([]);
   const [email, setEmail] = useState('');
   const [address, setAddress] = useState('');
   const [serviceType, setServiceType] = useState('');
@@ -250,8 +263,16 @@ export default function AdminCreateTicket() {
   // Product picker
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
-  const [salesNo, setSalesNo] = useState('');
   const [projectTitle, setProjectTitle] = useState('');
+  const [additionalProductDetails, setAdditionalProductDetails] = useState<AdditionalProductDetails>({
+    client_purchase_no: '',
+    maptech_dr: '',
+    maptech_sales_invoice: '',
+    maptech_sales_order_no: '',
+    supplier_purchase_no: '',
+    supplier_sales_invoice: '',
+    supplier_delivery_receipt: '',
+  });
   const [productPickerOpen, setProductPickerOpen] = useState(false);
   const [productSearch, setProductSearch] = useState('');
   const [productPage, setProductPage] = useState(1);
@@ -264,7 +285,7 @@ export default function AdminCreateTicket() {
     serial_no: '', version_no: '', date_purchased: '', has_warranty: false,
   });
   const [savingProductDetails, setSavingProductDetails] = useState(false);
-  const [deviceEquipments, setDeviceEquipments] = useState<{ id: number; device_name?: string; device_equipment?: string; is_active?: boolean }[]>([]);
+  const [deviceEquipments, setDeviceEquipments] = useState<{ id: number; name?: string; device_name?: string; device_equipment?: string; is_active?: boolean }[]>([]);
   const [deviceModalOpen, setDeviceModalOpen] = useState(false);
   const [deviceSearch, setDeviceSearch] = useState('');
   const [devicePage, setDevicePage] = useState(1);
@@ -334,8 +355,8 @@ export default function AdminCreateTicket() {
       .catch(() => {});
   }, [isExistingClient, selectedClientId]);
 
-  // Multi-step form state (reduced to 4 steps; Service now includes Support+Description)
-  const steps = ['Contact', 'Product', 'Service', 'Review & Submit'];
+  // Multi-step form state
+  const steps = ['Client Information', 'Product Information', 'Additional Product Details', 'Service', 'Review & Submit'];
   const [currentStep, setCurrentStep] = useState(0);
 
   const lastStep = steps.length - 1;
@@ -346,6 +367,7 @@ export default function AdminCreateTicket() {
 
     setCurrentStep(Math.min(Math.max(draft.currentStep, 0), lastStep));
     setContactValues(draft.contactValues || { client: '', contactPerson: '', landline: '', mobile: '', designation: '', department: '' });
+    setAdditionalContacts(Array.isArray(draft.additionalContacts) ? draft.additionalContacts : []);
     setEmail(draft.email || '');
     setAddress(draft.address || '');
     setServiceType(draft.serviceType || '');
@@ -356,8 +378,19 @@ export default function AdminCreateTicket() {
     setAdditionalSalesReps(Array.isArray(draft.additionalSalesReps) ? draft.additionalSalesReps : []);
     setIsExistingClient(!!draft.isExistingClient);
     setSelectedClientId(draft.selectedClientId ?? null);
-    setSalesNo(draft.salesNo || '');
     setProjectTitle(draft.projectTitle || '');
+    setAdditionalProductDetails(
+      draft.additionalProductDetails ||
+      {
+        client_purchase_no: '',
+        maptech_dr: '',
+        maptech_sales_invoice: '',
+        maptech_sales_order_no: '',
+        supplier_purchase_no: '',
+        supplier_sales_invoice: '',
+        supplier_delivery_receipt: '',
+      }
+    );
     setIsExistingProduct(!!draft.isExistingProduct);
     setSelectedProductId(draft.selectedProductId ?? null);
     setNewProductInfo(
@@ -371,6 +404,7 @@ export default function AdminCreateTicket() {
     adminCreateTicketDraft = {
       currentStep,
       contactValues,
+      additionalContacts,
       email,
       address,
       serviceType,
@@ -381,8 +415,8 @@ export default function AdminCreateTicket() {
       additionalSalesReps,
       isExistingClient,
       selectedClientId,
-      salesNo,
       projectTitle,
+      additionalProductDetails,
       isExistingProduct,
       selectedProductId,
       newProductInfo,
@@ -391,6 +425,7 @@ export default function AdminCreateTicket() {
   }, [
     currentStep,
     contactValues,
+    additionalContacts,
     email,
     address,
     serviceType,
@@ -401,8 +436,8 @@ export default function AdminCreateTicket() {
     additionalSalesReps,
     isExistingClient,
     selectedClientId,
-    salesNo,
     projectTitle,
+    additionalProductDetails,
     isExistingProduct,
     selectedProductId,
     newProductInfo,
@@ -413,50 +448,75 @@ export default function AdminCreateTicket() {
     const newErrors: Record<string, boolean> = {};
     const msgs: Record<string, string> = {};
     if (step === 0) {
-      CONTACT_FIELDS.forEach((f) => {
-        if (f.name === 'mobile') {
-          const err = validatePhone(contactValues[f.name] || '', 'Mobile No.');
-          if (err) { newErrors[f.name] = true; msgs[f.name] = err; }
-        } else if (f.name === 'landline') {
-          const err = validateLandline(contactValues[f.name] || '');
-          if (err) { newErrors[f.name] = true; msgs[f.name] = err; }
-        } else if (f.name === 'contactPerson') {
-          const err = validateName(contactValues[f.name] || '', 'Contact Person');
-          if (err) { newErrors[f.name] = true; msgs[f.name] = err; }
-        } else if (f.required && !contactValues[f.name]?.trim()) {
-          newErrors[f.name] = true; msgs[f.name] = `${f.label} is required.`;
-        }
-      });
+      if (!contactValues.client.trim()) { newErrors['client'] = true; msgs['client'] = 'Client is required.'; }
+      const addrErr = validateAddress(address);
+      if (addrErr) { newErrors['address'] = true; msgs['address'] = addrErr; }
+
+      const landlineErr = validateLandline(contactValues.landline || '');
+      if (landlineErr) { newErrors['landline'] = true; msgs['landline'] = landlineErr; }
+
+      const contactErr = validateName(contactValues.contactPerson || '', 'Contact Person');
+      if (contactErr) { newErrors['contactPerson'] = true; msgs['contactPerson'] = contactErr; }
+
+      if (!contactValues.designation.trim()) { newErrors['designation'] = true; msgs['designation'] = 'Designation is required.'; }
+      if (!contactValues.department.trim()) { newErrors['department'] = true; msgs['department'] = 'Department is required.'; }
+
+      const mobileErr = validatePhone(contactValues.mobile || '', 'Mobile No.');
+      if (mobileErr) { newErrors['mobile'] = true; msgs['mobile'] = mobileErr; }
+
       if (email.trim()) {
         const emailErr = validateEmail(email);
         if (emailErr) { newErrors['email'] = true; msgs['email'] = emailErr; }
       }
-      const addrErr = validateAddress(address);
-      if (addrErr) { newErrors['address'] = true; msgs['address'] = addrErr; }
-      if (!selectedSalesRep.trim()) { newErrors['salesRepresentative'] = true; msgs['salesRepresentative'] = 'Sales Representative is required.'; }
+
+      additionalContacts.forEach((contact, idx) => {
+        const contactLabel = `Additional contact #${idx + 1}`;
+        if (!contact.contact_person.trim()) {
+          newErrors[`additionalContact-${idx}-contact_person`] = true;
+          msgs[`additionalContact-${idx}-contact_person`] = `${contactLabel}: Contact Person is required.`;
+        }
+        if (!contact.designation.trim()) {
+          newErrors[`additionalContact-${idx}-designation`] = true;
+          msgs[`additionalContact-${idx}-designation`] = `${contactLabel}: Designation is required.`;
+        }
+        if (!contact.department.trim()) {
+          newErrors[`additionalContact-${idx}-department`] = true;
+          msgs[`additionalContact-${idx}-department`] = `${contactLabel}: Department is required.`;
+        }
+        const telErr = validateLandline(contact.telephone || '');
+        if (telErr) {
+          newErrors[`additionalContact-${idx}-telephone`] = true;
+          msgs[`additionalContact-${idx}-telephone`] = `${contactLabel}: ${telErr}`;
+        }
+        const addMobileErr = validatePhone(contact.mobile || '', 'Mobile No.');
+        if (addMobileErr) {
+          newErrors[`additionalContact-${idx}-mobile`] = true;
+          msgs[`additionalContact-${idx}-mobile`] = `${contactLabel}: ${addMobileErr}`;
+        }
+        if (contact.email.trim()) {
+          const addEmailErr = validateEmail(contact.email);
+          if (addEmailErr) {
+            newErrors[`additionalContact-${idx}-email`] = true;
+            msgs[`additionalContact-${idx}-email`] = `${contactLabel}: ${addEmailErr}`;
+          }
+        }
+      });
     }
     if (step === 1) {
-      if (!projectTitle.trim()) { newErrors['projectTitle'] = true; msgs['projectTitle'] = 'Project Title is required.'; }
-      // require full product details for either existing or new product
       if (isExistingProduct && !selectedProductId) {
         newErrors['product'] = true; msgs['product'] = 'Please select a product.';
       }
-      const requiredProductFields = [
-        ['device_equipment', newProductInfo.device_equipment, 'Device / Equipment is required.'],
-        ['product_name', newProductInfo.product_name, 'Product name is required.'],
-        ['brand', newProductInfo.brand, 'Brand is required.'],
-        ['model_name', newProductInfo.model_name, 'Model is required.'],
-        ['serial_no', newProductInfo.serial_no, 'Serial No. is required.'],
-        ['version_no', newProductInfo.version_no, 'Version No. is required.'],
-        ['date_purchased', newProductInfo.date_purchased, 'Date Purchased is required.'],
-      ];
-      for (const [key, val, msg] of requiredProductFields) {
-        if (!String(val || '').trim()) { newErrors[key as string] = true; msgs[key as string] = msg; }
-      }
-      if (!salesNo.trim()) { newErrors['salesNo'] = true; msgs['salesNo'] = 'Sales / Invoice No. is required.'; }
+      if (!projectTitle.trim()) { newErrors['projectTitle'] = true; msgs['projectTitle'] = 'Project Title is required.'; }
+      if (!newProductInfo.product_name.trim()) { newErrors['product_name'] = true; msgs['product_name'] = 'Product name is required.'; }
+      if (!newProductInfo.device_equipment.trim()) { newErrors['device_equipment'] = true; msgs['device_equipment'] = 'Device / Equipment is required.'; }
     }
     if (step === 2) {
-      // Step 2 now includes: Type of Service (3), Preferred Type of Support (4), Description (5)
+      if (!additionalProductDetails.maptech_sales_invoice.trim()) {
+        newErrors['maptech_sales_invoice'] = true;
+        msgs['maptech_sales_invoice'] = 'Maptech Sales Invoice is required.';
+      }
+    }
+    if (step === 3) {
       if (!serviceType) { newErrors['serviceType'] = true; msgs['serviceType'] = 'Please select a type of service'; }
       if (serviceType === 'Others' && !serviceOthersText.trim()) { newErrors['serviceOthersText'] = true; msgs['serviceOthersText'] = 'Please specify the service'; }
       if (!supportType) { newErrors['supportType'] = true; msgs['supportType'] = 'Please select a support type'; }
@@ -488,7 +548,10 @@ export default function AdminCreateTicket() {
     const p = products.find((x) => x.id === selectedProductId);
     if (!p) return;
     setProjectTitle(p.project_title || '');
-    setSalesNo(p.sales_no || '');
+    setAdditionalProductDetails((prev) => ({
+      ...prev,
+      maptech_sales_invoice: p.sales_no || prev.maptech_sales_invoice,
+    }));
     setNewProductInfo({
       device_equipment: p.device_equipment || '',
       product_name: p.product_name || '',
@@ -499,7 +562,7 @@ export default function AdminCreateTicket() {
       date_purchased: p.date_purchased || '',
       has_warranty: !!p.has_warranty,
     });
-    setErrors((prev) => ({ ...prev, product: false, product_name: false, brand: false, model_name: false, serial_no: false, version_no: false, date_purchased: false, salesNo: false, device_equipment: false }));
+    setErrors((prev) => ({ ...prev, product: false, product_name: false, brand: false, model_name: false, serial_no: false, version_no: false, date_purchased: false, maptech_sales_invoice: false, device_equipment: false }));
   }, [selectedProductId, products]);
 
   const handleSaveProductDetails = async () => {
@@ -510,12 +573,12 @@ export default function AdminCreateTicket() {
     setSavingProductDetails(true);
     try {
       const payload: Partial<Product> = {
-        device_equipment: newProductInfo.device_equipment || null,
-        product_name: newProductInfo.product_name || null,
-        brand: newProductInfo.brand || null,
-        model_name: newProductInfo.model_name || null,
-        serial_no: newProductInfo.serial_no || null,
-        version_no: newProductInfo.version_no || null,
+        device_equipment: newProductInfo.device_equipment || undefined,
+        product_name: newProductInfo.product_name || undefined,
+        brand: newProductInfo.brand || undefined,
+        model_name: newProductInfo.model_name || undefined,
+        serial_no: newProductInfo.serial_no || undefined,
+        version_no: newProductInfo.version_no || undefined,
         date_purchased: newProductInfo.date_purchased || null,
         has_warranty: newProductInfo.has_warranty,
       };
@@ -547,12 +610,35 @@ export default function AdminCreateTicket() {
     if (selectedProduct.serial_no) ticketData.serial_no = selectedProduct.serial_no;
     if (selectedProduct.has_warranty) ticketData.has_warranty = selectedProduct.has_warranty;
     if (selectedProduct.others) ticketData.others = selectedProduct.others;
-    ticketData.sales_no = salesNo.trim() || selectedProduct.sales_no || '';
+    ticketData.sales_no = additionalProductDetails.maptech_sales_invoice.trim() || selectedProduct.sales_no || '';
   };
 
   const setContactField = (name: string, value: string) => {
     setContactValues((prev) => ({ ...prev, [name]: value }));
     if (value.trim()) setErrors((prev) => ({ ...prev, [name]: false }));
+  };
+
+  const buildAdditionalContactsNote = () => {
+    if (additionalContacts.length === 0) return '';
+    const lines = additionalContacts.map((contact, index) => (
+      `${index + 1}. ${contact.contact_person || '-'} | ${contact.designation || '-'} | ${contact.department || '-'} | Tel: ${contact.telephone || '-'} | Mobile: ${contact.mobile || '-'} | Email: ${contact.email || '-'}`
+    ));
+    return `Additional Contacts:\n${lines.join('\n')}`;
+  };
+
+  const getDescriptionWithMetadata = () => {
+    const blocks = [description.trim(), buildAdditionalContactsNote()].filter(Boolean);
+    return blocks.join('\n\n');
+  };
+
+  const applyAdditionalProductDetailsToTicketData = (ticketData: Record<string, unknown>) => {
+    ticketData.client_purchase_no = additionalProductDetails.client_purchase_no.trim();
+    ticketData.maptech_dr = additionalProductDetails.maptech_dr.trim();
+    ticketData.maptech_sales_invoice = additionalProductDetails.maptech_sales_invoice.trim();
+    ticketData.maptech_sales_order_no = additionalProductDetails.maptech_sales_order_no.trim();
+    ticketData.supplier_purchase_no = additionalProductDetails.supplier_purchase_no.trim();
+    ticketData.supplier_sales_invoice = additionalProductDetails.supplier_sales_invoice.trim();
+    ticketData.supplier_delivery_receipt = additionalProductDetails.supplier_delivery_receipt.trim();
   };
 
   const formatSalesRepInput = (value: string) => {
@@ -609,21 +695,38 @@ export default function AdminCreateTicket() {
     const newErrors: Record<string, boolean> = {};
     const msgs: Record<string, string> = {};
 
-    CONTACT_FIELDS.forEach((f) => {
-      if (f.name === 'mobile') {
-        const err = validatePhone(contactValues[f.name] || '', 'Mobile No.');
-        if (err) { newErrors[f.name] = true; msgs[f.name] = err; }
-      } else if (f.name === 'landline') {
-        const err = validateLandline(contactValues[f.name] || '');
-        if (err) { newErrors[f.name] = true; msgs[f.name] = err; }
-      } else if (f.name === 'contactPerson') {
-        const err = validateName(contactValues[f.name] || '', 'Contact Person');
-        if (err) { newErrors[f.name] = true; msgs[f.name] = err; }
-      } else if (f.required && !contactValues[f.name]?.trim()) {
-        newErrors[f.name] = true;
-        msgs[f.name] = `${f.label} is required.`;
-      }
-    });
+    if (!contactValues.client.trim()) {
+      newErrors['client'] = true;
+      msgs['client'] = 'Client is required.';
+    }
+
+    const contactErr = validateName(contactValues.contactPerson || '', 'Contact Person');
+    if (contactErr) {
+      newErrors['contactPerson'] = true;
+      msgs['contactPerson'] = contactErr;
+    }
+
+    const landlineErr = validateLandline(contactValues.landline || '');
+    if (landlineErr) {
+      newErrors['landline'] = true;
+      msgs['landline'] = landlineErr;
+    }
+
+    const mobileErr = validatePhone(contactValues.mobile || '', 'Mobile No.');
+    if (mobileErr) {
+      newErrors['mobile'] = true;
+      msgs['mobile'] = mobileErr;
+    }
+
+    if (!contactValues.designation.trim()) {
+      newErrors['designation'] = true;
+      msgs['designation'] = 'Designation is required.';
+    }
+
+    if (!contactValues.department.trim()) {
+      newErrors['department'] = true;
+      msgs['department'] = 'Department is required.';
+    }
 
     if (email.trim()) {
       const emailErr = validateEmail(email);
@@ -633,9 +736,24 @@ export default function AdminCreateTicket() {
     const addrErr = validateAddress(address);
     if (addrErr) { newErrors['address'] = true; msgs['address'] = addrErr; }
 
-    if (!selectedSalesRep.trim()) {
-      newErrors['salesRepresentative'] = true;
-      msgs['salesRepresentative'] = 'Sales Representative is required.';
+    if (!projectTitle.trim()) {
+      newErrors['projectTitle'] = true;
+      msgs['projectTitle'] = 'Project Title is required.';
+    }
+
+    if (!newProductInfo.product_name.trim()) {
+      newErrors['product_name'] = true;
+      msgs['product_name'] = 'Product name is required.';
+    }
+
+    if (!newProductInfo.device_equipment.trim()) {
+      newErrors['device_equipment'] = true;
+      msgs['device_equipment'] = 'Device / Equipment is required.';
+    }
+
+    if (!additionalProductDetails.maptech_sales_invoice.trim()) {
+      newErrors['maptech_sales_invoice'] = true;
+      msgs['maptech_sales_invoice'] = 'Maptech Sales Invoice is required.';
     }
 
     if (!serviceType) newErrors['serviceType'] = true;
@@ -674,7 +792,7 @@ export default function AdminCreateTicket() {
           department_organization: contactValues.department,
           email_address: email.trim(),
           address,
-          description_of_problem: description,
+          description_of_problem: getDescriptionWithMetadata(),
           preferred_support_type: supportTypeMap[supportType?.trim()] || 'remote_online',
         };
 
@@ -698,9 +816,11 @@ export default function AdminCreateTicket() {
           ticketData.is_existing_client = true;
         }
 
+        applyAdditionalProductDetailsToTicketData(ticketData);
+
         if (isExistingProduct) {
           applySelectedProductToTicketData(ticketData);
-          if (salesNo.trim()) ticketData.sales_no = salesNo.trim();
+          if (additionalProductDetails.maptech_sales_invoice.trim()) ticketData.sales_no = additionalProductDetails.maptech_sales_invoice.trim();
         } else {
           if (newProductInfo.device_equipment.trim()) ticketData.device_equipment = newProductInfo.device_equipment.trim();
           if (newProductInfo.product_name.trim()) ticketData.product = newProductInfo.product_name.trim();
@@ -710,13 +830,13 @@ export default function AdminCreateTicket() {
           if (newProductInfo.version_no.trim()) ticketData.version_no = newProductInfo.version_no.trim();
           if (newProductInfo.date_purchased) ticketData.date_purchased = newProductInfo.date_purchased;
           ticketData.has_warranty = newProductInfo.has_warranty;
-          if (salesNo.trim()) ticketData.sales_no = salesNo.trim();
+          if (additionalProductDetails.maptech_sales_invoice.trim()) ticketData.sales_no = additionalProductDetails.maptech_sales_invoice.trim();
         }
 
         const created = await createTicket(ticketData as never);
         adminCreateTicketDraft = null;
         toast.success(`STF ${created.stf_no} submitted to supervisors for call and priority review.`);
-        navigate(`/admin/ticket-details?stf=${encodeURIComponent(created.stf_no)}`);
+        navigate(`${routeBase}/ticket-details?stf=${encodeURIComponent(created.stf_no)}`);
       } catch (err: any) {
         toast.error(err?.message || 'Failed to create ticket.');
       }
@@ -836,7 +956,7 @@ export default function AdminCreateTicket() {
       department_organization: contactValues.department,
       email_address: email.trim(),
       address,
-      description_of_problem: description,
+      description_of_problem: getDescriptionWithMetadata(),
       preferred_support_type: supportTypeMap[supportType?.trim()] || 'remote_online',
     };
 
@@ -868,9 +988,11 @@ export default function AdminCreateTicket() {
       ticketData.is_existing_client = true;
     }
 
+    applyAdditionalProductDetailsToTicketData(ticketData);
+
     if (isExistingProduct) {
       applySelectedProductToTicketData(ticketData);
-      if (salesNo.trim()) ticketData.sales_no = salesNo.trim();
+      if (additionalProductDetails.maptech_sales_invoice.trim()) ticketData.sales_no = additionalProductDetails.maptech_sales_invoice.trim();
     } else {
       if (newProductInfo.device_equipment.trim()) ticketData.device_equipment = newProductInfo.device_equipment.trim();
       if (newProductInfo.product_name.trim()) ticketData.product = newProductInfo.product_name.trim();
@@ -880,7 +1002,7 @@ export default function AdminCreateTicket() {
       if (newProductInfo.version_no.trim()) ticketData.version_no = newProductInfo.version_no.trim();
       if (newProductInfo.date_purchased) ticketData.date_purchased = newProductInfo.date_purchased;
       ticketData.has_warranty = newProductInfo.has_warranty;
-      if (salesNo.trim()) ticketData.sales_no = salesNo.trim();
+      if (additionalProductDetails.maptech_sales_invoice.trim()) ticketData.sales_no = additionalProductDetails.maptech_sales_invoice.trim();
     }
 
     return ticketData;
@@ -915,7 +1037,7 @@ export default function AdminCreateTicket() {
           ? `Linked to ${linkedStf} | Priority: ${priorityLevel} | Service: ${serviceType}`
           : `Priority: ${priorityLevel} | Service: ${serviceType}`,
       });
-      navigate(`/admin/ticket-details?stf=${encodeURIComponent(created.stf_no)}`);
+      navigate(`${routeBase}/ticket-details?stf=${encodeURIComponent(created.stf_no)}`);
     } catch (err: any) {
       toast.error(err?.message || 'Failed to create ticket.');
     } finally {
@@ -946,7 +1068,7 @@ export default function AdminCreateTicket() {
           ? `Linked to ${linkedStf} | Priority: ${priorityLevel} | Service: ${serviceType}`
           : `Priority: ${priorityLevel} | Service: ${serviceType}`,
       });
-      navigate(`/admin/ticket-details?stf=${encodeURIComponent(created.stf_no)}`);
+      navigate(`${routeBase}/ticket-details?stf=${encodeURIComponent(created.stf_no)}`);
     } catch (err: any) {
       toast.error(err?.message || 'Failed to create ticket.');
     } finally {
@@ -977,7 +1099,7 @@ export default function AdminCreateTicket() {
           ? `Linked to ${linkedStf}. Assignment will remain blocked until client call and priority review are completed.`
           : 'Assignment will remain blocked until client call and priority review are completed.',
       });
-      navigate(`/admin/ticket-details?stf=${encodeURIComponent(created.stf_no)}`);
+      navigate(`${routeBase}/ticket-details?stf=${encodeURIComponent(created.stf_no)}`);
     } catch (err: any) {
       toast.error(err?.message || 'Failed to create pending ticket.');
     } finally {
@@ -1040,7 +1162,7 @@ export default function AdminCreateTicket() {
               },
             }}
           >
-            {steps.map((label, idx) => (
+            {steps.map((label) => (
               <Step key={label}>
                 <StepLabel StepIconComponent={GradientStepIcon}>{label}</StepLabel>
               </Step>
@@ -1115,18 +1237,132 @@ export default function AdminCreateTicket() {
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {CONTACT_FIELDS.map((f) => (
-              <div key={f.name}>
-                <label className={labelCls}>
-                  {f.label} {f.required && <span className="text-red-500 ml-1">*</span>}
-                  {f.name === 'landline' && <span className="text-gray-400 text-xs font-normal">(optional)</span>}
-                </label>
-                <input type="text" placeholder={f.placeholder} value={contactValues[f.name]} onChange={(e) => { const val = e.target.value; if (f.name === 'mobile' && val !== '' && !/^\d*$/.test(val)) return; if (f.name === 'landline' && val !== '' && !/^[\d()\-\s]*$/.test(val)) return; setContactField(f.name, val); }} maxLength={f.name === 'mobile' ? 11 : f.name === 'landline' ? MAX_PHONE : MAX_FIELD} className={`${inputCls} ${errors[f.name] ? errorRing : ''}`} />
-                {errors[f.name] && <p className="text-red-500 text-xs mt-1">{errorMsgs[f.name] || 'This field is required'}</p>}
-              </div>
-            ))}
             <div>
-              <label className={labelCls}>Sales Representative <span className="text-red-500 ml-1">*</span></label>
+              <label className={labelCls}>Client <span className="text-red-500 ml-1">*</span></label>
+              <input
+                type="text"
+                placeholder="e.g. Maptech Inc."
+                value={contactValues.client}
+                onChange={(e) => setContactField('client', e.target.value)}
+                maxLength={MAX_FIELD}
+                className={`${inputCls} ${errors['client'] ? errorRing : ''}`}
+              />
+              {errors['client'] && <p className="text-red-500 text-xs mt-1">{errorMsgs['client'] || 'Client is required.'}</p>}
+            </div>
+
+            <div className="md:col-span-2">
+              <label className={labelCls}>Address <span className="text-red-500 ml-1">*</span></label>
+              <textarea
+                rows={2}
+                placeholder="e.g. 123 Main Street, Quezon City, Metro Manila"
+                value={address}
+                maxLength={MAX_ADDRESS}
+                onChange={(e) => {
+                  setAddress(e.target.value);
+                  if (e.target.value.trim()) {
+                    setErrors((p) => ({ ...p, address: false }));
+                    setErrorMsgs((p) => ({ ...p, address: '' }));
+                  }
+                }}
+                className={`${inputCls} resize-none ${errors['address'] ? errorRing : ''}`}
+              />
+              {errors['address'] && <p className="text-red-500 text-xs mt-1">{errorMsgs['address'] || 'Address is required.'}</p>}
+            </div>
+
+            <div>
+              <label className={labelCls}>Contact # / Telephone <span className="text-gray-400 text-xs font-normal">(optional)</span></label>
+              <input
+                type="text"
+                placeholder="e.g. (02) 1234-5678"
+                value={contactValues.landline}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val !== '' && !/^[\d()\-\s]*$/.test(val)) return;
+                  setContactField('landline', val);
+                }}
+                maxLength={MAX_PHONE}
+                className={`${inputCls} ${errors['landline'] ? errorRing : ''}`}
+              />
+              {errors['landline'] && <p className="text-red-500 text-xs mt-1">{errorMsgs['landline']}</p>}
+            </div>
+
+            <div>
+              <label className={labelCls}>Contact Person <span className="text-red-500 ml-1">*</span></label>
+              <input
+                type="text"
+                placeholder="e.g. Juan Dela Cruz"
+                value={contactValues.contactPerson}
+                onChange={(e) => setContactField('contactPerson', e.target.value)}
+                maxLength={MAX_FIELD}
+                className={`${inputCls} ${errors['contactPerson'] ? errorRing : ''}`}
+              />
+              {errors['contactPerson'] && <p className="text-red-500 text-xs mt-1">{errorMsgs['contactPerson']}</p>}
+            </div>
+
+            <div>
+              <label className={labelCls}>Designation <span className="text-red-500 ml-1">*</span></label>
+              <input
+                type="text"
+                placeholder="e.g. IT Manager"
+                value={contactValues.designation}
+                onChange={(e) => setContactField('designation', e.target.value)}
+                maxLength={MAX_FIELD}
+                className={`${inputCls} ${errors['designation'] ? errorRing : ''}`}
+              />
+              {errors['designation'] && <p className="text-red-500 text-xs mt-1">{errorMsgs['designation']}</p>}
+            </div>
+
+            <div>
+              <label className={labelCls}>Department <span className="text-red-500 ml-1">*</span></label>
+              <input
+                type="text"
+                placeholder="e.g. Information Technology"
+                value={contactValues.department}
+                onChange={(e) => setContactField('department', e.target.value)}
+                maxLength={MAX_FIELD}
+                className={`${inputCls} ${errors['department'] ? errorRing : ''}`}
+              />
+              {errors['department'] && <p className="text-red-500 text-xs mt-1">{errorMsgs['department']}</p>}
+            </div>
+
+            <div>
+              <label className={labelCls}>Mobile # <span className="text-red-500 ml-1">*</span></label>
+              <input
+                type="text"
+                placeholder="e.g. 09171234567"
+                value={contactValues.mobile}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val !== '' && !/^\d*$/.test(val)) return;
+                  setContactField('mobile', val);
+                }}
+                maxLength={11}
+                className={`${inputCls} ${errors['mobile'] ? errorRing : ''}`}
+              />
+              {errors['mobile'] && <p className="text-red-500 text-xs mt-1">{errorMsgs['mobile']}</p>}
+            </div>
+
+            <div>
+              <label className={labelCls}>Email <span className="text-gray-400 text-xs font-normal">(optional)</span></label>
+              <input
+                type="text"
+                placeholder="e.g. juandelacruz@email.com"
+                value={email}
+                maxLength={MAX_EMAIL}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (e.target.value.trim()) {
+                    setErrors((p) => ({ ...p, email: false }));
+                    setErrorMsgs((p) => ({ ...p, email: '' }));
+                  }
+                }}
+                className={`${inputCls} ${errors['email'] ? errorRing : ''}`}
+              />
+              {errors['email'] && <p className="text-red-500 text-xs mt-1">{errorMsgs['email']}</p>}
+            </div>
+
+            <div>
+              <label className={labelCls}>Sales Representative <span className="text-gray-400 text-xs font-normal">(optional, multiple)</span></label>
               <div className="flex items-center gap-2">
                 <input
                   type="text"
@@ -1154,20 +1390,52 @@ export default function AdminCreateTicket() {
                   <Plus className="w-4 h-4" />
                 </button>
               </div>
-              {errors['salesRepresentative'] && <p className="text-red-500 text-xs mt-1">{errorMsgs['salesRepresentative'] || 'This field is required'}</p>}
               {additionalSalesReps.length > 0 && (
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Other representative(s): {additionalSalesReps.join(', ')}</p>
               )}
             </div>
-            <div>
-              <label className={labelCls}>Email Address <span className="text-gray-400 text-xs font-normal">(optional)</span></label>
-              <input type="text" placeholder="e.g. juandelacruz@email.com" value={email} maxLength={MAX_EMAIL} onChange={(e) => { setEmail(e.target.value); if (e.target.value.trim()) { setErrors((p) => ({ ...p, email: false })); setErrorMsgs((p) => ({ ...p, email: '' })); } }} className={`${inputCls} ${errors['email'] ? errorRing : ''}`} />
-              {errors['email'] && <p className="text-red-500 text-xs mt-1">{errorMsgs['email'] || 'This field is required'}</p>}
-            </div>
-            <div className="md:col-span-2">
-              <label className={labelCls}>Full Address <span className="text-red-500 ml-1">*</span></label>
-              <textarea rows={2} placeholder="e.g. 123 Main Street, Quezon City, Metro Manila" value={address} maxLength={MAX_ADDRESS} onChange={(e) => { setAddress(e.target.value); if (e.target.value.trim()) { setErrors((p) => ({ ...p, address: false })); setErrorMsgs((p) => ({ ...p, address: '' })); } }} className={`${inputCls} resize-none ${errors['address'] ? errorRing : ''}`} />
-              {errors['address'] && <p className="text-red-500 text-xs mt-1">{errorMsgs['address'] || 'This field is required'}</p>}
+
+            <div className="md:col-span-2 space-y-3">
+              <div className="flex items-center justify-between">
+                <label className={labelCls}>Multiple Contacts (Optional)</label>
+                <button
+                  type="button"
+                  onClick={() => setAdditionalContacts((prev) => ([
+                    ...prev,
+                    { contact_person: '', designation: '', department: '', telephone: '', mobile: '', email: '' },
+                  ]))}
+                  className="px-3 py-1.5 rounded-lg bg-[#0E8F79] hover:bg-[#0B7A68] text-white text-xs font-semibold"
+                >
+                  Add Contact
+                </button>
+              </div>
+
+              {additionalContacts.length === 0 && (
+                <p className="text-xs text-gray-500 dark:text-gray-400">No additional contacts added.</p>
+              )}
+
+              {additionalContacts.map((contact, idx) => (
+                <div key={`additional-contact-${idx}`} className="p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/70 dark:bg-gray-800/50 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">Contact #{idx + 1}</p>
+                    <button
+                      type="button"
+                      onClick={() => setAdditionalContacts((prev) => prev.filter((_, i) => i !== idx))}
+                      className="text-red-600 text-xs font-semibold"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <input value={contact.contact_person} onChange={(e) => setAdditionalContacts((prev) => prev.map((item, i) => i === idx ? { ...item, contact_person: e.target.value } : item))} placeholder="Contact Person" className={`${inputCls} ${errors[`additionalContact-${idx}-contact_person`] ? errorRing : ''}`} />
+                    <input value={contact.designation} onChange={(e) => setAdditionalContacts((prev) => prev.map((item, i) => i === idx ? { ...item, designation: e.target.value } : item))} placeholder="Designation" className={`${inputCls} ${errors[`additionalContact-${idx}-designation`] ? errorRing : ''}`} />
+                    <input value={contact.department} onChange={(e) => setAdditionalContacts((prev) => prev.map((item, i) => i === idx ? { ...item, department: e.target.value } : item))} placeholder="Department" className={`${inputCls} ${errors[`additionalContact-${idx}-department`] ? errorRing : ''}`} />
+                    <input value={contact.telephone} onChange={(e) => { const val = e.target.value; if (val !== '' && !/^[\d()\-\s]*$/.test(val)) return; setAdditionalContacts((prev) => prev.map((item, i) => i === idx ? { ...item, telephone: val } : item)); }} placeholder="Telephone" className={`${inputCls} ${errors[`additionalContact-${idx}-telephone`] ? errorRing : ''}`} />
+                    <input value={contact.mobile} onChange={(e) => { const val = e.target.value; if (val !== '' && !/^\d*$/.test(val)) return; setAdditionalContacts((prev) => prev.map((item, i) => i === idx ? { ...item, mobile: val } : item)); }} placeholder="Mobile" maxLength={11} className={`${inputCls} ${errors[`additionalContact-${idx}-mobile`] ? errorRing : ''}`} />
+                    <input value={contact.email} onChange={(e) => setAdditionalContacts((prev) => prev.map((item, i) => i === idx ? { ...item, email: e.target.value } : item))} placeholder="Email (optional)" className={`${inputCls} ${errors[`additionalContact-${idx}-email`] ? errorRing : ''}`} />
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
           </Card>
@@ -1176,7 +1444,7 @@ export default function AdminCreateTicket() {
         {/* Navigation controls for step 0 */}
         {currentStep === 0 && (
           <div className="flex justify-end gap-3">
-            <GreenButton type="button" variant="outline" onClick={() => { setContactValues({ client: '', contactPerson: '', landline: '', mobile: '', designation: '', department: '' }); setEmail(''); setAddress(''); setSelectedSalesRep(''); setAdditionalSalesReps([]); }}>Clear</GreenButton>
+            <GreenButton type="button" variant="outline" onClick={() => { setContactValues({ client: '', contactPerson: '', landline: '', mobile: '', designation: '', department: '' }); setAdditionalContacts([]); setEmail(''); setAddress(''); setSelectedSalesRep(''); setAdditionalSalesReps([]); }}>Clear</GreenButton>
             <GreenButton type="button" onClick={goNext}>Next</GreenButton>
           </div>
         )}
@@ -1502,14 +1770,14 @@ export default function AdminCreateTicket() {
         {/* Section 2: Product Information */}
         {currentStep === 1 && (
           <Card className="border-l-4 border-l-[#3BC25B]">
-          <h3 className={sectionHeaderCls}>2. Product Details</h3>
+          <h3 className={sectionHeaderCls}>2. Product Information</h3>
           {errors['product'] && <p className="text-red-500 text-xs mb-3 -mt-4">{errorMsgs['product'] || 'Please complete product details.'}</p>}
 
           {/* New / Existing product toggle */}
           <div className="flex items-center gap-4 mb-6">
             <button
               type="button"
-              onClick={() => { setIsExistingProduct(false); setSelectedProductId(null); setErrors((p) => ({ ...p, product: false, product_name: false, brand: false, model_name: false, serial_no: false, version_no: false, date_purchased: false, salesNo: false, device_equipment: false, projectTitle: false })); }}
+              onClick={() => { setIsExistingProduct(false); setSelectedProductId(null); setErrors((p) => ({ ...p, product: false, product_name: false, brand: false, model_name: false, serial_no: false, version_no: false, date_purchased: false, maptech_sales_invoice: false, device_equipment: false, projectTitle: false })); }}
               className={`px-4 py-2 rounded-lg text-sm font-medium border transition-all ${
                 !isExistingProduct
                   ? 'bg-[#0E8F79] text-white border-[#0E8F79]'
@@ -1520,7 +1788,7 @@ export default function AdminCreateTicket() {
             </button>
             <button
               type="button"
-              onClick={() => { setIsExistingProduct(true); setNewProductInfo({ device_equipment: '', product_name: '', brand: '', model_name: '', serial_no: '', version_no: '', date_purchased: '', has_warranty: false }); setErrors((p) => ({ ...p, product: false, product_name: false, brand: false, model_name: false, serial_no: false, version_no: false, date_purchased: false, salesNo: false, device_equipment: false, projectTitle: false })); }}
+              onClick={() => { setIsExistingProduct(true); setNewProductInfo({ device_equipment: '', product_name: '', brand: '', model_name: '', serial_no: '', version_no: '', date_purchased: '', has_warranty: false }); setErrors((p) => ({ ...p, product: false, product_name: false, brand: false, model_name: false, serial_no: false, version_no: false, date_purchased: false, maptech_sales_invoice: false, device_equipment: false, projectTitle: false })); }}
               className={`px-4 py-2 rounded-lg text-sm font-medium border transition-all ${
                 isExistingProduct
                   ? 'bg-[#0E8F79] text-white border-[#0E8F79]'
@@ -1531,17 +1799,91 @@ export default function AdminCreateTicket() {
             </button>
           </div>
 
+          {isExistingProduct && (
+            <div className="md:col-span-2 mb-6">
+              <label className={labelCls}>Select Product (optional)</label>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setProductPickerOpen(true)}
+                  className={`${inputCls} text-left`}
+                >
+                  {selectedProduct
+                    ? `${selectedProduct.product_name || selectedProduct.device_equipment || 'Unnamed'}${selectedProduct.brand ? ` | ${selectedProduct.brand}` : ''}${selectedProduct.model_name ? ` | ${selectedProduct.model_name}` : ''}${selectedProduct.serial_no ? ` | S/N: ${selectedProduct.serial_no}` : ''}`
+                    : 'Select a product'}
+                </button>
+                {selectedProductId && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedProductId(null)}
+                    className="px-3 py-2 rounded-lg text-sm border bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-600"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div>
+              <label className={labelCls}>Product Name <span className="text-red-500 ml-1">*</span></label>
+              <input
+                type="text"
+                placeholder="e.g. ZK-K40"
+                value={newProductInfo.product_name}
+                onChange={(e) => {
+                  setNewProductInfo((p) => ({ ...p, product_name: e.target.value }));
+                  if (e.target.value.trim()) setErrors((p) => ({ ...p, product_name: false }));
+                }}
+                maxLength={MAX_FIELD}
+                className={`${inputCls} ${errors['product_name'] ? errorRing : ''}`}
+              />
+              {errors['product_name'] && <p className="text-red-500 text-xs mt-1">{errorMsgs['product_name'] || 'Product name is required.'}</p>}
+            </div>
+
+            <div>
+              <label className={labelCls}>Project Title <span className="text-red-500 ml-1">*</span></label>
+              <input
+                type="text"
+                placeholder="Project title or reference"
+                value={projectTitle}
+                onChange={(e) => {
+                  setProjectTitle(e.target.value);
+                  if (e.target.value.trim()) {
+                    setErrors((p) => ({ ...p, projectTitle: false }));
+                    setErrorMsgs((p) => ({ ...p, projectTitle: '' }));
+                  }
+                }}
+                className={`${inputCls} ${errors['projectTitle'] ? errorRing : ''}`}
+              />
+              {errors['projectTitle'] && <p className="text-red-500 text-xs mt-1">{errorMsgs['projectTitle'] || 'Project Title is required.'}</p>}
+            </div>
+
+            <div className="md:col-span-2">
+              <label className={labelCls}>Device / Equipment (Category) <span className="text-red-500 ml-1">*</span></label>
+              <div className="relative">
+                <button type="button" onClick={() => { setDeviceModalOpen(true); setErrors((p) => ({ ...p, device_equipment: false })); }} className={`w-full text-left px-4 py-2.5 pr-12 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#3BC25B] ${newProductInfo.device_equipment ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500'} ${errors['device_equipment'] ? errorRing : ''}`}>
+                  {newProductInfo.device_equipment || 'Select Device / Equipment'}
+                </button>
+                <button type="button" onClick={() => { setDeviceModalOpen(true); setErrors((p) => ({ ...p, device_equipment: false })); }} className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1 rounded bg-[#0E8F79] text-white text-sm">Select</button>
+              </div>
+              {errors['device_equipment'] && <p className="text-red-500 text-xs mt-1">{errorMsgs['device_equipment'] || 'Device / Equipment is required.'}</p>}
+            </div>
+          </div>
+
           <div className="mb-4">
-            <label className={labelCls}>Project Title <span className="text-red-500 ml-1">*</span></label>
-            <input type="text" placeholder="Project title or reference" value={projectTitle} onChange={(e) => { setProjectTitle(e.target.value); if (e.target.value.trim()) { setErrors((p) => ({ ...p, projectTitle: false })); setErrorMsgs((p) => ({ ...p, projectTitle: '' })); } }} className={`${inputCls} ${errors['projectTitle'] ? errorRing : ''}`} />
-            {errors['projectTitle'] && <p className="text-red-500 text-xs mt-1">{errorMsgs['projectTitle'] || 'Project Title is required'}</p>}
+            <label className={labelCls}>Additional Product Specs (optional)</label>
+            <p className="text-xs text-gray-500 dark:text-gray-400">You can complete these now or update after selecting an existing product.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {!isExistingProduct ? (
               <>
                 <div>
-                  <label className={labelCls}>Device / Equipment <span className="text-red-500 ml-1">*</span></label>
+                  <label className={labelCls}>Device / Equipment</label>
                   <div className="relative">
                     <button type="button" onClick={() => { setDeviceModalOpen(true); setErrors((p) => ({ ...p, device_equipment: false })); }} className={`w-full text-left px-4 py-2.5 pr-12 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#3BC25B] ${newProductInfo.device_equipment ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500'} ${errors['device_equipment'] ? errorRing : ''}`}>
                       {newProductInfo.device_equipment || 'Select Device / Equipment'}
@@ -1551,7 +1893,7 @@ export default function AdminCreateTicket() {
                   {errors['device_equipment'] && <p className="text-red-500 text-xs mt-1">{errorMsgs['device_equipment'] || 'Device / Equipment is required.'}</p>}
                 </div>
                 <div>
-                  <label className={labelCls}>Product <span className="text-red-500 ml-1">*</span></label>
+                  <label className={labelCls}>Product</label>
                   <input type="text" placeholder="e.g. ZK-K40" value={newProductInfo.product_name} onChange={(e) => { setNewProductInfo((p) => ({ ...p, product_name: e.target.value })); if (e.target.value.trim()) setErrors((p) => ({ ...p, product_name: false })); }} maxLength={MAX_FIELD} className={`${inputCls} ${errors['product_name'] ? errorRing : ''}`} />
                   {errors['product_name'] && <p className="text-red-500 text-xs mt-1">{errorMsgs['product_name'] || 'Product name is required.'}</p>}
                 </div>
@@ -1587,37 +1929,9 @@ export default function AdminCreateTicket() {
                     <button type="button" onClick={() => setNewProductInfo((p) => ({ ...p, has_warranty: false }))} className={`flex-1 py-2.5 rounded-lg text-sm font-medium border transition-all ${!newProductInfo.has_warranty ? 'bg-[#0E8F79] text-white border-[#0E8F79]' : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-600'}`}>Without Warranty</button>
                   </div>
                 </div>
-                <div className="md:col-span-2">
-                  <label className={labelCls}>Sales / Invoice No. <span className="text-red-500 ml-1">*</span></label>
-                  <input type="text" placeholder="e.g. INV-2025-001" value={salesNo} onChange={(e) => { setSalesNo(e.target.value); if (e.target.value.trim()) setErrors((p) => ({ ...p, salesNo: false })); }} maxLength={MAX_FIELD} className={`${inputCls} ${errors['salesNo'] ? errorRing : ''}`} />
-                  {errors['salesNo'] && <p className="text-red-500 text-xs mt-1">{errorMsgs['salesNo'] || 'Sales / Invoice No. is required.'}</p>}
-                </div>
               </>
             ) : (
               <>
-                <div className="md:col-span-2">
-                  <label className={labelCls}>Select Product (optional)</label>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setProductPickerOpen(true)}
-                      className={`${inputCls} text-left`}
-                    >
-                      {selectedProduct
-                        ? `${selectedProduct.product_name || selectedProduct.device_equipment || 'Unnamed'}${selectedProduct.brand ? ` | ${selectedProduct.brand}` : ''}${selectedProduct.model_name ? ` | ${selectedProduct.model_name}` : ''}${selectedProduct.serial_no ? ` | S/N: ${selectedProduct.serial_no}` : ''}`
-                        : 'Select a product'}
-                    </button>
-                    {selectedProductId && (
-                      <button
-                        type="button"
-                        onClick={() => setSelectedProductId(null)}
-                        className="px-3 py-2 rounded-lg text-sm border bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-600"
-                      >
-                        Clear
-                      </button>
-                    )}
-                  </div>
-                </div>
                 {selectedProduct && (
                   <>
                     <div>
@@ -1673,33 +1987,85 @@ export default function AdminCreateTicket() {
                         <textarea value={selectedProduct.others} rows={2} className={`${inputCls} resize-none`} readOnly />
                       </div>
                     )}
-                    <div className="md:col-span-2">
-                      <label className={labelCls}>Sales / Invoice No.</label>
-                      <input type="text" placeholder="e.g. INV-2025-001" value={salesNo} onChange={(e) => { setSalesNo(e.target.value); if (e.target.value.trim()) setErrors((p) => ({ ...p, salesNo: false })); }} maxLength={MAX_FIELD} className={`${inputCls} ${errors['salesNo'] ? errorRing : ''}`} />
-                      {errors['salesNo'] && <p className="text-red-500 text-xs mt-1">{errorMsgs['salesNo'] || 'Sales / Invoice No. is required.'}</p>}
-                      <div className="mt-3 flex justify-end">
-                        <button type="button" onClick={handleSaveProductDetails} disabled={!selectedProductId || savingProductDetails} className={`ml-3 px-4 py-2 rounded-lg text-sm ${savingProductDetails ? 'bg-gray-300 text-gray-700 cursor-not-allowed' : 'bg-[#0E8F79] text-white'}`}>
-                          {savingProductDetails ? 'Saving...' : 'Save product details'}
-                        </button>
-                      </div>
+                    <div className="md:col-span-2 mt-3 flex justify-end">
+                      <button type="button" onClick={handleSaveProductDetails} disabled={!selectedProductId || savingProductDetails} className={`ml-3 px-4 py-2 rounded-lg text-sm ${savingProductDetails ? 'bg-gray-300 text-gray-700 cursor-not-allowed' : 'bg-[#0E8F79] text-white'}`}>
+                        {savingProductDetails ? 'Saving...' : 'Save product details'}
+                      </button>
                     </div>
                   </>
                 )}
-                {!selectedProduct && (
-                  <div className="md:col-span-2">
-                    <label className={labelCls}>Sales / Invoice No.</label>
-                    <input type="text" placeholder="e.g. INV-2025-001" value={salesNo} onChange={(e) => { setSalesNo(e.target.value); if (e.target.value.trim()) setErrors((p) => ({ ...p, salesNo: false })); }} maxLength={MAX_FIELD} className={`${inputCls} ${errors['salesNo'] ? errorRing : ''}`} />
-                    {errors['salesNo'] && <p className="text-red-500 text-xs mt-1">{errorMsgs['salesNo'] || 'Sales / Invoice No. is required.'}</p>}
-                  </div>
-                )}
               </>
             )}
+          </div>
+
+          {/* Client Purchase No. */}
+          <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-600">
+            <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-4 uppercase">Purchase Reference</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className={labelCls}>Client Purchase No.</label>
+                <input value={additionalProductDetails.client_purchase_no} onChange={(e) => setAdditionalProductDetails((prev) => ({ ...prev, client_purchase_no: e.target.value }))} className={inputCls} />
+              </div>
+            </div>
           </div>
           </Card>
         )}
 
         {/* Navigation controls for product step */}
         {currentStep === 1 && (
+          <div className="flex justify-between gap-3">
+            <GreenButton type="button" variant="outline" onClick={goPrev}>Previous</GreenButton>
+            <GreenButton type="button" onClick={goNext}>Next</GreenButton>
+          </div>
+        )}
+
+        {/* Section 3: Additional Product Details */}
+        {currentStep === 2 && (
+          <Card className="border-l-4 border-l-[#3BC25B]">
+            <h3 className={sectionHeaderCls}>3. Additional Product Details</h3>
+
+            <div className="space-y-6">
+              <div>
+                <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-3 uppercase">Maptech Issued Details</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className={labelCls}>Delivery Receipt</label>
+                    <input value={additionalProductDetails.maptech_dr} onChange={(e) => setAdditionalProductDetails((prev) => ({ ...prev, maptech_dr: e.target.value }))} className={inputCls} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Sales Invoice <span className="text-red-500 ml-1">*</span></label>
+                    <input value={additionalProductDetails.maptech_sales_invoice} onChange={(e) => { setAdditionalProductDetails((prev) => ({ ...prev, maptech_sales_invoice: e.target.value })); if (e.target.value.trim()) setErrors((p) => ({ ...p, maptech_sales_invoice: false })); }} className={`${inputCls} ${errors['maptech_sales_invoice'] ? errorRing : ''}`} />
+                    {errors['maptech_sales_invoice'] && <p className="text-red-500 text-xs mt-1">{errorMsgs['maptech_sales_invoice'] || 'Maptech Sales Invoice is required.'}</p>}
+                  </div>
+                  <div>
+                    <label className={labelCls}>Sales Order No.</label>
+                    <input value={additionalProductDetails.maptech_sales_order_no} onChange={(e) => setAdditionalProductDetails((prev) => ({ ...prev, maptech_sales_order_no: e.target.value }))} className={inputCls} />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-3 uppercase">Supplier Issued Details</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className={labelCls}>Supplier Purchase No.</label>
+                    <input value={additionalProductDetails.supplier_purchase_no} onChange={(e) => setAdditionalProductDetails((prev) => ({ ...prev, supplier_purchase_no: e.target.value }))} className={inputCls} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Sales Invoice</label>
+                    <input value={additionalProductDetails.supplier_sales_invoice} onChange={(e) => setAdditionalProductDetails((prev) => ({ ...prev, supplier_sales_invoice: e.target.value }))} className={inputCls} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Delivery Receipt</label>
+                    <input value={additionalProductDetails.supplier_delivery_receipt} onChange={(e) => setAdditionalProductDetails((prev) => ({ ...prev, supplier_delivery_receipt: e.target.value }))} className={inputCls} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {currentStep === 2 && (
           <div className="flex justify-between gap-3">
             <GreenButton type="button" variant="outline" onClick={goPrev}>Previous</GreenButton>
             <GreenButton type="button" onClick={goNext}>Next</GreenButton>
@@ -1828,11 +2194,11 @@ export default function AdminCreateTicket() {
           </div>
         , document.body)}
 
-        {/* Section 3: Type of Service (now includes Preferred Support and Description) */}
-        {currentStep === 2 && (
+        {/* Section 4: Service */}
+        {currentStep === 3 && (
           <>
             <Card className="border-l-4 border-l-[#3BC25B]">
-            <h3 className={sectionHeaderCls}>3. Type of Service <span className="text-red-500 ml-1">*</span></h3>
+            <h3 className={sectionHeaderCls}>4. Type of Service <span className="text-red-500 ml-1">*</span></h3>
             {errors['serviceType'] && <p className="text-red-500 text-xs mb-3 -mt-4">Please select a type of service</p>}
             {serviceTypes.length === 0 && (
               <p className="text-sm text-gray-400 dark:text-gray-500 mb-4">Loading service types...</p>
@@ -1885,7 +2251,7 @@ export default function AdminCreateTicket() {
             </Card>
 
             <Card className="border-l-4 border-l-[#3BC25B]">
-              <h3 className={sectionHeaderCls}>4. Preferred Type of Support <span className="text-red-500 ml-1">*</span></h3>
+              <h3 className={sectionHeaderCls}>4.1 Preferred Type of Support <span className="text-red-500 ml-1">*</span></h3>
               {errors['supportType'] && <p className="text-red-500 text-xs mb-3 -mt-4">{errorMsgs['supportType'] || 'Please select a support type'}</p>}
               <div className="flex flex-wrap gap-4">
                 {['Remote / Online', 'Onsite', 'Chat', 'Call'].map((type) => (
@@ -1895,7 +2261,7 @@ export default function AdminCreateTicket() {
             </Card>
 
             <Card className="border-l-4 border-l-[#3BC25B]">
-              <h3 className={sectionHeaderCls}>5. Description of Problem <span className="text-red-500 ml-1">*</span></h3>
+              <h3 className={sectionHeaderCls}>4.2 Description of Problem <span className="text-red-500 ml-1">*</span></h3>
               <textarea rows={8} value={description} maxLength={MAX_DESCRIPTION} onChange={(e) => { setDescription(e.target.value); if (e.target.value.trim()) { setErrors((p) => ({ ...p, description: false })); setErrorMsgs((p) => ({ ...p, description: '' })); } }} className={`${inputCls} resize-none ${errors['description'] ? errorRing : ''}`} placeholder="Please describe the problem in detail. Include any error messages, steps to reproduce, and when the issue started..." />
               <div className="flex justify-between mt-1">
                 {errors['description'] ? <p className="text-red-500 text-xs">{errorMsgs['description'] || 'This field is required'}</p> : <span />}
@@ -1905,7 +2271,7 @@ export default function AdminCreateTicket() {
           </>
         )}
 
-        {currentStep === 2 && (
+        {currentStep === 3 && (
           <div className="flex justify-between gap-3">
             <GreenButton type="button" variant="outline" onClick={goPrev}>Previous</GreenButton>
             <GreenButton type="button" onClick={goNext}>Next</GreenButton>
@@ -1915,7 +2281,7 @@ export default function AdminCreateTicket() {
         {/* Support & Description moved into step 3 (rendered above). */}
 
         {/* Section 5: Review & Submit */}
-        {currentStep === 3 && (
+        {currentStep === 4 && (
           <Card className="border-l-4 border-l-[#3BC25B]">
           <h3 className={sectionHeaderCls}>5. Review & Submit</h3>
           <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 space-y-2 text-sm">
@@ -1923,11 +2289,29 @@ export default function AdminCreateTicket() {
               ['STF No.', stfNo],
               ['Client', contactValues.client],
               ['Contact Person', contactValues.contactPerson],
+              ['Designation', contactValues.designation || '—'],
+              ['Department', contactValues.department || '—'],
               ['Mobile', contactValues.mobile],
               ['Landline', contactValues.landline || '—'],
               ['Email', email || '—'],
+              ['Address', address || '—'],
+              ['Additional Contacts', additionalContacts.length > 0 ? additionalContacts.map((c) => c.contact_person || 'Unnamed').join(', ') : '—'],
               ['Project Title', projectTitle || '—'],
               ['Product', isExistingProduct ? (selectedProduct ? selectedProduct.product_name || selectedProduct.device_equipment : '—') : (newProductInfo.product_name || '—')],
+              ['Device / Equipment', isExistingProduct ? (selectedProduct?.device_equipment || '—') : (newProductInfo.device_equipment || '—')],
+              ['Brand', isExistingProduct ? (selectedProduct?.brand || '—') : (newProductInfo.brand || '—')],
+              ['Model', isExistingProduct ? (selectedProduct?.model_name || '—') : (newProductInfo.model_name || '—')],
+              ['Serial No.', isExistingProduct ? (selectedProduct?.serial_no || '—') : (newProductInfo.serial_no || '—')],
+              ['Version No.', isExistingProduct ? (selectedProduct?.version_no || '—') : (newProductInfo.version_no || '—')],
+              ['Date Purchased', isExistingProduct ? (selectedProduct?.date_purchased || '—') : (newProductInfo.date_purchased || '—')],
+              ['Warranty', isExistingProduct ? (selectedProduct?.has_warranty ? 'With Warranty' : 'Without Warranty') : (newProductInfo.has_warranty ? 'With Warranty' : 'Without Warranty')],
+              ['Client Purchase No.', additionalProductDetails.client_purchase_no || '—'],
+              ['Maptech DR', additionalProductDetails.maptech_dr || '—'],
+              ['Maptech Sales Invoice', additionalProductDetails.maptech_sales_invoice || '—'],
+              ['Maptech Sales Order No.', additionalProductDetails.maptech_sales_order_no || '—'],
+              ['Supplier Purchase No.', additionalProductDetails.supplier_purchase_no || '—'],
+              ['Supplier Sales Invoice', additionalProductDetails.supplier_sales_invoice || '—'],
+              ['Supplier Delivery Receipt', additionalProductDetails.supplier_delivery_receipt || '—'],
               ['Type of Service', serviceType === 'Others' ? `Others — ${serviceOthersText}` : serviceType || '—'],
               ['Support Type', supportType || '—'],
               ['Description', description || '—'],
@@ -1941,10 +2325,9 @@ export default function AdminCreateTicket() {
           </Card>
         )}
 
-        {currentStep === 3 && (
+        {currentStep === 4 && (
           <div className="flex justify-between items-center pt-4">
             <GreenButton type="button" variant="outline" onClick={goPrev}>Previous</GreenButton>
-            <div className="flex-1 mx-4 text-center text-xs text-gray-500">By submitting, you agree to our support terms and conditions.</div>
             <GreenButton type="submit" className="py-3 px-6 text-lg shadow-lg shadow-green-500/20">Submit Service Ticket and Call Client</GreenButton>
           </div>
         )}

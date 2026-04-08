@@ -1,4 +1,3 @@
-import React from 'react';
 import { Toaster } from 'sonner';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -11,18 +10,21 @@ import { TermsOfService } from './pages/auth/TermsOfService';
 import { NotFound } from './pages/auth/NotFound';
 import { SuperAdminLayout } from './layouts/SuperAdminLayout';
 import { AdminLayout } from './layouts/AdminLayout';
-import { EmployeeLayout } from './layouts/EmployeeLayout';
+import { TechnicalStaffLayout } from './layouts/TechnicalStaffLayout';
+import { SalesLayout } from './layouts/SalesLayout';
 
 import SuperAdminDashboard from './pages/superadmin/dashboard';
 import SuperAdminUsers from './pages/superadmin/users';
 import SuperAdminReports from './pages/superadmin/reports';
 import SuperAdminSettings from './pages/superadmin/settings';
 import SuperAdminAuditLogs from './pages/superadmin/audit-logs';
+import SuperAdminEmployeeRatings from './pages/superadmin/employee-ratings';
 
 import AdminDashboard from './pages/admin/dashboard';
 import AdminTickets from './pages/admin/tickets';
 import AdminEscalatedTickets from './pages/admin/escalated-tickets';
-import AdminOnHoldTickets from './pages/admin/on-hold-tickets';
+import AdminPendingTickets from './pages/admin/pending-tickets';
+import AdminToBeClosedTickets from './pages/admin/to-be-closed-tickets';
 import AdminEscalation from './pages/admin/escalation';
 import AdminReports from './pages/admin/reports';
 import AdminCreateTicket from './pages/admin/create-ticket';
@@ -36,13 +38,20 @@ import AdminProducts from './pages/admin/products';
 import AdminClients from './pages/admin/clients';
 import AdminDeviceEquipment from './pages/admin/device-equipment';
 
-import EmployeeDashboard from './pages/employee/dashboard';
-import EmployeeMyTickets from './pages/employee/my-tickets';
-import EmployeeTicketDetails from './pages/employee/ticket-details';
-import EmployeeKnowledgeHub from './pages/employee/knowledge-base';
-import EmployeeSettings from './pages/employee/settings';
-import EmployeeEscalation from './pages/employee/escalation';
-import EmployeeReports from './pages/employee/reports';
+import SalesTickets from './pages/sales/tickets';
+import SalesCreateTicket from './pages/sales/create-ticket';
+import SalesTicketDetails from './pages/sales/ticket-details';
+import SalesProducts from './pages/sales/products';
+import SalesClients from './pages/sales/clients';
+import SalesCategories from './pages/sales/categories';
+
+import TechnicalStaffDashboard from './pages/technical-staff/dashboard';
+import TechnicalStaffMyTickets from './pages/technical-staff/my-tickets';
+import TechnicalStaffTicketDetails from './pages/technical-staff/ticket-details';
+import TechnicalStaffKnowledgeHub from './pages/technical-staff/knowledge-base';
+import TechnicalStaffSettings from './pages/technical-staff/settings';
+import TechnicalStaffEscalation from './pages/technical-staff/escalation';
+import TechnicalStaffReports from './pages/technical-staff/reports';
 
 
 
@@ -81,13 +90,14 @@ export function App() {
               <Route path="users" element={<SuperAdminUsers />} />
               <Route path="audit-logs" element={<SuperAdminAuditLogs />} />
               <Route path="reports" element={<SuperAdminReports />} />
+              <Route path="technical-staff-ratings" element={<SuperAdminEmployeeRatings />} />
               <Route path="settings" element={<SuperAdminSettings />} />
             </Route>
 
             <Route
               path="/admin"
               element={
-                <ProtectedRoute allowedRole={['admin', 'sales']}>
+                <ProtectedRoute allowedRole="admin">
                   <AdminLayout />
                 </ProtectedRoute>
               }
@@ -96,7 +106,9 @@ export function App() {
               <Route path="dashboard" element={<AdminDashboard />} />
               <Route path="tickets" element={<AdminTickets />} />
               <Route path="tickets/escalated" element={<AdminEscalatedTickets />} />
-              <Route path="tickets/on-hold" element={<AdminOnHoldTickets />} />
+              <Route path="tickets/pending" element={<AdminPendingTickets />} />
+              <Route path="tickets/to-be-closed" element={<AdminToBeClosedTickets />} />
+              <Route path="tickets/on-hold" element={<Navigate to="/admin/tickets/pending" replace />} />
               <Route path="escalation" element={<AdminEscalation />} />
               <Route path="reports" element={<AdminReports />} />
               <Route path="create-ticket" element={<AdminCreateTicket />} />
@@ -115,22 +127,42 @@ export function App() {
             </Route>
 
             <Route
-              path="/employee"
+              path="/sales"
               element={
-                <ProtectedRoute allowedRole="employee">
-                  <EmployeeLayout />
+                <ProtectedRoute allowedRole="sales">
+                  <SalesLayout />
                 </ProtectedRoute>
               }
             >
-              <Route index element={<Navigate to="/employee/dashboard" replace />} />
-              <Route path="dashboard" element={<EmployeeDashboard />} />
-              <Route path="my-tickets" element={<EmployeeMyTickets />} />
-              <Route path="reports" element={<EmployeeReports />} />
-              <Route path="ticket-details" element={<EmployeeTicketDetails />} />
-              <Route path="escalation" element={<EmployeeEscalation />} />
-              <Route path="knowledge-hub" element={<EmployeeKnowledgeHub />} />
-              <Route path="settings" element={<EmployeeSettings />} />
+              <Route index element={<Navigate to="/sales/tickets" replace />} />
+              <Route path="tickets" element={<SalesTickets />} />
+              <Route path="create-ticket" element={<SalesCreateTicket />} />
+              <Route path="ticket-details" element={<SalesTicketDetails />} />
+              <Route path="products" element={<SalesProducts />} />
+              <Route path="device-equipment" element={<SalesCategories />} />
+              <Route path="categories" element={<SalesCategories />} />
+              <Route path="clients" element={<SalesClients />} />
             </Route>
+
+            <Route
+              path="/technical-staff"
+              element={
+                <ProtectedRoute allowedRole="employee">
+                  <TechnicalStaffLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<Navigate to="/technical-staff/dashboard" replace />} />
+              <Route path="dashboard" element={<TechnicalStaffDashboard />} />
+              <Route path="my-tickets" element={<TechnicalStaffMyTickets />} />
+              <Route path="reports" element={<TechnicalStaffReports />} />
+              <Route path="ticket-details" element={<TechnicalStaffTicketDetails />} />
+              <Route path="escalation" element={<TechnicalStaffEscalation />} />
+              <Route path="knowledge-hub" element={<TechnicalStaffKnowledgeHub />} />
+              <Route path="settings" element={<TechnicalStaffSettings />} />
+            </Route>
+
+            <Route path="/employee/*" element={<Navigate to="/technical-staff/dashboard" replace />} />
 
             <Route path="*" element={<NotFound />} />
           </Routes>

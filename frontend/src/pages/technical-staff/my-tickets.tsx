@@ -6,8 +6,8 @@ import { PriorityBadge } from '../../components/ui/PriorityBadge';
 import { SLATimer } from '../../components/ui/SLATimer';
 import { Eye } from 'lucide-react';
 import { fetchTickets } from '../../services/api';
-import { mapBackendTicketToEmployee } from '../../services/ticketMapper';
-import type { UIEmployeeTicket } from '../../services/ticketMapper';
+import { mapBackendTicketToTechnicalStaff } from '../../services/ticketMapper';
+import type { UITechnicalStaffTicket } from '../../services/ticketMapper';
 
 function truncateText(value: string, maxLength: number): string {
   if (value.length <= maxLength) return value;
@@ -28,13 +28,13 @@ function getPaginationPages(current: number, total: number): (number | 'ellipsis
   return pages;
 }
 
-export default function EmployeeMyTickets() {
+export default function TechnicalStaffMyTickets() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [tickets, setTickets] = useState<UIEmployeeTicket[]>([]);
+  const [tickets, setTickets] = useState<UITechnicalStaffTicket[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Fetch tickets from backend
@@ -44,7 +44,7 @@ export default function EmployeeMyTickets() {
       try {
         const raw = await fetchTickets();
         if (cancelled) return;
-        setTickets(raw.map(mapBackendTicketToEmployee));
+        setTickets(raw.map(mapBackendTicketToTechnicalStaff));
       } catch {
         // silently fail
       } finally {
@@ -151,7 +151,7 @@ export default function EmployeeMyTickets() {
                   <td className="px-4 py-3 text-center">
                     <button
                       aria-label={`View ${ticket.id}`}
-                      onClick={() => navigate(`/employee/ticket-details?stf=${encodeURIComponent(ticket.id)}`)}
+                      onClick={() => navigate(`/technical-staff/ticket-details?stf=${encodeURIComponent(ticket.id)}`)}
                       className="inline-flex items-center justify-center w-9 h-9 rounded-full text-[#63D44A] dark:text-green-300 hover:bg-green-50 dark:hover:bg-green-900/20"
                     >
                       <Eye className="w-5 h-5" />

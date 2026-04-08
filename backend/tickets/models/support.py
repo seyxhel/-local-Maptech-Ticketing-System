@@ -27,7 +27,7 @@ class CallLog(models.Model):
         return f"Call #{self.id} by {self.admin.username} at {self.call_start}"
 
 
-class CSATFeedback(models.Model):
+class FeedbackRating(models.Model):
     """Admin feedback on employee performance before closing a ticket."""
     RATING_CHOICES = [
         (1, 'Very Poor'),
@@ -37,17 +37,17 @@ class CSATFeedback(models.Model):
         (5, 'Excellent'),
     ]
 
-    ticket = models.OneToOneField(Ticket, on_delete=models.CASCADE, related_name='csat_feedback')
-    employee = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='csat_received', on_delete=models.CASCADE)
-    admin = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='csat_given', on_delete=models.CASCADE)
+    ticket = models.OneToOneField(Ticket, on_delete=models.CASCADE, related_name='feedback_rating')
+    employee = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='feedback_ratings_received', on_delete=models.CASCADE)
+    admin = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='feedback_ratings_given', on_delete=models.CASCADE)
     rating = models.PositiveSmallIntegerField(choices=RATING_CHOICES)
     comments = models.TextField(blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ['-created_at']
-        verbose_name = 'CSAT Feedback'
-        verbose_name_plural = 'CSAT Feedbacks'
+        verbose_name = 'Feedback Rating'
+        verbose_name_plural = 'Feedback Ratings'
 
     def __str__(self):
-        return f"CSAT for {self.ticket.stf_no}: {self.rating}/5 by {self.admin.username}"
+        return f"Feedback Rating for {self.ticket.stf_no}: {self.rating}/5 by {self.admin.username}"

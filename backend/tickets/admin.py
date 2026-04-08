@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth import get_user_model
-from .models import Ticket, TicketTask, TypeOfService, TicketAttachment, EscalationLog, AuditLog, Product, Client, CallLog, CSATFeedback, Notification, Category, RetentionPolicy, Announcement
+from .models import Ticket, TicketTask, TypeOfService, TicketAttachment, EscalationLog, AuditLog, Product, Client, CallLog, FeedbackRating, Notification, Category, RetentionPolicy, Announcement
 
 User = get_user_model()
 
@@ -78,8 +78,8 @@ class CallLogAdmin(admin.ModelAdmin):
     search_fields = ('client_name', 'phone_number', 'notes')
 
 
-@admin.register(CSATFeedback)
-class CSATFeedbackAdmin(admin.ModelAdmin):
+@admin.register(FeedbackRating)
+class FeedbackRatingAdmin(admin.ModelAdmin):
     list_display = ('ticket', 'employee', 'admin', 'rating', 'created_at')
     list_filter = ('rating',)
     search_fields = ('comments',)

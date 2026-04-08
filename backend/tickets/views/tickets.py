@@ -107,27 +107,52 @@ class TicketViewSet(viewsets.ModelViewSet):
 
             # Extract write-only product text fields
             product_text = {
-                'project_title':    serializer.validated_data.pop('project_title', '') or '',
-                'product_name':     serializer.validated_data.pop('product', '') or '',
-                'brand':            serializer.validated_data.pop('brand', '') or '',
-                'model_name':       serializer.validated_data.pop('model_name', '') or '',
-                'device_equipment': serializer.validated_data.pop('device_equipment', '') or '',
-                'version_no':       serializer.validated_data.pop('version_no', '') or '',
-                'date_purchased':   serializer.validated_data.pop('date_purchased', None),
-                'serial_no':        serializer.validated_data.pop('serial_no', '') or '',
-                'sales_no':         serializer.validated_data.pop('sales_no', '') or '',
-                'has_warranty':     serializer.validated_data.pop('has_warranty', False) or False,
-                'others':           serializer.validated_data.pop('others', '') or '',
+                'project_title':           serializer.validated_data.pop('project_title', '') or '',
+                'product_name':            serializer.validated_data.pop('product', '') or '',
+                'brand':                   serializer.validated_data.pop('brand', '') or '',
+                'model_name':              serializer.validated_data.pop('model_name', '') or '',
+                'device_equipment':        serializer.validated_data.pop('device_equipment', '') or '',
+                'version_no':              serializer.validated_data.pop('version_no', '') or '',
+                'date_purchased':          serializer.validated_data.pop('date_purchased', None),
+                'serial_no':               serializer.validated_data.pop('serial_no', '') or '',
+                'sales_no':                serializer.validated_data.pop('sales_no', '') or '',
+                'client_purchase_no':      serializer.validated_data.pop('client_purchase_no', '') or '',
+                'maptech_dr':              serializer.validated_data.pop('maptech_dr', '') or '',
+                'maptech_sales_invoice':   serializer.validated_data.pop('maptech_sales_invoice', '') or '',
+                'maptech_sales_order_no':  serializer.validated_data.pop('maptech_sales_order_no', '') or '',
+                'supplier_purchase_no':    serializer.validated_data.pop('supplier_purchase_no', '') or '',
+                'supplier_sales_invoice':  serializer.validated_data.pop('supplier_sales_invoice', '') or '',
+                'supplier_delivery_receipt': serializer.validated_data.pop('supplier_delivery_receipt', '') or '',
+                'has_warranty':            serializer.validated_data.pop('has_warranty', False) or False,
+                'others':                  serializer.validated_data.pop('others', '') or '',
             }
 
             if linked_product:
                 if not product_text['project_title']:
                     product_text['project_title'] = linked_product.project_title
-                for field in ('product_name', 'brand', 'model_name', 'device_equipment', 'version_no', 'serial_no', 'sales_no'):
+                for field in (
+                    'product_name', 'brand', 'model_name', 'device_equipment', 'version_no', 'serial_no', 'sales_no',
+                    'client_purchase_no', 'maptech_dr', 'maptech_sales_invoice', 'maptech_sales_order_no',
+                    'supplier_purchase_no', 'supplier_sales_invoice', 'supplier_delivery_receipt',
+                ):
                     if product_text[field] in (None, ''):
                         product_text[field] = getattr(linked_product, field, product_text[field])
                 if not product_text['has_warranty']:
                     product_text['has_warranty'] = bool(getattr(linked_product, 'has_warranty', False))
+
+                # Persist explicitly provided product detail values onto the linked product record.
+                linked_update_fields = []
+                for field in (
+                    'sales_no', 'client_purchase_no', 'maptech_dr', 'maptech_sales_invoice', 'maptech_sales_order_no',
+                    'supplier_purchase_no', 'supplier_sales_invoice', 'supplier_delivery_receipt',
+                ):
+                    if field in serializer.initial_data and serializer.initial_data.get(field) not in (None, ''):
+                        incoming = product_text[field]
+                        if getattr(linked_product, field, '') != incoming:
+                            setattr(linked_product, field, incoming)
+                            linked_update_fields.append(field)
+                if linked_update_fields:
+                    linked_product.save(update_fields=linked_update_fields)
 
             # If no product_record linked and product data present, auto-create a Product record
             if not serializer.validated_data.get('product_record'):
@@ -703,11 +728,11 @@ class TicketViewSet(viewsets.ModelViewSet):
         """Admin/Superadmin closes the ticket immediately."""
         ticket = self.get_object()
 
-        # Require CSAT feedback before closing
-        if not hasattr(ticket, 'csat_feedback') or not ticket.csat_feedback:
+        # Require feedback ratings before closing
+        if not hasattr(ticket, 'feedback_rating') or not ticket.feedback_rating:
             if ticket.assigned_to and ticket.assigned_to != request.user:
                 return Response(
-                    {'detail': 'Please submit CSAT feedback for the employee before closing this ticket.'},
+                    {'detail': 'Please submit feedback ratings for the employee before closing this ticket.'},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 

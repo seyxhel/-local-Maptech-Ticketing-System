@@ -18,7 +18,7 @@ import {
   type PasswordRules,
 } from '../../utils/validation';
 
-export default function EmployeeSettings() {
+export default function TechnicalStaffSettings() {
   const { user, updateUser } = useAuth();
 
   /* ── Profile editing state ── */

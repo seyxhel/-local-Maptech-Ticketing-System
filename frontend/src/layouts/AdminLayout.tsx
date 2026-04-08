@@ -16,7 +16,8 @@ const NAV_ITEMS: NavItem[] = [
     children: [
       { id: 'all-tickets', label: 'All Tickets', icon: Ticket, path: '/admin/tickets', exact: true },
       { id: 'escalated-tickets', label: 'Escalated Tickets', icon: ShieldAlert, path: '/admin/tickets/escalated' },
-      { id: 'on-hold-tickets', label: 'On Hold Tickets', icon: PauseCircle, path: '/admin/tickets/on-hold' },
+      { id: 'pending-tickets', label: 'Pending Tickets', icon: PauseCircle, path: '/admin/tickets/pending' },
+      { id: 'to-be-closed-tickets', label: 'For Closing Tickets', icon: FileCheck, path: '/admin/tickets/to-be-closed' },
     ],
   },
   { id: 'create-ticket', label: 'Create Ticket', icon: PlusCircle, path: '/admin/create-ticket' },

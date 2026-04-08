@@ -29,7 +29,7 @@ const ITEMS_PER_PAGE = 4;
 
 type EscalationType = 'internal' | 'external';
 
-export default function EmployeeEscalation() {
+export default function TechnicalStaffEscalation() {
   /* ── Data ── */
   const [tickets, setTickets] = useState<BackendTicket[]>([]);
   const [logs, setLogs] = useState<EscalationLog[]>([]);

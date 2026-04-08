@@ -5,7 +5,7 @@ from .views import (
     TicketViewSet, TypeOfServiceViewSet, EscalationLogViewSet,
     AuditLogViewSet, KnowledgeHubViewSet, PublishedArticleViewSet,
     list_employees,
-    ProductViewSet, ClientViewSet, CallLogViewSet, CSATFeedbackViewSet,
+    ProductViewSet, ClientViewSet, CallLogViewSet, FeedbackRatingViewSet,
     NotificationViewSet, CategoryViewSet, RetentionPolicyViewSet,
     AnnouncementViewSet,
 )
@@ -35,7 +35,7 @@ router.register(r'categories', CategoryViewSet, basename='category')
 router.register(r'products', ProductViewSet, basename='product')
 router.register(r'clients', ClientViewSet, basename='client')
 router.register(r'call-logs', CallLogViewSet, basename='calllog')
-router.register(r'csat-feedback', CSATFeedbackViewSet, basename='csatfeedback')
+router.register(r'feedback-ratings', FeedbackRatingViewSet, basename='feedbackrating')
 router.register(r'notifications', NotificationViewSet, basename='notification')
 router.register(r'retention-policy', RetentionPolicyViewSet, basename='retentionpolicy')
 router.register(r'announcements', AnnouncementViewSet, basename='announcement')

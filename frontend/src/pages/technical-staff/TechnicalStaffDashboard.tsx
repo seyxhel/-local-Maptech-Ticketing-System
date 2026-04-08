@@ -7,8 +7,8 @@ import { PriorityBadge } from '../../components/ui/PriorityBadge';
 import { SLATimer } from '../../components/ui/SLATimer';
 import { fetchTickets, fetchTicketStats } from '../../services/api';
 import type { BackendTicket, TicketStats } from '../../services/api';
-import { mapBackendTicketToEmployee } from '../../services/ticketMapper';
-import type { UIEmployeeTicket } from '../../services/ticketMapper';
+import { mapBackendTicketToTechnicalStaff } from '../../services/ticketMapper';
+import type { UITechnicalStaffTicket } from '../../services/ticketMapper';
 import { useAuth } from '../../context/AuthContext';
 import { AnnouncementBanner } from '../../components/ui/AnnouncementBanner';
 import {
@@ -19,16 +19,16 @@ import {
   ChevronRight,
   ArrowRight } from
 'lucide-react';
-interface EmployeeDashboardProps {
+interface TechnicalStaffDashboardProps {
   onNavigate?: (page: string) => void;
 }
-export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
+export function TechnicalStaffDashboard({ onNavigate }: TechnicalStaffDashboardProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const firstName = user?.name?.split(' ')[0] || 'there';
 
   const [rawTickets, setRawTickets] = useState<BackendTicket[]>([]);
-  const [tickets, setTickets] = useState<UIEmployeeTicket[]>([]);
+  const [tickets, setTickets] = useState<UITechnicalStaffTicket[]>([]);
   const [stats, setStats] = useState<TicketStats | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -42,7 +42,7 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
         ]);
         if (cancelled) return;
         setRawTickets(raw);
-        setTickets(raw.map(mapBackendTicketToEmployee));
+        setTickets(raw.map(mapBackendTicketToTechnicalStaff));
         if (statsData) setStats(statsData);
       } catch {
         // silently fail
@@ -72,7 +72,7 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
     const resolvedPct = weeklyTotal > 0 ? Math.round((resolvedThisWeek / weeklyTotal) * 100) : 0;
 
     const ratings = rawTickets
-      .map((ticket) => ticket.csat_feedback?.rating)
+      .map((ticket) => ticket.feedback_rating?.rating)
       .filter((rating): rating is number => typeof rating === 'number');
     const avgRating = ratings.length > 0
       ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length
@@ -181,7 +181,7 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
           <Card
             key={ticket.id}
             className="hover:border-[#3BC25B] dark:hover:border-[#3BC25B] hover:shadow-md transition-all group"
-            onClick={() => navigate(`/employee/ticket-details?stf=${encodeURIComponent(ticket.id)}`)}
+            onClick={() => navigate(`/technical-staff/ticket-details?stf=${encodeURIComponent(ticket.id)}`)}
           >
 
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from ..models import CallLog, CSATFeedback
+from ..models import CallLog, FeedbackRating
 
 
 class CallLogSerializer(serializers.ModelSerializer):
@@ -22,13 +22,13 @@ class CallLogSerializer(serializers.ModelSerializer):
         return ''
 
 
-class CSATFeedbackSerializer(serializers.ModelSerializer):
+class FeedbackRatingSerializer(serializers.ModelSerializer):
     admin_name = serializers.SerializerMethodField()
     employee_name = serializers.SerializerMethodField()
     stf_no = serializers.CharField(source='ticket.stf_no', read_only=True)
 
     class Meta:
-        model = CSATFeedback
+        model = FeedbackRating
         fields = [
             'id', 'ticket', 'stf_no', 'employee', 'employee_name',
             'admin', 'admin_name', 'rating', 'comments', 'created_at',

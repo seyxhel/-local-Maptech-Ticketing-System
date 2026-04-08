@@ -55,11 +55,22 @@ function roleToPath(role: Role): string {
   switch (role) {
     case 'superadmin': return '/superadmin/dashboard';
     case 'admin': return '/admin/dashboard';
-    case 'sales': return '/admin/dashboard';
-    case 'employee': return '/employee/dashboard';
+    case 'sales': return '/sales/tickets';
+    case 'employee': return '/technical-staff/dashboard';
     case null:
     default: return '/login';
   }
+}
+
+function normalizeRedirectPath(role: Role, path?: string): string {
+  if (!path) return roleToPath(role);
+  if (role === 'sales' && path.startsWith('/admin')) {
+    return path.replace('/admin', '/sales');
+  }
+  if (role === 'employee' && path.startsWith('/employee')) {
+    return path.replace('/employee', '/technical-staff');
+  }
+  return path;
 }
 
 function buildAuthUser(apiUser: Record<string, unknown>): AuthUser | null {
@@ -148,7 +159,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAccessToken(token);
       setUser(authUser);
 
-      return data.redirect_path || roleToPath(authUser.role);
+      return normalizeRedirectPath(authUser.role, data.redirect_path);
     },
     [],
   );
