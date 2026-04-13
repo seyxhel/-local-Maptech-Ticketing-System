@@ -277,8 +277,8 @@ class TicketViewSet(viewsets.ModelViewSet):
             'destroy':                  [IsAuthenticated(), IsAdminLevel()],
             # Admin-only lifecycle actions
             'assign':                   [IsAuthenticated(), IsSupervisorLevel()],
-            'review':                   [IsAuthenticated(), IsSupervisorLevel()],
-            'confirm_ticket':           [IsAuthenticated(), IsSupervisorLevel()],
+            'review':                   [IsAuthenticated(), IsAdminLevel()],
+            'confirm_ticket':           [IsAuthenticated(), IsAdminLevel()],
             'close_ticket':             [IsAuthenticated(), IsAdminLevel()],
             # Assigned-employee-only actions
             'escalate':                 [IsAuthenticated(), IsAssignedEmployee()],
@@ -535,13 +535,21 @@ class TicketViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def review(self, request, pk=None):
-        """Admin/Superadmin reviews a ticket — optionally sets priority."""
+        """Admin-level user reviews a ticket and can set priority."""
         ticket = self.get_object()
-        if request.user.role == User.ROLE_SALES:
-            return Response({'detail': 'Sales users cannot set ticket priority.'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Sales can only review their own unconfirmed tickets during call workflow.
+        if request.user.role == User.ROLE_SALES and ticket.confirmed_by_admin:
+            return Response({'detail': 'This ticket is already confirmed.'}, status=status.HTTP_400_BAD_REQUEST)
+
         priority = request.data.get('priority')
-        if priority and priority in dict(Ticket.PRIORITY_CHOICES):
+        if priority:
+            if priority not in dict(Ticket.PRIORITY_CHOICES):
+                return Response({'detail': 'Invalid priority value.'}, status=status.HTTP_400_BAD_REQUEST)
             ticket.priority = priority
+        elif request.user.role == User.ROLE_SALES:
+            return Response({'detail': 'Priority is required for sales call review.'}, status=status.HTTP_400_BAD_REQUEST)
+
         ticket.save()
 
         self._audit_ticket(request, ticket, AuditLog.ACTION_REVIEW,
@@ -685,10 +693,13 @@ class TicketViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def confirm_ticket(self, request, pk=None):
-        """Admin/Superadmin confirms they've contacted the client and verified the issue."""
+        """Admin-level user confirms client call verification for a ticket."""
         ticket = self.get_object()
-        if request.user.role == User.ROLE_SALES:
-            return Response({'detail': 'Sales users cannot confirm client call verification.'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Sales must set priority first before confirming call verification.
+        if request.user.role == User.ROLE_SALES and not ticket.priority:
+            return Response({'detail': 'Set a priority before confirming this ticket.'}, status=status.HTTP_400_BAD_REQUEST)
+
         ticket.confirmed_by_admin = True
         ticket.save()
 

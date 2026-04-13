@@ -770,6 +770,7 @@ export function TicketView() {
   const [reassignEmployeeId, setReassignEmployeeId] = useState('');
   const [reassignSearch, setReassignSearch] = useState('');
   const [reassigning, setReassigning] = useState(false);
+  const [submittingSalesCallStatus, setSubmittingSalesCallStatus] = useState(false);
   const [showReassignModal, setShowReassignModal] = useState(false);
   const [employeeTickets, setEmployeeTickets] = useState<Record<number, BackendTicket[]>>({});
   const [priorityLevel, setPriorityLevel] = useState('');
@@ -794,8 +795,9 @@ export function TicketView() {
       btData?.assigned_to?.id === user?.id
     );
   const needsCallPriorityWorkflow = isAdmin && !!btData && !btData.confirmed_by_admin && !btData.priority && ticket.status !== 'Closed';
-  const canSalesCallWorkflow = isSales && !!btData && !btData.confirmed_by_admin && btData.created_by?.id === user?.id && ticket.status !== 'Closed';
+  const canSalesCallWorkflow = isSales && !!btData && !btData.confirmed_by_admin && !btData.priority && btData.created_by?.id === user?.id && ticket.status !== 'Closed';
   const hasCallPriorityWorkflow = needsCallPriorityWorkflow || canSalesCallWorkflow;
+  const canSetPriorityInCallWorkflow = isAdmin || canSalesCallWorkflow;
 
   const filteredEmployees = [...employees]
     .sort((a, b) => a.active_ticket_count - b.active_ticket_count)
@@ -928,6 +930,37 @@ export function TicketView() {
       return;
     }
     setReassignModalStep('assign');
+  };
+
+  const handleSubmitSalesCallStatus = async () => {
+    if (!backendTicketId) return;
+    if (!callCompleted) {
+      toast.error('Please complete the client call before saving priority.');
+      return;
+    }
+    if (!priorityLevel) {
+      toast.error('Please select a priority level before saving call status.');
+      return;
+    }
+
+    setSubmittingSalesCallStatus(true);
+    try {
+      await reviewTicket(backendTicketId, {
+        priority: reverseMapPriority(priorityLevel),
+      });
+      const updated = await confirmTicket(backendTicketId);
+      setBtData(updated);
+
+      toast.success('Call status saved. Ticket is now ready for supervisor assignment.');
+      setShowReassignModal(false);
+      setReassignSearch('');
+      setReassignEmployeeId('');
+      resetCallAndPriorityState();
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to save call status.');
+    } finally {
+      setSubmittingSalesCallStatus(false);
+    }
   };
 
   useEffect(() => {
@@ -3797,7 +3830,7 @@ export function TicketView() {
                   </div>
                 )}
 
-                {isAdmin && (
+                {canSetPriorityInCallWorkflow && (
                   <>
                     <div className={`${!callCompleted ? 'opacity-40 pointer-events-none' : ''}`}>
                       <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Priority Level {!callCompleted && <span className="text-xs font-normal text-gray-400 ml-1">(complete a call first)</span>}</p>
@@ -3822,11 +3855,13 @@ export function TicketView() {
 
                     <div className="mt-5">
                       <button
-                        onClick={handleConfirmPriority}
-                        disabled={!callCompleted || !priorityLevel}
+                        onClick={isAdmin ? handleConfirmPriority : handleSubmitSalesCallStatus}
+                        disabled={!callCompleted || !priorityLevel || submittingSalesCallStatus}
                         className="w-full px-4 py-2.5 rounded-lg bg-[#3BC25B] hover:bg-[#2ea34a] text-white text-sm font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       >
-                        Continue to Assign
+                        {isAdmin
+                          ? 'Continue to Assign'
+                          : (submittingSalesCallStatus ? 'Saving Call Status...' : 'Save Call Status')}
                       </button>
                     </div>
                   </>

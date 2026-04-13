@@ -40,12 +40,15 @@ export function reverseMapStatus(uiStatus: string): string {
 // ── Priority mapping ──
 
 export function mapPriority(p: string): string {
-  if (!p) return 'Low';
-  return p.charAt(0).toUpperCase() + p.slice(1);
+  const normalized = String(p || '').trim();
+  if (!normalized) return 'Unknown';
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
 export function reverseMapPriority(p: string): string {
-  return p.toLowerCase();
+  const normalized = String(p || '').trim().toLowerCase();
+  if (!normalized || normalized === 'unknown' || normalized === 'n/a' || normalized === '—') return '';
+  return normalized;
 }
 
 export function getUserDisplayName(user: { first_name?: string; last_name?: string; username?: string } | null | undefined): string {
@@ -77,7 +80,7 @@ export interface UITicket {
   id: string;
   subject: string;
   client: string;
-  priority: 'Critical' | 'High' | 'Medium' | 'Low';
+  priority: 'Critical' | 'High' | 'Medium' | 'Low' | 'Unknown';
   status: string;
   sla: number;
   totalSla: number;
@@ -126,7 +129,7 @@ export interface UITechnicalStaffTicket {
   id: string;
   issue: string;
   client: string;
-  priority: 'Critical' | 'High' | 'Medium' | 'Low';
+  priority: 'Critical' | 'High' | 'Medium' | 'Low' | 'Unknown';
   status: 'In Progress' | 'Assigned' | 'Resolved' | 'Closed' | 'Pending';
   sla: number;
   total: number;
