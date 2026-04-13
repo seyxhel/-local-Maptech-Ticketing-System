@@ -1067,8 +1067,8 @@ export async function createCallLog(data: { ticket?: number; client_name: string
   return handleResponse<CallLog>(res);
 }
 
-/** End a call (update call_end). */
-export async function endCallLog(id: number, data: { call_end: string; notes?: string }): Promise<CallLog> {
+/** Update a call log (for ending calls and/or linking ticket references). */
+export async function endCallLog(id: number, data: { call_end?: string; notes?: string; ticket?: number | null }): Promise<CallLog> {
   const res = await apiFetch(`${API_BASE}/call-logs/${id}/`, {
     method: 'PATCH',
     headers: authHeaders(),

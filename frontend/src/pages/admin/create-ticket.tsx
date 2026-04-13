@@ -917,6 +917,14 @@ export default function AdminCreateTicket() {
         const ticketData = buildTicketData({ includePriority: true });
         const created = await createTicket(ticketData as any);
 
+        if (callLogId) {
+          try {
+            await endCallLog(callLogId, { ticket: created.id });
+          } catch (err) {
+            console.error('Failed to link call log to ticket:', err);
+          }
+        }
+
         if (linkedTicketId) {
           try {
             await linkTickets(linkedTicketId, [created.id]);
@@ -1048,6 +1056,14 @@ export default function AdminCreateTicket() {
       const ticketData = buildTicketData({ includePriority: true });
 
       const created = await createTicket(ticketData as any);
+
+      if (callLogId) {
+        try {
+          await endCallLog(callLogId, { ticket: created.id });
+        } catch (err) {
+          console.error('Failed to link call log to ticket:', err);
+        }
+      }
       await assignTicket(created.id, selectedEmployee);
 
       // Link to original ticket if this was triggered from "Link Ticket / Same Problem"
@@ -1083,6 +1099,14 @@ export default function AdminCreateTicket() {
 
       const created = await createTicket(ticketData as any);
 
+      if (callLogId) {
+        try {
+          await endCallLog(callLogId, { ticket: created.id });
+        } catch (err) {
+          console.error('Failed to link call log to ticket:', err);
+        }
+      }
+
       // Link to original ticket if this was triggered from "Link Ticket / Same Problem"
       if (linkedTicketId) {
         try {
@@ -1114,6 +1138,14 @@ export default function AdminCreateTicket() {
     try {
       const ticketData = buildTicketData({ clientUnavailableForCall: true });
       const created = await createTicket(ticketData as any);
+
+      if (callLogId) {
+        try {
+          await endCallLog(callLogId, { ticket: created.id });
+        } catch (err) {
+          console.error('Failed to link call log to ticket:', err);
+        }
+      }
 
       if (linkedTicketId) {
         try {
