@@ -3,20 +3,17 @@ import { useNavigate } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { StatCard } from '../../components/ui/StatCard';
 import { GreenButton } from '../../components/ui/GreenButton';
-import { StatusBadge } from '../../components/ui/StatusBadge';
-import { PriorityBadge } from '../../components/ui/PriorityBadge';
-import { Ticket, AlertTriangle, Users, ShieldCheck, Plus, Pencil, Trash2, Megaphone } from 'lucide-react';
+import { Users, UserCheck, UserCog, UserPlus, Plus, Pencil, Trash2, Megaphone } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   fetchTickets,
-  fetchTicketStats,
   fetchUsers,
   fetchAnnouncements,
   createAnnouncement,
   updateAnnouncement,
   deleteAnnouncement,
 } from '../../services/api';
-import type { AnnouncementData, BackendTicket, BackendUser, TicketStats } from '../../services/api';
+import type { AnnouncementData, BackendTicket, BackendUser } from '../../services/api';
 import {
   BarChart,
   Bar,
@@ -38,124 +35,14 @@ const PRIORITY_COLORS: Record<string, string> = {
   Critical: '#991B1B',
 };
 
-function formatLabel(value: string) {
-  return value
-    .replace(/[_-]/g, ' ')
-    .toLowerCase()
-    .replace(/\b\w/g, (char) => char.toUpperCase());
-}
-
 function normalize(value: string | null | undefined) {
   return (value || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
 }
 
-function startOfDay(date: Date) {
-  const next = new Date(date);
-  next.setHours(0, 0, 0, 0);
-  return next;
-}
-
-function localDateKey(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function buildWeekData(tickets: BackendTicket[]) {
-  const today = startOfDay(new Date());
-  const counts: Record<string, number> = {};
-
-  for (const ticket of tickets) {
-    const createdAt = new Date(ticket.created_at);
-    if (Number.isNaN(createdAt.getTime())) continue;
-    const key = localDateKey(createdAt);
-    counts[key] = (counts[key] || 0) + 1;
-  }
-
-  return Array.from({ length: 7 }, (_, index) => {
-    const date = new Date(today);
-    date.setDate(today.getDate() - (6 - index));
-    const key = localDateKey(date);
-    return {
-      name: date.toLocaleDateString('en-US', { weekday: 'short' }),
-      tickets: counts[key] || 0,
-    };
-  });
-}
-
-function buildMonthData(tickets: BackendTicket[]) {
-  const today = startOfDay(new Date());
-  const buckets = [0, 0, 0, 0];
-
-  for (const ticket of tickets) {
-    const createdAt = startOfDay(new Date(ticket.created_at));
-    if (Number.isNaN(createdAt.getTime())) continue;
-    const dayDiff = Math.floor((today.getTime() - createdAt.getTime()) / 86400000);
-    if (dayDiff < 0 || dayDiff > 27) continue;
-    const bucket = 3 - Math.floor(dayDiff / 7);
-    buckets[bucket] += 1;
-  }
-
-  return buckets.map((count, index) => ({
-    name: `Wk ${index + 1}`,
-    tickets: count,
-  }));
-}
-
-function buildYearData(tickets: BackendTicket[]) {
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const buckets = Array.from({ length: 12 }, () => 0);
-
-  for (const ticket of tickets) {
-    const createdAt = new Date(ticket.created_at);
-    if (Number.isNaN(createdAt.getTime())) continue;
-    if (createdAt.getFullYear() !== currentYear) continue;
-    buckets[createdAt.getMonth()] += 1;
-  }
-
-  return buckets.map((count, index) => ({
-    name: new Date(currentYear, index, 1).toLocaleDateString('en-US', { month: 'short' }),
-    tickets: count,
-  }));
-}
-
-function getAverageResolutionHours(tickets: BackendTicket[], priorityName: string) {
-  const normalizedPriority = normalize(priorityName);
-  const resolved = tickets.filter((ticket) => {
-    const status = normalize(ticket.status);
-    return normalize(ticket.priority) === normalizedPriority && (status === 'resolved' || status === 'closed');
-  });
-
-  if (resolved.length === 0) return null;
-
-  let total = 0;
-  let count = 0;
-  for (const ticket of resolved) {
-    const start = new Date(ticket.created_at).getTime();
-    const end = new Date(ticket.updated_at || ticket.created_at).getTime();
-    if (Number.isNaN(start) || Number.isNaN(end) || end <= start) continue;
-    total += (end - start) / 3600000;
-    count += 1;
-  }
-
-  if (count === 0) return null;
-  return total / count;
-}
-
-function formatDuration(hours: number | null) {
-  if (hours == null) return 'N/A';
-  if (hours < 24) return `${hours.toFixed(1)} hrs`;
-  return `${(hours / 24).toFixed(1)} days`;
-}
-
 export default function SuperAdminDashboard() {
   const navigate = useNavigate();
-  const [dateRange, setDateRange] = useState('Last 7 Days');
   const [tickets, setTickets] = useState<BackendTicket[]>([]);
   const [users, setUsers] = useState<BackendUser[]>([]);
-  const [stats, setStats] = useState<TicketStats | null>(null);
   const [loadingDashboard, setLoadingDashboard] = useState(true);
 
   // ── Announcement management state ──
@@ -180,14 +67,12 @@ export default function SuperAdminDashboard() {
   async function loadDashboardData() {
     setLoadingDashboard(true);
     try {
-      const [ticketData, userData, statsData] = await Promise.all([
+      const [ticketData, userData] = await Promise.all([
         fetchTickets(),
         fetchUsers().catch(() => []),
-        fetchTicketStats().catch(() => null),
       ]);
       setTickets(ticketData);
       setUsers(userData);
-      setStats(statsData);
     } catch {
       toast.error('Failed to load dashboard metrics.');
     } finally {
@@ -280,87 +165,82 @@ export default function SuperAdminDashboard() {
     critical: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
   };
 
-  const chartData = useMemo(() => {
-    if (dateRange === 'Last 30 Days') return buildMonthData(tickets);
-    if (dateRange === 'This Year') return buildYearData(tickets);
-    return buildWeekData(tickets);
-  }, [dateRange, tickets]);
-
-  const priorityData = useMemo(() => {
-    const base = {
-      low: 0,
-      medium: 0,
-      high: 0,
-      critical: 0,
-    };
-
-    if (stats?.by_priority) {
-      Object.entries(stats.by_priority).forEach(([key, value]) => {
-        const normalized = normalize(key);
-        if (normalized in base) {
-          base[normalized as keyof typeof base] += Number(value) || 0;
-        }
-      });
-    } else {
-      tickets.forEach((ticket) => {
-        const normalized = normalize(ticket.priority);
-        if (normalized in base) {
-          base[normalized as keyof typeof base] += 1;
-        }
-      });
-    }
-
-    return [
-      { name: 'Low', value: base.low, color: PRIORITY_COLORS.Low },
-      { name: 'Medium', value: base.medium, color: PRIORITY_COLORS.Medium },
-      { name: 'High', value: base.high, color: PRIORITY_COLORS.High },
-      { name: 'Critical', value: base.critical, color: PRIORITY_COLORS.Critical },
-    ];
-  }, [stats, tickets]);
-
-  const now = new Date();
-  const totalTicketsMonthly = useMemo(() => {
-    return tickets.filter((ticket) => {
-      const createdAt = new Date(ticket.created_at);
-      return createdAt.getFullYear() === now.getFullYear() && createdAt.getMonth() === now.getMonth();
-    }).length;
-  }, [tickets, now]);
-
-  const criticalIssues = stats?.by_priority?.critical ?? priorityData.find((entry) => entry.name === 'Critical')?.value ?? 0;
-
   const activeUsers = useMemo(() => users.filter((user) => user.is_active).length, [users]);
+  const supervisorCount = useMemo(() => users.filter((user) => normalize(user.role) === 'admin').length, [users]);
+  const salesCount = useMemo(() => users.filter((user) => normalize(user.role) === 'sales').length, [users]);
 
-  const slaCompliance = useMemo(() => {
-    const measurable = tickets.filter((ticket) => {
-      const status = normalize(ticket.status);
-      return (status === 'resolved' || status === 'closed') && (ticket.sla_estimated_days || 0) > 0;
+  const userRoleData = useMemo(() => {
+    const buckets: Record<string, number> = {};
+    users.forEach((user) => {
+      const role = normalize(user.role);
+      if (!role) return;
+      buckets[role] = (buckets[role] || 0) + 1;
     });
 
-    if (measurable.length === 0) return 0;
+    return Object.entries(buckets)
+      .map(([role, count]) => ({
+        name: role === 'admin' ? 'Supervisors' : role === 'employee' ? 'Technical' : role === 'sales' ? 'Sales' : role === 'superadmin' ? 'Superadmin' : role,
+        users: count,
+      }))
+      .sort((a, b) => b.users - a.users);
+  }, [users]);
 
-    const compliant = measurable.filter((ticket) => {
-      const start = new Date(ticket.created_at).getTime();
-      const end = new Date(ticket.updated_at || ticket.created_at).getTime();
-      if (Number.isNaN(start) || Number.isNaN(end) || end <= start) return false;
-      const days = (end - start) / 86400000;
-      return days <= (ticket.sla_estimated_days || 0);
-    }).length;
+  const ticketCreatorRoleData = useMemo(() => {
+    const buckets: Record<string, number> = {
+      supervisor: 0,
+      sales: 0,
+      technical: 0,
+      superadmin: 0,
+      other: 0,
+    };
 
-    return (compliant / measurable.length) * 100;
+    tickets.forEach((ticket) => {
+      const role = normalize(String(ticket.created_by?.role || ''));
+      if (role === 'admin') buckets.supervisor += 1;
+      else if (role === 'sales') buckets.sales += 1;
+      else if (role === 'employee') buckets.technical += 1;
+      else if (role === 'superadmin') buckets.superadmin += 1;
+      else buckets.other += 1;
+    });
+
+    return [
+      { name: 'Supervisors', value: buckets.supervisor, color: '#0E8F79' },
+      { name: 'Sales', value: buckets.sales, color: '#3BC25B' },
+      { name: 'Technical', value: buckets.technical, color: '#F59E0B' },
+      { name: 'Superadmin', value: buckets.superadmin, color: '#3B82F6' },
+      { name: 'Other', value: buckets.other, color: '#6B7280' },
+    ];
   }, [tickets]);
 
-  const escalatedTickets = useMemo(() => {
-    return [...tickets]
-      .filter((ticket) => {
-        const status = normalize(ticket.status);
-        return status === 'escalated' || Boolean(ticket.external_escalated_at) || (ticket.escalation_logs?.length || 0) > 0;
-      })
-      .sort((a, b) => new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime())
-      .slice(0, 5);
+  const supervisorLoad = useMemo(() => {
+    const buckets: Record<string, number> = {};
+    tickets.forEach((ticket) => {
+      const sup = ticket.supervisor;
+      if (!sup) return;
+      const label = `${sup.first_name || ''} ${sup.last_name || ''}`.trim() || sup.username || `Supervisor #${sup.id}`;
+      buckets[label] = (buckets[label] || 0) + 1;
+    });
+
+    return Object.entries(buckets)
+      .map(([name, count]) => ({ name, tickets: count }))
+      .sort((a, b) => b.tickets - a.tickets)
+      .slice(0, 6);
   }, [tickets]);
 
-  const criticalResolutionHours = useMemo(() => getAverageResolutionHours(tickets, 'Critical'), [tickets]);
-  const highResolutionHours = useMemo(() => getAverageResolutionHours(tickets, 'High'), [tickets]);
+  const salesCreated = useMemo(() => {
+    const buckets: Record<string, number> = {};
+    tickets.forEach((ticket) => {
+      const createdBy = ticket.created_by;
+      if (normalize(createdBy?.role) !== 'sales') return;
+      const label = `${createdBy.first_name || ''} ${createdBy.last_name || ''}`.trim() || createdBy.username || `Sales #${createdBy.id}`;
+      buckets[label] = (buckets[label] || 0) + 1;
+    });
+
+    return Object.entries(buckets)
+      .map(([name, count]) => ({ name, tickets: count }))
+      .sort((a, b) => b.tickets - a.tickets)
+      .slice(0, 6);
+  }, [tickets]);
 
   if (loadingDashboard) {
     return (
@@ -376,61 +256,52 @@ export default function SuperAdminDashboard() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            SuperAdmin Overview
+            SuperAdmin User Analytics
           </h1>
           <p className="text-gray-500 dark:text-gray-400">
-            Global system monitoring and performance metrics
+            User distribution, participation, and ticket ownership insights
           </p>
         </div>
+        <GreenButton onClick={() => navigate('/superadmin/reports')}>
+          View Detailed Reports
+        </GreenButton>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
-          title="Total Tickets (Monthly)"
-          value={totalTicketsMonthly.toLocaleString()}
-          icon={Ticket}
+          title="Total Users"
+          value={users.length.toLocaleString()}
+          icon={Users}
           color="green" />
-
-        <StatCard
-          title="Critical Issues"
-          value={String(criticalIssues)}
-          icon={AlertTriangle}
-          subtext="Requires immediate attention"
-          color="orange" />
-
-        <StatCard
-          title="SLA Compliance"
-          value={`${slaCompliance.toFixed(1)}%`}
-          icon={ShieldCheck}
-          color="blue" />
 
         <StatCard
           title="Active Users"
           value={activeUsers.toLocaleString()}
-          icon={Users}
-          subtext="Clients & Technicals"
+          icon={UserCheck}
+          color="orange" />
+
+        <StatCard
+          title="Supervisors"
+          value={supervisorCount.toLocaleString()}
+          icon={UserCog}
+          color="blue" />
+
+        <StatCard
+          title="Sales Team"
+          value={salesCount.toLocaleString()}
+          icon={UserPlus}
           color="purple" />
 
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2" accent>
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-              Ticket Volume Trends
-            </h3>
-            <select
-              value={dateRange}
-              onChange={(e) => setDateRange(e.target.value)}
-              className="text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-2 py-1 focus:ring-2 focus:ring-[#3BC25B] outline-none">
-              <option>Last 7 Days</option>
-              <option>Last 30 Days</option>
-              <option>This Year</option>
-            </select>
-          </div>
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6">
+            Users by Role
+          </h3>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData}>
+              <BarChart data={userRoleData}>
                 <CartesianGrid
                   strokeDasharray="3 3"
                   vertical={false}
@@ -440,21 +311,15 @@ export default function SuperAdminDashboard() {
                   dataKey="name"
                   axisLine={false}
                   tickLine={false}
-                  tick={{
-                    fill: '#6B7280'
-                  }} />
+                  tick={{ fill: '#6B7280' }} />
 
                 <YAxis
                   axisLine={false}
                   tickLine={false}
-                  tick={{
-                    fill: '#6B7280'
-                  }} />
+                  tick={{ fill: '#6B7280' }} />
 
                 <Tooltip
-                  cursor={{
-                    fill: '#F3F4F6'
-                  }}
+                  cursor={{ fill: '#F3F4F6' }}
                   contentStyle={{
                     borderRadius: '8px',
                     border: 'none',
@@ -464,13 +329,13 @@ export default function SuperAdminDashboard() {
                   }} />
 
                 <Bar
-                  dataKey="tickets"
-                  fill="url(#colorGradient)"
+                  dataKey="users"
+                  fill="url(#usersGradient)"
                   radius={[4, 4, 0, 0]} />
 
                 <defs>
                   <linearGradient
-                    id="colorGradient"
+                    id="usersGradient"
                     x1="0"
                     y1="0"
                     x2="0"
@@ -487,13 +352,13 @@ export default function SuperAdminDashboard() {
 
         <Card accent>
           <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6">
-            Tickets by Priority
+            Ticket Creators by Role
           </h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={priorityData}
+                  data={ticketCreatorRoleData}
                   cx="50%"
                   cy="50%"
                   innerRadius={60}
@@ -501,7 +366,7 @@ export default function SuperAdminDashboard() {
                   paddingAngle={5}
                   dataKey="value">
 
-                  {priorityData.map((entry, i) =>
+                  {ticketCreatorRoleData.map((entry, i) =>
                   <Cell key={i} fill={entry.color} />
                   )}
                 </Pie>
@@ -517,95 +382,90 @@ export default function SuperAdminDashboard() {
                 <Legend
                   verticalAlign="bottom"
                   height={36}
-                  wrapperStyle={{
-                    color: '#6b7280'
-                  }} />
+                  wrapperStyle={{ color: '#6b7280' }} />
 
               </PieChart>
             </ResponsiveContainer>
           </div>
-          <div className="mt-4 space-y-3">
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-gray-500 dark:text-gray-400">
-                Critical Resolution Time
-              </span>
-              <span className="font-medium text-gray-900 dark:text-white">
-                {formatDuration(criticalResolutionHours)}
-              </span>
-            </div>
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-gray-500 dark:text-gray-400">
-                High Priority Resolution
-              </span>
-              <span className="font-medium text-gray-900 dark:text-white">
-                {formatDuration(highResolutionHours)}
-              </span>
-            </div>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card accent>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+            Supervisor Ticket Ownership
+            </h3>
+          <div className="h-72 mt-4">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={supervisorLoad} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e5e7eb" />
+                <XAxis type="number" tick={{ fontSize: 12 }} />
+                <YAxis dataKey="name" type="category" tick={{ fontSize: 12 }} width={120} />
+                <Tooltip />
+                <Bar dataKey="tickets" fill="#0E8F79" radius={[0, 4, 4, 0]} name="Tickets" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+
+        <Card accent>
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+            Sales Ticket Creation
+          </h3>
+          <div className="h-72 mt-4">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={salesCreated} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e5e7eb" />
+                <XAxis type="number" tick={{ fontSize: 12 }} />
+                <YAxis dataKey="name" type="category" tick={{ fontSize: 12 }} width={120} />
+                <Tooltip />
+                <Bar dataKey="tickets" fill="#3BC25B" radius={[0, 4, 4, 0]} name="Created Tickets" />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </Card>
       </div>
 
       <Card accent>
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-            Recent Escalations
-          </h3>
-          <GreenButton variant="ghost" className="text-sm" onClick={() => navigate('/superadmin/reports')}>
-            View All
-          </GreenButton>
-        </div>
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6">
+          User Role Activity Summary
+        </h3>
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-gray-500 dark:text-gray-400 uppercase bg-gray-50 dark:bg-gray-700/50">
               <tr>
-                <th className="px-4 py-3">Ticket ID</th>
-                <th className="px-4 py-3">Subject</th>
-                <th className="px-4 py-3">Client</th>
-                <th className="px-4 py-3">Priority</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Assigned To</th>
+                <th className="px-4 py-3">Role</th>
+                <th className="px-4 py-3">User Count</th>
+                <th className="px-4 py-3">Created Tickets</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-              {escalatedTickets.length === 0 ? (
+              {userRoleData.length === 0 ? (
                 <tr>
-                  <td className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400" colSpan={6}>
-                    No escalated tickets found.
+                  <td className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400" colSpan={3}>
+                    No role analytics available.
                   </td>
                 </tr>
               ) : (
-                escalatedTickets.map((ticket) => (
+                userRoleData.map((entry) => {
+                  const creatorEntry = ticketCreatorRoleData.find((item) => normalize(item.name) === normalize(entry.name));
+                  return (
                   <tr
-                    key={ticket.id}
+                    key={entry.name}
                     className="hover:bg-gray-50 dark:hover:bg-gray-700/40"
                   >
-                    <td className="px-4 py-3 font-medium text-gray-900 dark:text-white font-mono text-xs">
-                      {ticket.stf_no}
+                    <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">
+                      {entry.name}
                     </td>
                     <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
-                      {ticket.description_of_problem || 'No subject provided'}
+                      {entry.users}
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center text-xs font-bold text-gray-600 dark:text-gray-300">
-                          {(ticket.client || 'C').slice(0, 1).toUpperCase()}
-                        </div>
-                        <span className="text-gray-700 dark:text-gray-300">
-                          {ticket.client || 'Unknown Client'}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <PriorityBadge priority={formatLabel(ticket.priority || 'medium')} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={formatLabel(ticket.status || 'escalated')} />
-                    </td>
-                    <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
-                      {ticket.assigned_to ? `${ticket.assigned_to.first_name} ${ticket.assigned_to.last_name}`.trim() || ticket.assigned_to.username : 'Unassigned'}
+                    <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
+                      {creatorEntry?.value ?? 0}
                     </td>
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>

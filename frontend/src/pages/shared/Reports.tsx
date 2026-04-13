@@ -1,4 +1,4 @@
-﻿import { useRef, useEffect, useState } from 'react';
+﻿import { useRef, useEffect, useMemo, useState } from 'react';
 import { Card } from '../../components/ui/Card';
 import { StatCard } from '../../components/ui/StatCard';
 import { GreenButton } from '../../components/ui/GreenButton';
@@ -26,6 +26,9 @@ import {
   LineChart,
   Line,
   Legend,
+  PieChart,
+  Pie,
+  Cell,
 } from 'recharts';
 import { fetchTickets, fetchTicketStats } from '../../services/api';
 import type { BackendTicket, TicketStats } from '../../services/api';
@@ -34,6 +37,11 @@ import type { BackendTicket, TicketStats } from '../../services/api';
 const emptyMonthly: { name: string; tickets: number; resolved: number }[] = [];
 const emptySla: { name: string; withinSla: number; breached: number }[] = [];
 const emptyCategory: { name: string; count: number }[] = [];
+const ROLE_COLORS = ['#0E8F79', '#3BC25B', '#3B82F6', '#F59E0B', '#6B7280'];
+
+function normalizeRole(value: string | null | undefined) {
+  return (value || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+}
 
 export function Reports() {
   const reportRef = useRef<HTMLDivElement>(null);
@@ -50,6 +58,61 @@ export function Reports() {
   const resolvedVal = stats?.pending_closure ?? (tickets ? tickets.filter((t) => ['pending_closure', 'closed', 'resolved'].includes(t.status)).length : 0);
   const avgResVal = stats?.avg_resolution_time != null ? `${Math.round(stats.avg_resolution_time)}h` : 'N/A';
   const slaComplianceVal = slaData.length ? `${Math.round(slaData.reduce((s, x) => s + x.withinSla, 0) / slaData.length)}%` : 'N/A';
+
+  const creatorRoleData = useMemo(() => {
+    if (!tickets) return [] as { name: string; value: number; color: string }[];
+    const buckets: Record<string, number> = {};
+    tickets.forEach((t) => {
+      const role = normalizeRole(String(t.created_by?.role || 'other'));
+      const label = role === 'admin'
+        ? 'Supervisor'
+        : role === 'sales'
+          ? 'Sales'
+          : role === 'employee'
+            ? 'Technical'
+            : role === 'superadmin'
+              ? 'Superadmin'
+              : 'Other';
+      buckets[label] = (buckets[label] || 0) + 1;
+    });
+
+    return Object.entries(buckets)
+      .map(([name, value], index) => ({ name, value, color: ROLE_COLORS[index % ROLE_COLORS.length] }))
+      .sort((a, b) => b.value - a.value);
+  }, [tickets]);
+
+  const supervisorTicketData = useMemo(() => {
+    if (!tickets) return [] as { name: string; tickets: number }[];
+    const buckets: Record<string, number> = {};
+    tickets.forEach((t) => {
+      if (!t.supervisor) return;
+      const name = `${t.supervisor.first_name || ''} ${t.supervisor.last_name || ''}`.trim() || t.supervisor.username || `Supervisor #${t.supervisor.id}`;
+      buckets[name] = (buckets[name] || 0) + 1;
+    });
+
+    return Object.entries(buckets)
+      .map(([name, value]) => ({ name, tickets: value }))
+      .sort((a, b) => b.tickets - a.tickets)
+      .slice(0, 10);
+  }, [tickets]);
+
+  const salesCreatedData = useMemo(() => {
+    if (!tickets) return [] as { name: string; tickets: number }[];
+    const buckets: Record<string, number> = {};
+    tickets.forEach((t) => {
+      if (normalizeRole(t.created_by?.role) !== 'sales') return;
+      const name = `${t.created_by.first_name || ''} ${t.created_by.last_name || ''}`.trim() || t.created_by.username || `Sales #${t.created_by.id}`;
+      buckets[name] = (buckets[name] || 0) + 1;
+    });
+
+    return Object.entries(buckets)
+      .map(([name, value]) => ({ name, tickets: value }))
+      .sort((a, b) => b.tickets - a.tickets)
+      .slice(0, 10);
+  }, [tickets]);
+
+  const supervisorTicketTotal = useMemo(() => supervisorTicketData.reduce((sum, item) => sum + item.tickets, 0), [supervisorTicketData]);
+  const salesCreatedTotal = useMemo(() => salesCreatedData.reduce((sum, item) => sum + item.tickets, 0), [salesCreatedData]);
 
   const handleExportPDF = () => {
     setShowExportMenu(false);
@@ -82,6 +145,27 @@ export function Reports() {
         <thead><tr><th>Category</th><th>Count</th></tr></thead>
         <tbody>
           ${categoryData.map((d) => `<tr><td>${d.name}</td><td>${d.count}</td></tr>`).join('')}
+        </tbody>
+      </table>
+      <h2>Tickets Created by Role</h2>
+      <table>
+        <thead><tr><th>Role</th><th>Ticket Count</th></tr></thead>
+        <tbody>
+          ${creatorRoleData.map((d) => `<tr><td>${d.name}</td><td>${d.value}</td></tr>`).join('')}
+        </tbody>
+      </table>
+      <h2>Supervisor Ticket Ownership</h2>
+      <table>
+        <thead><tr><th>Supervisor</th><th>Ticket Count</th></tr></thead>
+        <tbody>
+          ${supervisorTicketData.map((d) => `<tr><td>${d.name}</td><td>${d.tickets}</td></tr>`).join('')}
+        </tbody>
+      </table>
+      <h2>Sales Ticket Creation</h2>
+      <table>
+        <thead><tr><th>Sales User</th><th>Created Tickets</th></tr></thead>
+        <tbody>
+          ${salesCreatedData.map((d) => `<tr><td>${d.name}</td><td>${d.tickets}</td></tr>`).join('')}
         </tbody>
       </table>`;
     const html = buildPdfDocument('Supervisor Reports - Maptech Ticketing System', 'Supervisor Reports', body, `${totalTicketsVal} total tickets`);
@@ -362,11 +446,13 @@ export function Reports() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6">
         <StatCard title="Total Tickets" value={loading ? '—' : String(totalTicketsVal)} icon={BarChart3} color="blue" trend={{ value: totalTicketsVal, isPositive: true }} />
         <StatCard title="Resolved" value={loading ? '—' : String(resolvedVal)} icon={TrendingUp} color="green" trend={{ value: resolvedVal, isPositive: true }} />
         <StatCard title="Avg Resolution" value={loading ? '—' : avgResVal} icon={Clock} color="orange" trend={{ value: 0, isPositive: true }} />
         <StatCard title="SLA Compliance" value={loading ? '—' : slaComplianceVal} icon={Users} color="purple" trend={{ value: 0, isPositive: true }} />
+        <StatCard title="Supervisor-Owned" value={loading ? '—' : String(supervisorTicketTotal)} icon={Users} color="blue" trend={{ value: supervisorTicketTotal, isPositive: true }} />
+        <StatCard title="Sales-Created" value={loading ? '—' : String(salesCreatedTotal)} icon={TrendingUp} color="green" trend={{ value: salesCreatedTotal, isPositive: true }} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -419,6 +505,33 @@ export function Reports() {
           </ResponsiveContainer>
         </div>
       </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card accent>
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Tickets Created by Role</h3>
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={loading ? [] : creatorRoleData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={55}
+                  outerRadius={85}
+                  paddingAngle={4}
+                  dataKey="value"
+                >
+                  {(loading ? [] : creatorRoleData).map((entry, i) => (
+                    <Cell key={`${entry.name}-${i}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+      </div>
     </div>
   );
 }
