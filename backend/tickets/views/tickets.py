@@ -83,7 +83,7 @@ class TicketViewSet(viewsets.ModelViewSet):
 
             if supervisor_id:
                 try:
-                    sup = User.objects.get(id=supervisor_id, role__in=[User.ROLE_ADMIN, User.ROLE_SUPERADMIN], is_active=True)
+                    sup = User.objects.get(id=supervisor_id, role=User.ROLE_ADMIN, is_active=True)
                     serializer.validated_data['supervisor'] = sup
                 except User.DoesNotExist:
                     return Response({'detail': 'Selected supervisor was not found.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -1046,12 +1046,12 @@ def list_sales_users(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def list_supervisors(request):
-    """Return active supervisors (admin/superadmin) for sales routing."""
+    """Return active supervisors (admin) for sales routing."""
     if not request.user.is_authenticated:
         return Response({'detail': 'Not allowed'}, status=status.HTTP_403_FORBIDDEN)
 
     supervisors = User.objects.filter(
-        role__in=[User.ROLE_ADMIN, User.ROLE_SUPERADMIN],
+        role=User.ROLE_ADMIN,
         is_active=True,
     ).order_by('first_name', 'last_name', 'username')
     data = UserSerializer(supervisors, many=True).data

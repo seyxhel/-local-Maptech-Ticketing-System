@@ -376,8 +376,11 @@ export default function AdminCreateTicket() {
       .catch((err) => console.error('Failed to load sales users:', err));
     fetchSupervisors()
       .then((users) => {
+        const assignableSupervisors = users.filter((supervisor) => (
+          supervisor.role === 'admin' || supervisor.role === 'supervisor'
+        ));
         setSupervisors(
-          users.map((supervisor) => ({
+          assignableSupervisors.map((supervisor) => ({
             id: supervisor.id,
             name: `${supervisor.first_name || ''} ${supervisor.last_name || ''}`.trim() || supervisor.username,
             role: supervisor.role,
@@ -402,6 +405,14 @@ export default function AdminCreateTicket() {
     setSelectedSalesRep(currentSalesRepName);
     setAdditionalSalesReps((prev) => prev.filter((rep) => rep.trim().toLowerCase() !== currentSalesRepName.toLowerCase()));
   }, [isSalesUser, currentSalesRepName]);
+
+  useEffect(() => {
+    if (!selectedSupervisorId) return;
+    const isAllowedSupervisor = supervisors.some((supervisor) => supervisor.id === selectedSupervisorId);
+    if (!isAllowedSupervisor) {
+      setSelectedSupervisorId(null);
+    }
+  }, [selectedSupervisorId, supervisors]);
 
   // Load products for selected client when available; otherwise, load full catalog.
   useEffect(() => {
@@ -1502,7 +1513,7 @@ export default function AdminCreateTicket() {
                   <option value="">Select assigned supervisor</option>
                   {supervisors.map((supervisor) => (
                     <option key={supervisor.id} value={supervisor.id}>
-                      {supervisor.name} ({supervisor.role === 'superadmin' ? 'Superadmin' : 'Supervisor'})
+                      {supervisor.name} ({supervisor.role === 'admin' ? 'Admin' : 'Supervisor'})
                     </option>
                   ))}
                 </select>
