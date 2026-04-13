@@ -326,6 +326,17 @@ export default function AdminCreateTicket() {
     return fullName || user?.name?.trim() || user?.username?.trim() || user?.email?.trim() || '';
   }, [isSalesUser, user?.first_name, user?.last_name, user?.name, user?.username, user?.email]);
 
+  useEffect(() => {
+    if (isExistingClient) return;
+
+    if (isExistingProduct) {
+      setIsExistingProduct(false);
+    }
+    if (selectedProductId) {
+      setSelectedProductId(null);
+    }
+  }, [isExistingClient, isExistingProduct, selectedProductId]);
+
   const combinedSalesReps = useMemo(() => {
     const reps = [selectedSalesRep.trim(), ...additionalSalesReps.map((r) => r.trim()).filter(Boolean)];
     if (isSalesUser && currentSalesRepName) {
@@ -1241,7 +1252,7 @@ export default function AdminCreateTicket() {
           <div className="flex items-center gap-4 mb-6">
             <button
               type="button"
-              onClick={() => { setIsExistingClient(false); setSelectedClientId(null); }}
+              onClick={() => { setIsExistingClient(false); setSelectedClientId(null); setIsExistingProduct(false); setSelectedProductId(null); }}
               className={`px-4 py-2 rounded-lg text-sm font-medium border transition-all ${
                 !isExistingClient
                   ? 'bg-[#0E8F79] text-white border-[#0E8F79]'
@@ -1890,18 +1901,24 @@ export default function AdminCreateTicket() {
             >
               New Product
             </button>
-            <button
-              type="button"
-              onClick={() => { setIsExistingProduct(true); setNewProductInfo({ device_equipment: '', product_name: '', brand: '', model_name: '', serial_no: '', version_no: '', date_purchased: '', has_warranty: false }); setErrors((p) => ({ ...p, product: false, product_name: false, brand: false, model_name: false, serial_no: false, version_no: false, date_purchased: false, maptech_sales_invoice: false, device_equipment: false, projectTitle: false })); }}
-              className={`px-4 py-2 rounded-lg text-sm font-medium border transition-all ${
-                isExistingProduct
-                  ? 'bg-[#0E8F79] text-white border-[#0E8F79]'
-                  : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-600'
-              }`}
-            >
-              Existing Product
-            </button>
+            {isExistingClient && (
+              <button
+                type="button"
+                onClick={() => { setIsExistingProduct(true); setNewProductInfo({ device_equipment: '', product_name: '', brand: '', model_name: '', serial_no: '', version_no: '', date_purchased: '', has_warranty: false }); setErrors((p) => ({ ...p, product: false, product_name: false, brand: false, model_name: false, serial_no: false, version_no: false, date_purchased: false, maptech_sales_invoice: false, device_equipment: false, projectTitle: false })); }}
+                className={`px-4 py-2 rounded-lg text-sm font-medium border transition-all ${
+                  isExistingProduct
+                    ? 'bg-[#0E8F79] text-white border-[#0E8F79]'
+                    : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-600'
+                }`}
+              >
+                Existing Product
+              </button>
+            )}
           </div>
+
+          {!isExistingClient && (
+            <p className="mb-6 text-xs text-gray-500 dark:text-gray-400">New clients can only be created with a new product.</p>
+          )}
 
           {isExistingProduct && (
             <div className="md:col-span-2 mb-6">
