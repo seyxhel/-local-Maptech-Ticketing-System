@@ -527,7 +527,7 @@ export default function CallLogs() {
             <thead className="text-xs text-gray-500 dark:text-gray-400 uppercase bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700">
               <tr>
                 <th className="px-4 py-4 font-semibold">Status</th>
-                <th className="px-4 py-4 font-semibold">Admin</th>
+                <th className="px-4 py-4 font-semibold">Caller</th>
                 <th className="px-4 py-4 font-semibold">Client</th>
                 <th className="px-4 py-4 font-semibold">Phone</th>
                 <th className="px-4 py-4 font-semibold">Call Start</th>

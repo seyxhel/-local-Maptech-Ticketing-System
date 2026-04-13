@@ -4,13 +4,23 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { Layout } from '../components/layout/Layout';
 import { Sidebar, type NavItem } from '../components/layout/Sidebar';
-import { LayoutDashboard, Users, BarChart3, Settings, ScrollText, Award } from 'lucide-react';
+import { LayoutDashboard, Users, BarChart3, Settings, ScrollText, Award, PhoneCall, ShieldAlert, Shield } from 'lucide-react';
 import { NetworkErrorModal, useNetworkStatus } from '../shared';
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/superadmin/dashboard' },
   { id: 'users', label: 'User Management', icon: Users, path: '/superadmin/users' },
-  { id: 'audit-logs', label: 'Audit Logs', icon: ScrollText, path: '/superadmin/audit-logs' },
+  {
+    id: 'logs',
+    label: 'Logs',
+    icon: ScrollText,
+    path: '/superadmin/logs',
+    children: [
+      { id: 'audit-logs', label: 'Audit Logs', icon: Shield, path: '/superadmin/audit-logs' },
+      { id: 'call-logs', label: 'Call Logs', icon: PhoneCall, path: '/superadmin/call-logs' },
+      { id: 'escalation-logs', label: 'Escalation Logs', icon: ShieldAlert, path: '/superadmin/escalation-logs' },
+    ],
+  },
   { id: 'reports', label: 'Reports', icon: BarChart3, path: '/superadmin/reports' },
   { id: 'technical-staff-ratings', label: 'Technical Staff Ratings', icon: Award, path: '/superadmin/technical-staff-ratings' },
   { id: 'settings', label: 'Settings', icon: Settings, path: '/superadmin/settings' },

@@ -18,6 +18,8 @@ import SuperAdminUsers from './pages/superadmin/users';
 import SuperAdminReports from './pages/superadmin/reports';
 import SuperAdminSettings from './pages/superadmin/settings';
 import SuperAdminAuditLogs from './pages/superadmin/audit-logs';
+import SuperAdminCallLogs from './pages/superadmin/call-logs';
+import SuperAdminEscalationLogs from './pages/superadmin/escalation-logs';
 import SuperAdminEmployeeRatings from './pages/superadmin/employee-ratings';
 
 import AdminDashboard from './pages/admin/dashboard';
@@ -92,6 +94,8 @@ export function App() {
               <Route path="dashboard" element={<SuperAdminDashboard />} />
               <Route path="users" element={<SuperAdminUsers />} />
               <Route path="audit-logs" element={<SuperAdminAuditLogs />} />
+              <Route path="call-logs" element={<SuperAdminCallLogs />} />
+              <Route path="escalation-logs" element={<SuperAdminEscalationLogs />} />
               <Route path="reports" element={<SuperAdminReports />} />
               <Route path="technical-staff-ratings" element={<SuperAdminEmployeeRatings />} />
               <Route path="settings" element={<SuperAdminSettings />} />

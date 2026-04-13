@@ -26,10 +26,13 @@ const PRIORITIES = ['Critical', 'High', 'Medium', 'Low'];
 export default function AdminEscalatedTickets() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
+  const [salesAssignedSearch, setSalesAssignedSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [salesAssignedCurrentPage, setSalesAssignedCurrentPage] = useState(1);
   const [showFilter, setShowFilter] = useState(false);
   const [filterPriority, setFilterPriority] = useState<string[]>([]);
-  const [tickets, setTickets] = useState<UITicket[]>([]);
+  const [technicalStaffEscalatedTickets, setTechnicalStaffEscalatedTickets] = useState<UITicket[]>([]);
+  const [salesAssignedSupervisorTickets, setSalesAssignedSupervisorTickets] = useState<UITicket[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -40,8 +43,22 @@ export default function AdminEscalatedTickets() {
         const escalatedTickets = raw
           .filter((ticket: BackendTicket) => ticket.status === 'escalated' || ticket.status === 'escalated_external')
           .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+
+        const salesToSupervisorTickets = raw
+          .filter((ticket: BackendTicket) => {
+            const createdByRole = String(ticket.created_by?.role || '').toLowerCase();
+            const assigneeRole = String(ticket.assigned_to?.role || '').toLowerCase();
+            const supervisorRole = String(ticket.supervisor?.role || '').toLowerCase();
+            const isSalesCreated = createdByRole === 'sales';
+            const assignedToAdmin = assigneeRole === 'admin' || assigneeRole === 'superadmin';
+            const hasSupervisorRoute = supervisorRole === 'admin' || supervisorRole === 'superadmin';
+            return isSalesCreated && (assignedToAdmin || hasSupervisorRoute);
+          })
+          .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+
         if (cancelled) return;
-        setTickets(escalatedTickets.map(mapBackendTicketToUI));
+        setTechnicalStaffEscalatedTickets(escalatedTickets.map(mapBackendTicketToUI));
+        setSalesAssignedSupervisorTickets(salesToSupervisorTickets.map(mapBackendTicketToUI));
       } catch {
         if (!cancelled) toast.error('Failed to load escalated tickets.');
       } finally {
@@ -51,7 +68,7 @@ export default function AdminEscalatedTickets() {
     return () => { cancelled = true; };
   }, []);
 
-  const filtered = tickets.filter((ticket) => {
+  const filteredTechnicalStaffEscalations = technicalStaffEscalatedTickets.filter((ticket) => {
     if (filterPriority.length > 0 && !filterPriority.includes(ticket.priority)) return false;
     if (
       search &&
@@ -62,15 +79,31 @@ export default function AdminEscalatedTickets() {
     return true;
   });
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
-  const paged = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  const filteredSalesAssigned = salesAssignedSupervisorTickets.filter((ticket) => {
+    if (
+      salesAssignedSearch &&
+      !ticket.subject.toLowerCase().includes(salesAssignedSearch.toLowerCase()) &&
+      !ticket.id.toLowerCase().includes(salesAssignedSearch.toLowerCase()) &&
+      !ticket.client.toLowerCase().includes(salesAssignedSearch.toLowerCase()) &&
+      !(ticket.assignee || '').toLowerCase().includes(salesAssignedSearch.toLowerCase())
+    ) return false;
+    return true;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filteredTechnicalStaffEscalations.length / ITEMS_PER_PAGE));
+  const paged = filteredTechnicalStaffEscalations.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  const salesAssignedTotalPages = Math.max(1, Math.ceil(filteredSalesAssigned.length / ITEMS_PER_PAGE));
+  const salesAssignedPaged = filteredSalesAssigned.slice(
+    (salesAssignedCurrentPage - 1) * ITEMS_PER_PAGE,
+    salesAssignedCurrentPage * ITEMS_PER_PAGE
+  );
   const toggleFilter = (arr: string[], val: string) => arr.includes(val) ? arr.filter((v) => v !== val) : [...arr, val];
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#3BC25B]"></div>
-        <span className="ml-3 text-gray-500">Loading escalated tickets...</span>
+        <span className="ml-3 text-gray-500">Loading tickets...</span>
       </div>
     );
   }
@@ -80,9 +113,9 @@ export default function AdminEscalatedTickets() {
       <div>
         <div className="flex items-center gap-2">
           <ShieldAlert className="w-6 h-6 text-orange-500" />
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Escalated Tickets</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Escalated Tickets by Technical Staff</h1>
         </div>
-        <p className="text-gray-500 dark:text-gray-400">View all tickets currently escalated to supervisor level</p>
+        <p className="text-gray-500 dark:text-gray-400">View all tickets escalated by the technical staff to supervisor level</p>
       </div>
 
       <Card accent>
@@ -112,7 +145,7 @@ export default function AdminEscalatedTickets() {
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
               {paged.length === 0 && (
-                <tr><td colSpan={8} className="px-6 py-12 text-center text-gray-400 dark:text-gray-500">No escalated tickets match your filters.</td></tr>
+                <tr><td colSpan={8} className="px-6 py-12 text-center text-gray-400 dark:text-gray-500">No technical staff escalations match your filters.</td></tr>
               )}
               {paged.map((ticket) => (
                 <tr key={ticket.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
@@ -156,13 +189,94 @@ export default function AdminEscalatedTickets() {
         </div>
 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-6 pt-4 border-t border-gray-100 dark:border-gray-700">
-          <span className="text-sm text-gray-500 dark:text-gray-400">Showing {filtered.length === 0 ? 0 : (currentPage - 1) * ITEMS_PER_PAGE + 1}-{Math.min(currentPage * ITEMS_PER_PAGE, filtered.length)} of {filtered.length} tickets</span>
+          <span className="text-sm text-gray-500 dark:text-gray-400">Showing {filteredTechnicalStaffEscalations.length === 0 ? 0 : (currentPage - 1) * ITEMS_PER_PAGE + 1}-{Math.min(currentPage * ITEMS_PER_PAGE, filteredTechnicalStaffEscalations.length)} of {filteredTechnicalStaffEscalations.length} tickets</span>
           <div className="flex items-center gap-1 flex-wrap justify-end">
             <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-[#3BC25B] hover:text-white dark:hover:bg-[#3BC25B] text-gray-600 dark:text-gray-400 disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-600 transition-colors" aria-label="Previous page"><ChevronLeft className="w-4 h-4" /></button>
             {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
               <button key={page} onClick={() => setCurrentPage(page)} className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${currentPage === page ? 'bg-[#3BC25B] text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`} aria-label={`Go to page ${page}`} aria-current={currentPage === page ? 'page' : undefined}>{page}</button>
             ))}
             <button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-[#3BC25B] hover:text-white dark:hover:bg-[#3BC25B] text-gray-600 dark:text-gray-400 disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-600 transition-colors" aria-label="Next page"><ChevronRightIcon className="w-4 h-4" /></button>
+          </div>
+        </div>
+      </Card>
+
+      <Card>
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Tickets Assigned to Supervisor by Sales</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Tickets created by Sales and routed to Supervisor</p>
+        </div>
+
+        <div className="relative w-full md:max-w-md mb-6">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            value={salesAssignedSearch}
+            onChange={(e) => {
+              setSalesAssignedSearch(e.target.value);
+              setSalesAssignedCurrentPage(1);
+            }}
+            type="text"
+            placeholder="Search by ticket ID, subject, client or assignee..."
+            className="w-full pl-10 pr-4 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#3BC25B]"
+          />
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[800px] text-sm text-left">
+            <thead className="text-xs text-gray-500 dark:text-gray-400 uppercase bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700">
+              <tr>
+                <th className="px-6 py-4 font-semibold">Ticket Details</th>
+                <th className="px-6 py-4 font-semibold">Client</th>
+                <th className="px-6 py-4 font-semibold">Priority</th>
+                <th className="px-6 py-4 font-semibold">Status</th>
+                <th className="px-6 py-4 font-semibold min-w-[180px]">Assigned Supervisor/Admin</th>
+                <th className="px-6 py-4 font-semibold">Ticket Created by</th>
+                <th className="px-6 py-4 font-semibold text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+              {salesAssignedPaged.length === 0 && (
+                <tr><td colSpan={7} className="px-6 py-12 text-center text-gray-400 dark:text-gray-500">No Sales-assigned supervisor/admin tickets match your search.</td></tr>
+              )}
+              {salesAssignedPaged.map((ticket) => (
+                <tr key={ticket.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
+                  <td className="px-6 py-4">
+                    <span className="font-bold text-gray-900 dark:text-white text-xs block mb-1">{ticket.id}</span>
+                    <span className="font-medium text-gray-800 dark:text-gray-200">{ticket.subject}</span>
+                  </td>
+                  <td className="px-6 py-4 text-gray-600 dark:text-gray-400">{ticket.client}</td>
+                  <td className="px-6 py-4"><PriorityBadge priority={ticket.priority} /></td>
+                  <td className="px-6 py-4"><StatusBadge status={ticket.status} /></td>
+                  <td className="px-6 py-4 min-w-[180px]">
+                    {ticket.assignee ? (
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-6 h-6 aspect-square shrink-0 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center text-xs text-gray-700 dark:text-gray-300">{ticket.assignee.charAt(0)}</div>
+                        <span className="text-gray-600 dark:text-gray-400 whitespace-nowrap">{ticket.assignee}</span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-gray-400 italic">Assigned via supervisor route</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 text-gray-500 dark:text-gray-400 text-xs">
+                    <div className="font-medium text-gray-700 dark:text-gray-200">{ticket.createdBy}</div>
+                    <div className="text-[11px] text-gray-400 dark:text-gray-500">{ticket.created}</div>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <button onClick={() => navigate(`/admin/ticket-details?stf=${ticket.id}`)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" aria-label={`View details for ticket ${ticket.id}`}><Eye className="w-5 h-5" /></button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-6 pt-4 border-t border-gray-100 dark:border-gray-700">
+          <span className="text-sm text-gray-500 dark:text-gray-400">Showing {filteredSalesAssigned.length === 0 ? 0 : (salesAssignedCurrentPage - 1) * ITEMS_PER_PAGE + 1}-{Math.min(salesAssignedCurrentPage * ITEMS_PER_PAGE, filteredSalesAssigned.length)} of {filteredSalesAssigned.length} tickets</span>
+          <div className="flex items-center gap-1 flex-wrap justify-end">
+            <button onClick={() => setSalesAssignedCurrentPage((p) => Math.max(1, p - 1))} disabled={salesAssignedCurrentPage === 1} className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-[#3BC25B] hover:text-white dark:hover:bg-[#3BC25B] text-gray-600 dark:text-gray-400 disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-600 transition-colors" aria-label="Previous sales-assigned page"><ChevronLeft className="w-4 h-4" /></button>
+            {Array.from({ length: salesAssignedTotalPages }, (_, i) => i + 1).map((page) => (
+              <button key={page} onClick={() => setSalesAssignedCurrentPage(page)} className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${salesAssignedCurrentPage === page ? 'bg-[#3BC25B] text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`} aria-label={`Go to sales-assigned page ${page}`} aria-current={salesAssignedCurrentPage === page ? 'page' : undefined}>{page}</button>
+            ))}
+            <button onClick={() => setSalesAssignedCurrentPage((p) => Math.min(salesAssignedTotalPages, p + 1))} disabled={salesAssignedCurrentPage === salesAssignedTotalPages} className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-[#3BC25B] hover:text-white dark:hover:bg-[#3BC25B] text-gray-600 dark:text-gray-400 disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-600 transition-colors" aria-label="Next sales-assigned page"><ChevronRightIcon className="w-4 h-4" /></button>
           </div>
         </div>
       </Card>

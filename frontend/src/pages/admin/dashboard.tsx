@@ -270,7 +270,7 @@ export default function AdminDashboard() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Supervisor Console</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Supervisor Dashboard</h1>
           <p className="text-gray-500 dark:text-gray-400">Manage tickets, assignments, and team performance</p>
         </div>
         <GreenButton onClick={() => navigate('/admin/create-ticket')}>+ Create Ticket</GreenButton>

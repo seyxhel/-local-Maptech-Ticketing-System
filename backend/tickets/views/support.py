@@ -35,12 +35,15 @@ class CallLogViewSet(viewsets.ModelViewSet):
                 Q(ticket__created_by=user) |
                 Q(ticket__supervisor=user)
             )
-        elif user.role in (User.ROLE_ADMIN, User.ROLE_SUPERADMIN):
+        elif user.role == User.ROLE_ADMIN:
             qs = qs.filter(
                 Q(admin=user) |
                 Q(ticket__created_by=user) |
                 Q(ticket__supervisor=user)
             )
+        elif user.role == User.ROLE_SUPERADMIN:
+            # Superadmin can review the full call log history.
+            qs = qs
         else:
             return CallLog.objects.none()
 

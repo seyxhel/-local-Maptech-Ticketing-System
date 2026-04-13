@@ -256,7 +256,7 @@ export default function SuperAdminDashboard() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            SuperAdmin User Analytics
+            Super Administrator Dashboard
           </h1>
           <p className="text-gray-500 dark:text-gray-400">
             User distribution, participation, and ticket ownership insights
