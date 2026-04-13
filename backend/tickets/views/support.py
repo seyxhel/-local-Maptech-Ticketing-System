@@ -3,28 +3,54 @@ from django.db.models import Q
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.exceptions import ValidationError
 from django.utils import timezone
+from django.contrib.auth import get_user_model
 
 from ..models import CallLog, FeedbackRating
 from ..serializers import CallLogSerializer, FeedbackRatingSerializer
-from ..permissions import IsAdminLevel, IsSupervisorLevel
+from ..permissions import IsAdminLevel
+
+User = get_user_model()
 
 
 class CallLogViewSet(viewsets.ModelViewSet):
-    """CRUD for call logs. Admin creates, all admin-level can list."""
+    """CRUD for call logs. Scoped to ticket participants."""
     queryset = CallLog.objects.all().order_by('-call_start')
     serializer_class = CallLogSerializer
-    permission_classes = [IsAuthenticated, IsSupervisorLevel]
+    permission_classes = [IsAuthenticated]
     swagger_tags = ['Call Logs']
 
     def get_queryset(self):
         if getattr(self, 'swagger_fake_view', False):
             return CallLog.objects.none()
+        user = self.request.user
         qs = CallLog.objects.all().order_by('-call_start')
+
+        if user.role == User.ROLE_EMPLOYEE:
+            qs = qs.filter(ticket__assigned_to=user)
+        elif user.role == User.ROLE_SALES:
+            qs = qs.filter(
+                Q(admin=user) |
+                Q(ticket__created_by=user) |
+                Q(ticket__supervisor=user)
+            )
+        elif user.role in (User.ROLE_ADMIN, User.ROLE_SUPERADMIN):
+            qs = qs.filter(
+                Q(admin=user) |
+                Q(ticket__created_by=user) |
+                Q(ticket__supervisor=user)
+            )
+        else:
+            return CallLog.objects.none()
 
         ticket_id = self.request.query_params.get('ticket')
         if ticket_id:
             qs = qs.filter(ticket_id=ticket_id)
+
+        active_only = self.request.query_params.get('active')
+        if active_only in ('1', 'true', 'True'):
+            qs = qs.filter(call_end__isnull=True)
 
         search = self.request.query_params.get('search')
         if search:
@@ -36,7 +62,23 @@ class CallLogViewSet(viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
-        serializer.save(admin=self.request.user)
+        user = self.request.user
+        ticket = serializer.validated_data.get('ticket')
+
+        if ticket:
+            is_ticket_participant = (
+                ticket.created_by_id == user.id
+                or getattr(ticket, 'supervisor_id', None) == user.id
+                or ticket.assigned_to_id == user.id
+            )
+            if not is_ticket_participant:
+                raise ValidationError({'detail': 'You are not allowed to start a call for this ticket.'})
+
+            active_call = CallLog.objects.filter(ticket=ticket, call_end__isnull=True).first()
+            if active_call:
+                raise ValidationError({'detail': 'A call is already in progress for this ticket.'})
+
+        serializer.save(admin=user)
 
     @action(detail=True, methods=['post'])
     def end_call(self, request, pk=None):

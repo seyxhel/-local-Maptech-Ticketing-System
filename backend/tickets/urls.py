@@ -4,7 +4,7 @@ from drf_yasg.utils import swagger_auto_schema
 from .views import (
     TicketViewSet, TypeOfServiceViewSet, EscalationLogViewSet,
     AuditLogViewSet, KnowledgeHubViewSet, PublishedArticleViewSet,
-    list_employees,
+    list_employees, list_sales_users, list_supervisors,
     ProductViewSet, ClientViewSet, CallLogViewSet, FeedbackRatingViewSet,
     NotificationViewSet, CategoryViewSet, RetentionPolicyViewSet,
     AnnouncementViewSet,
@@ -45,4 +45,6 @@ urlpatterns = [
     path('auth/login/', decorated_login_view, name='token_obtain_pair'),
     path('auth/token/refresh/', decorated_refresh_view, name='token_refresh'),
     path('employees/', list_employees, name='list_employees'),
+    path('sales-users/', list_sales_users, name='list_sales_users'),
+    path('supervisors/', list_supervisors, name='list_supervisors'),
 ]

@@ -134,6 +134,7 @@ export interface BackendTicket {
   created_at: string;
   updated_at: string;
   created_by: { id: number; username: string; email: string; role: string; first_name: string; last_name: string };
+  supervisor: { id: number; username: string; email: string; role: string; first_name: string; last_name: string } | null;
   assigned_to: { id: number; username: string; email: string; role: string; first_name: string; last_name: string } | null;
   confirmed_by_admin: boolean;
   // Employee fields
@@ -584,6 +585,18 @@ export async function fetchAssignmentHistory(ticketId: number): Promise<Assignme
 /** Fetch the list of employees (for assignment dropdowns). Sorted by fewest active tickets. */
 export async function fetchEmployees(): Promise<{ id: number; username: string; email: string; first_name: string; last_name: string; active_ticket_count: number; is_active: boolean }[]> {
   const res = await apiFetch(`${API_BASE}/employees/`, { headers: authHeaders() });
+  return handleResponse(res);
+}
+
+/** Fetch active sales users (for sales representative dropdowns). */
+export async function fetchSalesUsers(): Promise<{ id: number; username: string; email: string; first_name: string; last_name: string; is_active: boolean }[]> {
+  const res = await apiFetch(`${API_BASE}/sales-users/`, { headers: authHeaders() });
+  return handleResponse(res);
+}
+
+/** Fetch active supervisors (admin/superadmin) for sales ticket routing. */
+export async function fetchSupervisors(): Promise<{ id: number; username: string; email: string; first_name: string; last_name: string; role: string; is_active: boolean }[]> {
+  const res = await apiFetch(`${API_BASE}/supervisors/`, { headers: authHeaders() });
   return handleResponse(res);
 }
 
@@ -1065,8 +1078,12 @@ export async function endCallLog(id: number, data: { call_end: string; notes?: s
 }
 
 /** Fetch call logs. */
-export async function fetchCallLogs(): Promise<CallLog[]> {
-  const res = await apiFetch(`${API_BASE}/call-logs/`, { headers: authHeaders() });
+export async function fetchCallLogs(params?: { ticketId?: number; activeOnly?: boolean }): Promise<CallLog[]> {
+  const query = new URLSearchParams();
+  if (params?.ticketId) query.set('ticket', String(params.ticketId));
+  if (params?.activeOnly) query.set('active', '1');
+  const qs = query.toString();
+  const res = await apiFetch(`${API_BASE}/call-logs/${qs ? `?${qs}` : ''}`, { headers: authHeaders() });
   return handleResponse<CallLog[]>(res);
 }
 

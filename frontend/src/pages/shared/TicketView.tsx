@@ -16,8 +16,8 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { TicketChatSocket } from '../../services/chatService';
 import type { ChatMessage, ChatEvent, ChatAttachment } from '../../services/chatService';
-import { fetchTicketByStf, fetchTicketById, uploadResolutionProof, deleteAttachment, closeTicket, updateEmployeeFields, saveProductDetails, escalateTicket, escalateExternal, startWork, createFeedbackRating, updateTicket, deleteTicket as apiDeleteTicket, fetchProducts, submitForObservation, assignTicket, fetchEmployees, fetchTickets, createCallLog, endCallLog, reviewTicket, confirmTicket } from '../../services/api';
-import type { Product } from '../../services/api';
+import { fetchTicketByStf, fetchTicketById, uploadResolutionProof, deleteAttachment, closeTicket, updateEmployeeFields, saveProductDetails, escalateTicket, escalateExternal, startWork, createFeedbackRating, updateTicket, deleteTicket as apiDeleteTicket, fetchProducts, submitForObservation, assignTicket, fetchEmployees, fetchTickets, createCallLog, endCallLog, reviewTicket, confirmTicket, fetchCallLogs } from '../../services/api';
+import type { Product, CallLog } from '../../services/api';
 import { toast } from 'sonner';
 import type { BackendTicket } from '../../services/api';
 import { mapStatus, mapPriority, getAssigneeName, reverseMapStatus, reverseMapPriority, getUserDisplayName } from '../../services/ticketMapper';
@@ -283,6 +283,7 @@ function resolveTicketProductSnapshot(btData: BackendTicket): {
 export function TicketView() {
   const { user } = useAuth();
   const isEmployee = user?.role === 'employee';
+  const isSales = user?.role === 'sales';
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
   const routeBase = user?.role === 'sales' ? '/sales' : '/admin';
   const isRoleEditable = isEmployee || isAdmin;
@@ -781,6 +782,7 @@ export function TicketView() {
   const [holdStartTime, setHoldStartTime] = useState<number | null>(null);
   const [holdOffset, setHoldOffset] = useState(0);
   const [reassignModalStep, setReassignModalStep] = useState<ReassignModalStep>('assign');
+  const [activeTicketCall, setActiveTicketCall] = useState<CallLog | null>(null);
 
   // Show reassign when: ticket is Escalated (admin handles escalation),
   // OR the employee hasn't clicked Start Work yet (time_in is null),
@@ -791,7 +793,9 @@ export function TicketView() {
       !btData?.time_in ||
       btData?.assigned_to?.id === user?.id
     );
-  const needsCallPriorityWorkflow = isAdmin && !!btData && !btData.confirmed_by_admin && ticket.status !== 'Closed';
+  const needsCallPriorityWorkflow = isAdmin && !!btData && !btData.confirmed_by_admin && !btData.priority && ticket.status !== 'Closed';
+  const canSalesCallWorkflow = isSales && !!btData && !btData.confirmed_by_admin && btData.created_by?.id === user?.id && ticket.status !== 'Closed';
+  const hasCallPriorityWorkflow = needsCallPriorityWorkflow || canSalesCallWorkflow;
 
   const filteredEmployees = [...employees]
     .sort((a, b) => a.active_ticket_count - b.active_ticket_count)
@@ -836,7 +840,7 @@ export function TicketView() {
     setShowReassignModal(true);
     setReassignSearch('');
     setReassignEmployeeId('');
-    if (needsCallPriorityWorkflow) {
+    if (hasCallPriorityWorkflow) {
       resetCallAndPriorityState();
       setReassignModalStep('stf-details');
     } else {
@@ -844,8 +848,34 @@ export function TicketView() {
     }
   };
 
+  const refreshActiveCallStatus = useCallback(async () => {
+    if (!backendTicketId || !showReassignModal || !hasCallPriorityWorkflow) return;
+    try {
+      const activeCalls = await fetchCallLogs({ ticketId: backendTicketId, activeOnly: true });
+      setActiveTicketCall(activeCalls[0] || null);
+    } catch {
+      setActiveTicketCall(null);
+    }
+  }, [backendTicketId, showReassignModal, hasCallPriorityWorkflow]);
+
+  useEffect(() => {
+    if (!showReassignModal || !hasCallPriorityWorkflow) {
+      setActiveTicketCall(null);
+      return;
+    }
+    void refreshActiveCallStatus();
+    const timer = setInterval(() => {
+      void refreshActiveCallStatus();
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [showReassignModal, hasCallPriorityWorkflow, refreshActiveCallStatus]);
+
   const handleStartCall = async () => {
     if (!backendTicketId || !btData) return;
+    if (activeTicketCall && activeTicketCall.admin !== user?.id) {
+      toast.error(`Call already in progress by ${activeTicketCall.admin_name || 'another user'}.`);
+      return;
+    }
     setCallCompleted(false);
     setCallTimer(0);
     setCallEndTime(null);
@@ -860,11 +890,11 @@ export function TicketView() {
         call_start: new Date().toISOString(),
       });
       setCallLogId(log.id);
-      setCallStartTime(new Date());
+      setCallStartTime(new Date(log.call_start));
+      setActiveTicketCall(log);
       setReassignModalStep('ongoing');
-    } catch {
-      setCallStartTime(new Date());
-      setReassignModalStep('ongoing');
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to start call log.');
     }
   };
 
@@ -884,6 +914,7 @@ export function TicketView() {
     setCallEndTime(new Date());
     setCallStartTime(null);
     setCallCompleted(true);
+    setActiveTicketCall(null);
     setReassignModalStep('stf-details');
   };
 
@@ -1199,6 +1230,9 @@ export function TicketView() {
         await reviewTicket(backendTicketId, {
           priority: reverseMapPriority(priorityLevel),
         });
+        await confirmTicket(backendTicketId);
+      } else if (btData && !btData.confirmed_by_admin && !!btData.priority) {
+        // Backfill confirmation for older sales-created tickets that already have priority.
         await confirmTicket(backendTicketId);
       }
       const updated = await assignTicket(backendTicketId, Number(reassignEmployeeId));
@@ -2551,6 +2585,15 @@ export function TicketView() {
                   )}
                 </>
               )}
+              {canSalesCallWorkflow && !canAdminReassign && (
+                <button
+                  type="button"
+                  onClick={openReassignModal}
+                  className="w-full py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-orange-500 to-orange-600 hover:shadow-lg hover:shadow-orange-500/20 flex items-center justify-center gap-2 transition-all text-sm"
+                >
+                  <Phone className="w-4 h-4" /> Open Call Status
+                </button>
+              )}
               {/* Start Work — only shown when no time_in yet (work has not begun) */}
               {canStartWorkAction && (
                 <button
@@ -3693,7 +3736,7 @@ export function TicketView() {
       {/* ── Reassign Ticket Modal ── */}
       {showReassignModal && createPortal(
         <div className="fixed inset-0 z-[9999] bg-black/60 flex items-center justify-center p-4">
-          {needsCallPriorityWorkflow && reassignModalStep === 'stf-details' && (
+          {hasCallPriorityWorkflow && reassignModalStep === 'stf-details' && (
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
               <div className="p-6">
                 <div className="flex items-center justify-between mb-5">
@@ -3739,7 +3782,7 @@ export function TicketView() {
                 <button
                   onClick={handleStartCall}
                   className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-colors mb-5 ${callCompleted ? 'bg-gray-100 dark:bg-gray-700 text-green-600 dark:text-green-400 cursor-default' : 'bg-[#3BC25B] hover:bg-[#2ea34a] text-white'}`}
-                  disabled={callCompleted}
+                  disabled={callCompleted || (!!activeTicketCall && activeTicketCall.admin !== user?.id)}
                 >
                   {callCompleted ? (
                     <><CheckCircle className="w-4 h-4" /> Call Completed</>
@@ -3748,79 +3791,51 @@ export function TicketView() {
                   )}
                 </button>
 
-                <div className={`${!callCompleted ? 'opacity-40 pointer-events-none' : ''}`}>
-                  <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Priority Level {!callCompleted && <span className="text-xs font-normal text-gray-400 ml-1">(complete a call first)</span>}</p>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {[
-                      { label: 'Low', color: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700 text-blue-700 dark:text-blue-300', active: 'bg-blue-500 text-white border-blue-500 ring-2 ring-blue-300 dark:ring-blue-700' },
-                      { label: 'Medium', color: 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-700 text-yellow-700 dark:text-yellow-300', active: 'bg-yellow-500 text-white border-yellow-500 ring-2 ring-yellow-300 dark:ring-yellow-700' },
-                      { label: 'High', color: 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-700 text-orange-700 dark:text-orange-300', active: 'bg-orange-500 text-white border-orange-500 ring-2 ring-orange-300 dark:ring-orange-700' },
-                      { label: 'Critical', color: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700 text-red-700 dark:text-red-300', active: 'bg-red-500 text-white border-red-500 ring-2 ring-red-300 dark:ring-red-700' },
-                    ].map(({ label, color, active }) => (
-                      <button
-                        key={label}
-                        type="button"
-                        onClick={() => setPriorityLevel(label)}
-                        className={`px-2 py-3 rounded-xl border-2 text-xs font-bold transition-all ${priorityLevel === label ? active : `${color} hover:opacity-80`}`}
-                      >
-                        {label}
-                      </button>
-                    ))}
+                {!!activeTicketCall && activeTicketCall.admin !== user?.id && (
+                  <div className="mb-4 px-3 py-2 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700 text-amber-800 dark:text-amber-300 text-xs font-medium">
+                    Client is currently on call by {activeTicketCall.admin_name || 'another user'}.
                   </div>
-                </div>
+                )}
 
-                <div className="mt-5">
-                  <button
-                    onClick={handleConfirmPriority}
-                    disabled={!callCompleted || !priorityLevel}
-                    className="w-full px-4 py-2.5 rounded-lg bg-[#3BC25B] hover:bg-[#2ea34a] text-white text-sm font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    Continue to Assign
-                  </button>
-                </div>
-
-                {callCompleted && (
-                  <div className="mt-4 bg-white dark:bg-gray-800/50 rounded-lg p-3 border border-gray-100 dark:border-gray-700 text-sm">
-                    <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Call Log Preview</h4>
-                    <div className="space-y-3">
-                      <div className="flex items-start gap-3">
-                        <div className="w-2 h-2 rounded-full bg-green-500 mt-1" />
-                        <div>
-                          <div className="font-medium">Call Connected</div>
-                          <div className="text-xs text-gray-500">{callStartTime ? callStartTime.toLocaleString() : '—'} • {btData?.mobile_no || btData?.landline || ticket.mobile || '—'}</div>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <div className="w-2 h-2 rounded-full bg-blue-500 mt-1" />
-                        <div>
-                          <div className="font-medium">Ongoing</div>
-                          <div className="text-xs text-gray-500">Duration: {formatCallDuration(callTimer)}</div>
-                        </div>
-                      </div>
-                      {holdOffset > 0 && (
-                        <div className="flex items-start gap-3">
-                          <div className="w-2 h-2 rounded-full bg-yellow-500 mt-1" />
-                          <div>
-                            <div className="font-medium">On Hold</div>
-                            <div className="text-xs text-gray-500">Total hold: {formatCallDuration(Math.floor(holdOffset / 1000))}</div>
-                          </div>
-                        </div>
-                      )}
-                      <div className="flex items-start gap-3">
-                        <div className="w-2 h-2 rounded-full bg-red-500 mt-1" />
-                        <div>
-                          <div className="font-medium">End Call</div>
-                          <div className="text-xs text-gray-500">{callEndTime ? callEndTime.toLocaleString() : '—'}</div>
-                        </div>
+                {isAdmin && (
+                  <>
+                    <div className={`${!callCompleted ? 'opacity-40 pointer-events-none' : ''}`}>
+                      <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Priority Level {!callCompleted && <span className="text-xs font-normal text-gray-400 ml-1">(complete a call first)</span>}</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {[
+                          { label: 'Low', color: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700 text-blue-700 dark:text-blue-300', active: 'bg-blue-500 text-white border-blue-500 ring-2 ring-blue-300 dark:ring-blue-700' },
+                          { label: 'Medium', color: 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-700 text-yellow-700 dark:text-yellow-300', active: 'bg-yellow-500 text-white border-yellow-500 ring-2 ring-yellow-300 dark:ring-yellow-700' },
+                          { label: 'High', color: 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-700 text-orange-700 dark:text-orange-300', active: 'bg-orange-500 text-white border-orange-500 ring-2 ring-orange-300 dark:ring-orange-700' },
+                          { label: 'Critical', color: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700 text-red-700 dark:text-red-300', active: 'bg-red-500 text-white border-red-500 ring-2 ring-red-300 dark:ring-red-700' },
+                        ].map(({ label, color, active }) => (
+                          <button
+                            key={label}
+                            type="button"
+                            onClick={() => setPriorityLevel(label)}
+                            className={`px-2 py-3 rounded-xl border-2 text-xs font-bold transition-all ${priorityLevel === label ? active : `${color} hover:opacity-80`}`}
+                          >
+                            {label}
+                          </button>
+                        ))}
                       </div>
                     </div>
-                  </div>
+
+                    <div className="mt-5">
+                      <button
+                        onClick={handleConfirmPriority}
+                        disabled={!callCompleted || !priorityLevel}
+                        className="w-full px-4 py-2.5 rounded-lg bg-[#3BC25B] hover:bg-[#2ea34a] text-white text-sm font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        Continue to Assign
+                      </button>
+                    </div>
+                  </>
                 )}
               </div>
             </div>
           )}
 
-          {needsCallPriorityWorkflow && reassignModalStep === 'ongoing' && (
+          {hasCallPriorityWorkflow && reassignModalStep === 'ongoing' && (
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
               <div className="p-8 text-center">
                 <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-green-500 flex items-center justify-center">
@@ -3864,7 +3879,7 @@ export function TicketView() {
             </div>
           )}
 
-          {(!needsCallPriorityWorkflow || reassignModalStep === 'assign') && (
+          {isAdmin && (!hasCallPriorityWorkflow || reassignModalStep === 'assign') && (
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden">
               <div className="p-6">
                 <div className="flex items-center justify-between mb-4">

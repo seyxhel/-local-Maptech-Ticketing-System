@@ -34,6 +34,7 @@ class TicketAttachmentSerializer(serializers.ModelSerializer):
 
 class TicketSerializer(serializers.ModelSerializer):
     created_by = UserSerializer(read_only=True)
+    supervisor = UserSerializer(read_only=True)
     assigned_to = UserSerializer(read_only=True)
     tasks = TicketTaskSerializer(many=True, read_only=True)
     attachments = TicketAttachmentSerializer(many=True, read_only=True)
@@ -124,7 +125,7 @@ class TicketSerializer(serializers.ModelSerializer):
         model = Ticket
         fields = [
             'id', 'status',
-            'created_by', 'assigned_to', 'tasks', 'created_at', 'updated_at',
+            'created_by', 'supervisor', 'assigned_to', 'tasks', 'created_at', 'updated_at',
             # New fields
             'stf_no', 'date', 'time_in', 'time_out',
             # Client info – read-only, served via client_record
@@ -280,6 +281,7 @@ class AdminCreateTicketSerializer(serializers.ModelSerializer):
     """Form shown to admins when creating a new ticket.
     Includes priority and assign_to so the admin can set them during the call flow."""
     assign_to = serializers.IntegerField(required=False, write_only=True, help_text='Employee ID to assign')
+    supervisor_id = serializers.IntegerField(required=False, write_only=True, help_text='Supervisor ID for sales-created tickets')
     is_existing_client = serializers.BooleanField(required=False, default=False, write_only=True,
                                                    help_text='True if using existing client record')
     # Write-only client fields – used to auto-create a Client record when is_existing_client=False
@@ -324,6 +326,7 @@ class AdminCreateTicketSerializer(serializers.ModelSerializer):
             'type_of_service', 'type_of_service_others',
             'description_of_problem', 'preferred_support_type',
             'priority', 'assign_to',
+            'supervisor_id',
             'client_unavailable_for_call',
             'client_record', 'product_record',
             'estimated_resolution_days_override',

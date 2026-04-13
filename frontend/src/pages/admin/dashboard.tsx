@@ -278,7 +278,8 @@ export default function AdminDashboard() {
 
       <AnnouncementBanner />
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+        <StatCard title="Total Tickets" value={String(stats?.total ?? tickets.length)} icon={Building2} color="blue" subtext="All visible tickets" />
         <StatCard title="Unassigned" value={String(tickets.filter(t => !t.assignee).length)} icon={Ticket} color="orange" subtext="Needs immediate assignment" />
         <StatCard title="Pending" value={String(stats?.open ?? tickets.filter(t => t.status === 'Pending').length)} icon={Clock} color="blue" subtext="Waiting for action" />
         <StatCard title="In Progress" value={String(stats?.in_progress ?? tickets.filter(t => t.status === 'In Progress' || t.status === 'Assigned').length)} icon={UserCheck} color="green" />

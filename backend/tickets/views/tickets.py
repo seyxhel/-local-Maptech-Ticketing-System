@@ -32,7 +32,9 @@ class TicketViewSet(viewsets.ModelViewSet):
         if getattr(self, 'swagger_fake_view', False):
             return Ticket.objects.none()
         user = self.request.user
-        if user.is_admin_level:
+        if user.role == User.ROLE_SALES:
+            return Ticket.objects.filter(created_by=user).order_by('-created_at')
+        if user.role in (User.ROLE_ADMIN, User.ROLE_SUPERADMIN):
             return Ticket.objects.all().order_by('-created_at')
         if user.role == User.ROLE_EMPLOYEE:
             return Ticket.objects.filter(assigned_to=user).order_by('-created_at')
@@ -74,9 +76,20 @@ class TicketViewSet(viewsets.ModelViewSet):
         if user.is_admin_level:
             priority = serializer.validated_data.pop('priority', '') or request.data.get('priority', '')
             assign_to_id = serializer.validated_data.pop('assign_to', None) or request.data.get('assign_to')
+            supervisor_id = serializer.validated_data.pop('supervisor_id', None) or request.data.get('supervisor_id')
             client_unavailable_for_call = serializer.validated_data.pop('client_unavailable_for_call', False)
             is_existing = serializer.validated_data.pop('is_existing_client', False)
             type_of_service_others = serializer.validated_data.pop('type_of_service_others', '') or ''
+
+            if supervisor_id:
+                try:
+                    sup = User.objects.get(id=supervisor_id, role__in=[User.ROLE_ADMIN, User.ROLE_SUPERADMIN], is_active=True)
+                    serializer.validated_data['supervisor'] = sup
+                except User.DoesNotExist:
+                    return Response({'detail': 'Selected supervisor was not found.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            if user.role == User.ROLE_SALES and not serializer.validated_data.get('supervisor'):
+                return Response({'detail': 'Supervisor is required for sales-created tickets.'}, status=status.HTTP_400_BAD_REQUEST)
 
             # Extract write-only client text fields (no longer on the Ticket model)
             client_text = {
@@ -185,7 +198,7 @@ class TicketViewSet(viewsets.ModelViewSet):
                 ticket.type_of_service.type_of_service_others = type_of_service_others
                 ticket.type_of_service.save(update_fields=['type_of_service_others'])
 
-            if user.role != User.ROLE_SALES and not client_unavailable_for_call and priority and priority in dict(Ticket.PRIORITY_CHOICES):
+            if not client_unavailable_for_call and priority and priority in dict(Ticket.PRIORITY_CHOICES):
                 ticket.priority = priority
 
             if user.role != User.ROLE_SALES and assign_to_id:
@@ -197,9 +210,13 @@ class TicketViewSet(viewsets.ModelViewSet):
                 except User.DoesNotExist:
                     pass
 
-            # Sales-created and client-unavailable entries are intentionally unconfirmed
-            # so a supervisor can complete call + priority review before assignment.
-            ticket.confirmed_by_admin = (user.role != User.ROLE_SALES) and (not client_unavailable_for_call)
+            # Keep tickets unconfirmed only when client is unavailable or when a sales-created
+            # ticket still has no priority. If sales already completed call + priority,
+            # mark as confirmed so supervisors can assign immediately.
+            ticket.confirmed_by_admin = (
+                (not client_unavailable_for_call)
+                and (user.role != User.ROLE_SALES or bool(ticket.priority))
+            )
             ticket.save()
 
             self._audit_ticket(request, ticket, AuditLog.ACTION_CREATE,
@@ -998,4 +1015,33 @@ def list_employees(request):
     emp_counts = {e.id: e.active_ticket_count for e in employees}
     for d in data:
         d['active_ticket_count'] = emp_counts.get(d['id'], 0)
+    return Response(data)
+
+
+@swagger_auto_schema(method='get', tags=['Users'])
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_sales_users(request):
+    """Return active sales users for sales representative pickers."""
+    if not (request.user.is_admin_level or request.user.role == User.ROLE_SALES):
+        return Response({'detail': 'Not allowed'}, status=status.HTTP_403_FORBIDDEN)
+
+    sales_users = User.objects.filter(role=User.ROLE_SALES, is_active=True).order_by('first_name', 'last_name', 'username')
+    data = UserSerializer(sales_users, many=True).data
+    return Response(data)
+
+
+@swagger_auto_schema(method='get', tags=['Users'])
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_supervisors(request):
+    """Return active supervisors (admin/superadmin) for sales routing."""
+    if not request.user.is_authenticated:
+        return Response({'detail': 'Not allowed'}, status=status.HTTP_403_FORBIDDEN)
+
+    supervisors = User.objects.filter(
+        role__in=[User.ROLE_ADMIN, User.ROLE_SUPERADMIN],
+        is_active=True,
+    ).order_by('first_name', 'last_name', 'username')
+    data = UserSerializer(supervisors, many=True).data
     return Response(data)

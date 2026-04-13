@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback, type ReactNode } from 'react';
+﻿import { useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
 import Stepper from '@mui/material/Stepper';
 import Step from '@mui/material/Step';
 import StepLabel, { stepLabelClasses } from '@mui/material/StepLabel';
@@ -103,6 +103,8 @@ import {
   createTicket,
   assignTicket,
   fetchEmployees,
+  fetchSalesUsers,
+  fetchSupervisors,
   fetchNextTicketStfNo,
   fetchTypesOfService,
   fetchClients,
@@ -170,6 +172,7 @@ type AdminCreateTicketDraft = {
   description: string;
   selectedSalesRep: string;
   additionalSalesReps: string[];
+  selectedSupervisorId: number | null;
   isExistingClient: boolean;
   selectedClientId: number | null;
   projectTitle: string;
@@ -243,7 +246,10 @@ export default function AdminCreateTicket() {
 
   // Data from backend
   const [employees, setEmployees] = useState<{ id: number; name: string; role: string; avatar: string; available: boolean; activeTickets: number }[]>([]);
+  const [supervisors, setSupervisors] = useState<{ id: number; name: string; role: string }[]>([]);
+  const [salesUsers, setSalesUsers] = useState<{ id: number; name: string; username: string; email: string }[]>([]);
   const [selectedSalesRep, setSelectedSalesRep] = useState<string>('');
+  const [selectedSupervisorId, setSelectedSupervisorId] = useState<number | null>(null);
   const [additionalSalesReps, setAdditionalSalesReps] = useState<string[]>([]);
   const [salesRepModalOpen, setSalesRepModalOpen] = useState(false);
   const [salesRepPage, setSalesRepPage] = useState(1);
@@ -312,7 +318,22 @@ export default function AdminCreateTicket() {
   const canAssignExternal = !(callCompleted && !!priorityLevel);
   const selectedProduct = selectedProductId ? products.find((p) => p.id === selectedProductId) ?? null : null;
   const selectedClient = selectedClientId ? existingClients.find((c) => c.id === selectedClientId) ?? null : null;
-  const combinedSalesReps = [selectedSalesRep.trim(), ...additionalSalesReps.map((r) => r.trim()).filter(Boolean)].filter(Boolean).join(', ');
+  const currentSalesRepName = useMemo(() => {
+    if (!isSalesUser) return '';
+    const first = (user?.first_name || '').trim();
+    const last = (user?.last_name || '').trim();
+    const fullName = `${first} ${last}`.trim();
+    return fullName || user?.name?.trim() || user?.username?.trim() || user?.email?.trim() || '';
+  }, [isSalesUser, user?.first_name, user?.last_name, user?.name, user?.username, user?.email]);
+
+  const combinedSalesReps = useMemo(() => {
+    const reps = [selectedSalesRep.trim(), ...additionalSalesReps.map((r) => r.trim()).filter(Boolean)];
+    if (isSalesUser && currentSalesRepName) {
+      reps.unshift(currentSalesRepName);
+    }
+    const uniqueReps = Array.from(new Set(reps.filter(Boolean).map((rep) => rep.trim())));
+    return uniqueReps.join(', ');
+  }, [selectedSalesRep, additionalSalesReps, isSalesUser, currentSalesRepName]);
 
   // Fetch employees, service types, and clients from backend
   useEffect(() => {
@@ -330,6 +351,29 @@ export default function AdminCreateTicket() {
         );
       })
       .catch((err) => console.error('Failed to load employees:', err));
+    fetchSalesUsers()
+      .then((users) => {
+        setSalesUsers(
+          users.map((salesUser: any) => ({
+            id: salesUser.id,
+            name: `${salesUser.first_name || ''} ${salesUser.last_name || ''}`.trim() || salesUser.username,
+            username: salesUser.username,
+            email: salesUser.email,
+          }))
+        );
+      })
+      .catch((err) => console.error('Failed to load sales users:', err));
+    fetchSupervisors()
+      .then((users) => {
+        setSupervisors(
+          users.map((supervisor: any) => ({
+            id: supervisor.id,
+            name: `${supervisor.first_name || ''} ${supervisor.last_name || ''}`.trim() || supervisor.username,
+            role: supervisor.role,
+          }))
+        );
+      })
+      .catch((err) => console.error('Failed to load supervisors:', err));
     fetchTypesOfService()
       .then((types) => setServiceTypes(types))
       .catch((err) => console.error('Failed to load service types:', err));
@@ -341,6 +385,12 @@ export default function AdminCreateTicket() {
       .then((nextStfNo) => setStfNo(nextStfNo))
       .catch((err) => console.error('Failed to get next STF number:', err));
   }, []);
+
+  useEffect(() => {
+    if (!isSalesUser || !currentSalesRepName) return;
+    setSelectedSalesRep(currentSalesRepName);
+    setAdditionalSalesReps((prev) => prev.filter((rep) => rep.trim().toLowerCase() !== currentSalesRepName.toLowerCase()));
+  }, [isSalesUser, currentSalesRepName]);
 
   // Load products for selected client when available; otherwise, load full catalog.
   useEffect(() => {
@@ -376,6 +426,7 @@ export default function AdminCreateTicket() {
     setDescription(draft.description || '');
     setSelectedSalesRep(draft.selectedSalesRep || '');
     setAdditionalSalesReps(Array.isArray(draft.additionalSalesReps) ? draft.additionalSalesReps : []);
+    setSelectedSupervisorId(draft.selectedSupervisorId ?? null);
     setIsExistingClient(!!draft.isExistingClient);
     setSelectedClientId(draft.selectedClientId ?? null);
     setProjectTitle(draft.projectTitle || '');
@@ -413,6 +464,7 @@ export default function AdminCreateTicket() {
       description,
       selectedSalesRep,
       additionalSalesReps,
+      selectedSupervisorId,
       isExistingClient,
       selectedClientId,
       projectTitle,
@@ -434,6 +486,7 @@ export default function AdminCreateTicket() {
     description,
     selectedSalesRep,
     additionalSalesReps,
+    selectedSupervisorId,
     isExistingClient,
     selectedClientId,
     projectTitle,
@@ -501,6 +554,11 @@ export default function AdminCreateTicket() {
           }
         }
       });
+
+      if (isSalesUser && !selectedSupervisorId) {
+        newErrors['supervisor'] = true;
+        msgs['supervisor'] = 'Please select a supervisor.';
+      }
     }
     if (step === 1) {
       if (isExistingProduct && !selectedProductId) {
@@ -675,7 +733,7 @@ export default function AdminCreateTicket() {
       });
       setEmail(client.email_address || '');
       setAddress(client.address || '');
-      setSelectedSalesRep(((client as any).sales_representative || '').trim());
+      setSelectedSalesRep(isSalesUser ? currentSalesRepName : ((client as any).sales_representative || '').trim());
       setAdditionalSalesReps(Array.isArray((client as any).additional_sales_reps) ? (client as any).additional_sales_reps.filter(Boolean).map((rep: string) => String(rep).trim()) : []);
       setErrors((prev) => ({ ...prev, salesRepresentative: false }));
       setErrorMsgs((prev) => ({ ...prev, salesRepresentative: '' }));
@@ -763,83 +821,15 @@ export default function AdminCreateTicket() {
     const descErr = validateDescription(description, 'Description of problem');
     if (descErr) { newErrors['description'] = true; msgs['description'] = descErr; }
 
+    if (isSalesUser && !selectedSupervisorId) {
+      newErrors['supervisor'] = true;
+      msgs['supervisor'] = 'Please select a supervisor.';
+    }
+
     setErrors(newErrors);
     setErrorMsgs(msgs);
     if (Object.keys(newErrors).length > 0) {
       toast.error('Please fix the highlighted errors.');
-      return;
-    }
-
-    if (isSalesUser) {
-      const supportTypeMap: Record<string, string> = {
-        'Remote / Online': 'remote_online',
-        'Remote/Online': 'remote_online',
-        Onsite: 'onsite',
-        Chat: 'chat',
-        Call: 'call',
-      };
-
-      const matchedService = serviceTypes.find((s) => s.name === serviceType);
-
-      try {
-        const ticketData: Record<string, unknown> = {
-          project_title: projectTitle.trim(),
-          client: contactValues.client,
-          contact_person: contactValues.contactPerson,
-          landline: contactValues.landline,
-          mobile_no: contactValues.mobile,
-          designation: contactValues.designation,
-          department_organization: contactValues.department,
-          email_address: email.trim(),
-          address,
-          description_of_problem: getDescriptionWithMetadata(),
-          preferred_support_type: supportTypeMap[supportType?.trim()] || 'remote_online',
-        };
-
-        if (combinedSalesReps) {
-          ticketData.sales_representative = combinedSalesReps;
-        }
-
-        if (matchedService) {
-          ticketData.type_of_service = matchedService.id;
-        } else if (serviceType === 'Others') {
-          ticketData.type_of_service_others = serviceOthersText;
-          if (estimatedDaysOverride && Number(estimatedDaysOverride) > 0) {
-            ticketData.estimated_resolution_days_override = Number(estimatedDaysOverride);
-          }
-        } else if (serviceType) {
-          ticketData.type_of_service_others = serviceType;
-        }
-
-        if (isExistingClient && selectedClientId) {
-          ticketData.client_record = selectedClientId;
-          ticketData.is_existing_client = true;
-        }
-
-        applyAdditionalProductDetailsToTicketData(ticketData);
-
-        if (isExistingProduct) {
-          applySelectedProductToTicketData(ticketData);
-          if (additionalProductDetails.maptech_sales_invoice.trim()) ticketData.sales_no = additionalProductDetails.maptech_sales_invoice.trim();
-        } else {
-          if (newProductInfo.device_equipment.trim()) ticketData.device_equipment = newProductInfo.device_equipment.trim();
-          if (newProductInfo.product_name.trim()) ticketData.product = newProductInfo.product_name.trim();
-          if (newProductInfo.brand.trim()) ticketData.brand = newProductInfo.brand.trim();
-          if (newProductInfo.model_name.trim()) ticketData.model_name = newProductInfo.model_name.trim();
-          if (newProductInfo.serial_no.trim()) ticketData.serial_no = newProductInfo.serial_no.trim();
-          if (newProductInfo.version_no.trim()) ticketData.version_no = newProductInfo.version_no.trim();
-          if (newProductInfo.date_purchased) ticketData.date_purchased = newProductInfo.date_purchased;
-          ticketData.has_warranty = newProductInfo.has_warranty;
-          if (additionalProductDetails.maptech_sales_invoice.trim()) ticketData.sales_no = additionalProductDetails.maptech_sales_invoice.trim();
-        }
-
-        const created = await createTicket(ticketData as never);
-        adminCreateTicketDraft = null;
-        toast.success(`STF ${created.stf_no} submitted to supervisors for call and priority review.`);
-        navigate(`${routeBase}/ticket-details?stf=${encodeURIComponent(created.stf_no)}`);
-      } catch (err: any) {
-        toast.error(err?.message || 'Failed to create ticket.');
-      }
       return;
     }
 
@@ -914,11 +904,43 @@ export default function AdminCreateTicket() {
     setModalStep('stf-details'); // Go back to STF details with priority enabled
   }, [callLogId]);
 
-  const handleConfirmPriority = () => {
+  const handleConfirmPriority = async () => {
     if (!priorityLevel) {
       toast.error('Please select a priority level.');
       return;
     }
+
+    if (isSalesUser) {
+      if (isAssigning) return;
+      setIsAssigning(true);
+      try {
+        const ticketData = buildTicketData({ includePriority: true });
+        const created = await createTicket(ticketData as any);
+
+        if (linkedTicketId) {
+          try {
+            await linkTickets(linkedTicketId, [created.id]);
+          } catch (err) {
+            console.error('Failed to link tickets:', err);
+          }
+        }
+
+        setModalStep('none');
+        adminCreateTicketDraft = null;
+        toast.success(`Ticket ${created.stf_no} submitted for admin assignment`, {
+          description: linkedStf
+            ? `Linked to ${linkedStf} | Priority: ${priorityLevel} | Service: ${serviceType}`
+            : `Priority: ${priorityLevel} | Service: ${serviceType}`,
+        });
+        navigate(`${routeBase}/ticket-details?stf=${encodeURIComponent(created.stf_no)}`);
+      } catch (err: any) {
+        toast.error(err?.message || 'Failed to create ticket.');
+      } finally {
+        setIsAssigning(false);
+      }
+      return;
+    }
+
     // Fetch all tickets so we can show each employee's working tickets
     fetchTickets()
       .then((allTickets) => {
@@ -987,6 +1009,10 @@ export default function AdminCreateTicket() {
     if (isExistingClient && selectedClientId) {
       ticketData.client_record = selectedClientId;
       ticketData.is_existing_client = true;
+    }
+
+    if (isSalesUser && selectedSupervisorId) {
+      ticketData.supervisor_id = selectedSupervisorId;
     }
 
     applyAdditionalProductDetailsToTicketData(ticketData);
@@ -1229,7 +1255,7 @@ export default function AdminCreateTicket() {
                       });
                       setEmail('');
                       setAddress('');
-                      setSelectedSalesRep('');
+                      setSelectedSalesRep(isSalesUser ? currentSalesRepName : '');
                       setAdditionalSalesReps([]);
                     }}
                     className="px-3 py-2 rounded-lg text-sm border bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-600"
@@ -1369,17 +1395,31 @@ export default function AdminCreateTicket() {
             <div>
               <label className={labelCls}>Sales Representative <span className="text-gray-400 text-xs font-normal">(optional, multiple)</span></label>
               <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  placeholder="Primary sales representative"
-                  value={selectedSalesRep}
-                  onChange={(e) => {
-                    setSelectedSalesRep(formatSalesRepInput(e.target.value));
-                    setErrors((p) => ({ ...p, salesRepresentative: false }));
-                    setErrorMsgs((p) => ({ ...p, salesRepresentative: '' }));
-                  }}
-                  className={`${inputCls} ${errors['salesRepresentative'] ? errorRing : ''}`}
-                />
+                {isSalesUser ? (
+                  <input
+                    type="text"
+                    value={currentSalesRepName}
+                    readOnly
+                    className={`${inputCls} bg-gray-100 dark:bg-gray-800`}
+                  />
+                ) : (
+                  <select
+                    value={selectedSalesRep}
+                    onChange={(e) => {
+                      setSelectedSalesRep(e.target.value);
+                      setErrors((p) => ({ ...p, salesRepresentative: false }));
+                      setErrorMsgs((p) => ({ ...p, salesRepresentative: '' }));
+                    }}
+                    className={`${inputCls} ${errors['salesRepresentative'] ? errorRing : ''}`}
+                  >
+                    <option value="">Select sales representative</option>
+                    {salesUsers.map((salesUser) => (
+                      <option key={salesUser.id} value={salesUser.name}>
+                        {salesUser.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
                 <button
                   type="button"
                   onClick={() => { setSalesRepPage(1); setSalesRepModalOpen(true); }}
@@ -1395,10 +1435,37 @@ export default function AdminCreateTicket() {
                   <Plus className="w-4 h-4" />
                 </button>
               </div>
+              {isSalesUser && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Automatically set to the logged-in sales account.</p>
+              )}
               {additionalSalesReps.length > 0 && (
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Other representative(s): {additionalSalesReps.join(', ')}</p>
               )}
             </div>
+
+            {isSalesUser && (
+              <div>
+                <label className={labelCls}>Assigned Supervisor <span className="text-red-500 ml-1">*</span></label>
+                <select
+                  value={selectedSupervisorId ?? ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setSelectedSupervisorId(value ? Number(value) : null);
+                    setErrors((p) => ({ ...p, supervisor: false }));
+                    setErrorMsgs((p) => ({ ...p, supervisor: '' }));
+                  }}
+                  className={`${inputCls} ${errors['supervisor'] ? errorRing : ''}`}
+                >
+                  <option value="">Select assigned supervisor</option>
+                  {supervisors.map((supervisor) => (
+                    <option key={supervisor.id} value={supervisor.id}>
+                      {supervisor.name} ({supervisor.role === 'superadmin' ? 'Superadmin' : 'Supervisor'})
+                    </option>
+                  ))}
+                </select>
+                {errors['supervisor'] && <p className="text-red-500 text-xs mt-1">{errorMsgs['supervisor'] || 'Supervisor is required for sales tickets.'}</p>}
+              </div>
+            )}
 
             <div className="md:col-span-2 space-y-3">
               <div className="flex items-center justify-between">
@@ -1449,7 +1516,7 @@ export default function AdminCreateTicket() {
         {/* Navigation controls for step 0 */}
         {currentStep === 0 && (
           <div className="flex justify-end gap-3">
-            <GreenButton type="button" variant="outline" onClick={() => { setContactValues({ client: '', contactPerson: '', landline: '', mobile: '', designation: '', department: '' }); setAdditionalContacts([]); setEmail(''); setAddress(''); setSelectedSalesRep(''); setAdditionalSalesReps([]); }}>Clear</GreenButton>
+            <GreenButton type="button" variant="outline" onClick={() => { setContactValues({ client: '', contactPerson: '', landline: '', mobile: '', designation: '', department: '' }); setAdditionalContacts([]); setEmail(''); setAddress(''); setSelectedSalesRep(isSalesUser ? currentSalesRepName : ''); setAdditionalSalesReps([]); setSelectedSupervisorId(null); }}>Clear</GreenButton>
             <GreenButton type="button" onClick={goNext}>Next</GreenButton>
           </div>
         )}
@@ -2439,15 +2506,15 @@ export default function AdminCreateTicket() {
                   </div>
                 )}
 
-                {/* Continue to Assign - only show if client is available */}
+                {/* Continue action - only show if client is available */}
                 {clientAvailabilityChoice === 'available' && (
                   <div className="mt-5">
                     <button
                       onClick={handleConfirmPriority}
-                      disabled={!callCompleted || !priorityLevel}
+                      disabled={!callCompleted || !priorityLevel || isAssigning}
                       className="w-full px-4 py-2.5 rounded-lg bg-[#3BC25B] hover:bg-[#2ea34a] text-white text-sm font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                      Continue to Assign
+                      {isAssigning ? 'Submitting...' : (isSalesUser ? 'Submit for Admin Assignment' : 'Continue to Assign')}
                     </button>
                   </div>
                 )}

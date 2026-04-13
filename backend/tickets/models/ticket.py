@@ -81,6 +81,14 @@ class Ticket(models.Model):
     # ---- Original fields ----
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_OPEN)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='created_tickets', on_delete=models.CASCADE)
+    supervisor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name='supervised_tickets',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        help_text='Supervisor assigned by sales for call/priority review and technical assignment',
+    )
     assigned_to = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='assigned_tickets', null=True, blank=True, on_delete=models.SET_NULL)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
