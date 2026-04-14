@@ -18,6 +18,7 @@ import {
   FileSpreadsheet,
   ChevronDown,
   Info,
+  Eye,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchCallLogs, fetchRetentionPolicy, type CallLog, type RetentionPolicyData } from '../../services/api';
@@ -124,7 +125,7 @@ function exportToXlsx(
   mergeRow(R, '     CALL LOG RECORDS', C.GREEN_DARK, C.WHITE, { bold: true, sz: 13 }); rowHeights[R] = { hpt: 34 }; R++;
 
   // Column headers
-  const headers = ['#', 'Status', 'Admin', 'Client', 'Phone', 'Call Start', 'Call End', 'Duration', 'Ticket ID', 'Notes'];
+  const headers = ['#', 'Status', 'Admin', 'Client', 'Phone', 'Call Start', 'Call End', 'Duration', 'Ticket ID'];
   headers.forEach((h, c) => setCell(R, c, sc(h, C.GREEN_MID, '000000', { bold: true, sz: 10, center: true })));
   rowHeights[R] = { hpt: 28 }; R++;
 
@@ -143,10 +144,7 @@ function exportToXlsx(
     setCell(R, 6, sc(l.call_end ? new Date(l.call_end).toLocaleString() : '', bg, '000000', { sz: 9 }));
     setCell(R, 7, sc(l.duration_seconds != null ? `${l.duration_seconds}s` : '', bg, '000000', { center: true, sz: 10 }));
     setCell(R, 8, sc(l.ticket != null ? String(l.ticket) : '', bg, '1D4ED8', { center: true, sz: 10 }));
-    setCell(R, 9, sc(l.notes || '', bg, '000000', { sz: 9, wrap: true }));
-
-    const notesLen = (l.notes || '').length;
-    rowHeights[R] = { hpt: notesLen > 120 ? 48 : notesLen > 60 ? 36 : 28 };
+    rowHeights[R] = { hpt: 28 };
     R++;
   });
 
@@ -193,6 +191,7 @@ export default function CallLogs() {
   const [logs, setLogs] = useState<CallLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [retentionPolicy, setRetentionPolicy] = useState<RetentionPolicyData | null>(null);
+  const [selectedLog, setSelectedLog] = useState<CallLog | null>(null);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -251,8 +250,7 @@ export default function CallLogs() {
         (l) =>
           l.client_name?.toLowerCase().includes(q) ||
           l.phone_number?.toLowerCase().includes(q) ||
-          l.admin_name?.toLowerCase().includes(q) ||
-          l.notes?.toLowerCase().includes(q)
+          l.admin_name?.toLowerCase().includes(q)
       );
     }
 
@@ -317,11 +315,11 @@ export default function CallLogs() {
       </div>
       <h2>Call Log Records</h2>
       <table>
-        <thead><tr><th>#</th><th>Status</th><th>Admin</th><th>Client</th><th>Phone</th><th>Call Start</th><th>Call End</th><th>Duration</th><th>Ticket ID</th><th>Notes</th></tr></thead>
+        <thead><tr><th>#</th><th>Status</th><th>Admin</th><th>Client</th><th>Phone</th><th>Call Start</th><th>Call End</th><th>Duration</th><th>Ticket ID</th></tr></thead>
         <tbody>
           ${filtered.map((l, i) => {
             const status = l.call_end ? 'Completed' : 'Active';
-            return `<tr><td>${i + 1}</td><td><strong>${status}</strong></td><td>${l.admin_name || '\u2014'}</td><td>${l.client_name || '\u2014'}</td><td>${l.phone_number || '\u2014'}</td><td>${l.call_start ? new Date(l.call_start).toLocaleString() : '\u2014'}</td><td>${l.call_end ? new Date(l.call_end).toLocaleString() : '\u2014'}</td><td>${l.duration_seconds != null ? formatDuration(l.duration_seconds) : '\u2014'}</td><td>${l.ticket != null ? l.ticket : ''}</td><td>${l.notes || ''}</td></tr>`;
+            return `<tr><td>${i + 1}</td><td><strong>${status}</strong></td><td>${l.admin_name || '\u2014'}</td><td>${l.client_name || '\u2014'}</td><td>${l.phone_number || '\u2014'}</td><td>${l.call_start ? new Date(l.call_start).toLocaleString() : '\u2014'}</td><td>${l.call_end ? new Date(l.call_end).toLocaleString() : '\u2014'}</td><td>${l.duration_seconds != null ? formatDuration(l.duration_seconds) : '\u2014'}</td><td>${l.ticket != null ? l.ticket : ''}</td></tr>`;
           }).join('')}
         </tbody>
       </table>`;
@@ -470,7 +468,7 @@ export default function CallLogs() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 w-4 h-4" />
             <input
               type="text"
-              placeholder="Search client, phone, admin, notes..."
+              placeholder="Search client, phone, admin..."
               value={searchTerm}
               onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
               className="w-full pl-10 pr-4 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#3BC25B]"
@@ -522,7 +520,7 @@ export default function CallLogs() {
 
         {/* Table */}
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[950px] text-sm text-left">
+          <table className="w-full min-w-[840px] text-sm text-left">
             <thead className="text-xs text-gray-500 dark:text-gray-400 uppercase bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700">
               <tr>
                 <th className="px-4 py-4 font-semibold">Status</th>
@@ -532,14 +530,13 @@ export default function CallLogs() {
                 <th className="px-4 py-4 font-semibold">Call Start</th>
                 <th className="px-4 py-4 font-semibold">Call End</th>
                 <th className="px-4 py-4 font-semibold">Duration</th>
-                <th className="px-4 py-4 font-semibold">Ticket</th>
-                <th className="px-4 py-4 font-semibold">Notes</th>
+                <th className="px-4 py-4 font-semibold text-center">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-16 text-center">
+                  <td colSpan={8} className="px-6 py-16 text-center">
                     <div className="flex flex-col items-center gap-3">
                       <RefreshCw className="w-8 h-8 text-gray-300 dark:text-gray-600 animate-spin" />
                       <span className="text-gray-400 dark:text-gray-500">Loading call logs...</span>
@@ -548,7 +545,7 @@ export default function CallLogs() {
                 </tr>
               ) : paginated.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-16 text-center">
+                  <td colSpan={8} className="px-6 py-16 text-center">
                     <div className="flex flex-col items-center gap-3">
                       <PhoneOff className="w-10 h-10 text-gray-300 dark:text-gray-600" />
                       <span className="text-gray-400 dark:text-gray-500 text-base">No call logs found</span>
@@ -620,19 +617,17 @@ export default function CallLogs() {
                           {formatDuration(log.duration_seconds)}
                         </span>
                       </td>
-                      {/* Ticket */}
-                      <td className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">
-                        {log.ticket ? (
-                          <span className="px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-800 font-mono">
-                            #{log.ticket}
-                          </span>
-                        ) : '—'}
-                      </td>
-                      {/* Notes */}
-                      <td className="px-4 py-3 max-w-[200px]">
-                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate" title={log.notes}>
-                          {log.notes || <span className="italic text-gray-300 dark:text-gray-600">No notes</span>}
-                        </p>
+                      {/* Action */}
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedLog(log)}
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 dark:text-gray-300 hover:text-[#0E8F79] hover:bg-[#0E8F79]/10 dark:hover:bg-[#0E8F79]/20 transition-colors"
+                          aria-label={`View full details for call log ${log.id}`}
+                          title="View full details"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
                       </td>
                     </tr>
                   );
@@ -641,6 +636,68 @@ export default function CallLogs() {
             </tbody>
           </table>
         </div>
+
+        {selectedLog && (
+          <>
+            <div
+              className="fixed inset-0 bg-black/40 z-40"
+              onClick={() => setSelectedLog(null)}
+            />
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <div className="w-full max-w-2xl max-h-[90vh] overflow-auto rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-xl">
+                <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Call Log Details</h2>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Record #{selectedLog.id}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedLog(null)}
+                    className="p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700"
+                    aria-label="Close call log details"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Status</p>
+                    <p className="mt-1 font-medium text-gray-900 dark:text-gray-100">{selectedLog.call_end ? 'Completed' : 'Active / Ongoing'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Caller</p>
+                    <p className="mt-1 font-medium text-gray-900 dark:text-gray-100">{selectedLog.admin_name || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Client</p>
+                    <p className="mt-1 font-medium text-gray-900 dark:text-gray-100">{selectedLog.client_name || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Phone</p>
+                    <p className="mt-1 font-medium text-gray-900 dark:text-gray-100">{selectedLog.phone_number || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Call Start</p>
+                    <p className="mt-1 font-medium text-gray-900 dark:text-gray-100">{formatDate(selectedLog.call_start)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Call End</p>
+                    <p className="mt-1 font-medium text-gray-900 dark:text-gray-100">{selectedLog.call_end ? formatDate(selectedLog.call_end) : 'In progress…'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Duration</p>
+                    <p className="mt-1 font-medium text-gray-900 dark:text-gray-100">{formatDuration(selectedLog.duration_seconds)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Ticket STF#</p>
+                    <p className="mt-1 font-medium text-gray-900 dark:text-gray-100">{selectedLog.stf_no || '—'}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Pagination */}
         {totalPages > 1 && (

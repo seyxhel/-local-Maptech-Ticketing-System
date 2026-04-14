@@ -258,6 +258,7 @@ export interface ClientRecord {
 export interface CallLog {
   id: number;
   ticket: number | null;
+  stf_no?: string | null;
   admin: number;
   admin_name: string;
   client_name: string;

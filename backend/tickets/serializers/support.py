@@ -5,21 +5,26 @@ from ..models import CallLog, FeedbackRating
 class CallLogSerializer(serializers.ModelSerializer):
     admin_name = serializers.SerializerMethodField()
     duration_seconds = serializers.ReadOnlyField()
+    stf_no = serializers.SerializerMethodField()
 
     class Meta:
         model = CallLog
         fields = [
-            'id', 'ticket', 'admin', 'admin_name', 'client_name',
+            'id', 'ticket', 'stf_no', 'admin', 'admin_name', 'client_name',
             'phone_number', 'call_start', 'call_end', 'duration_seconds',
-            'notes', 'created_at',
+            'created_at',
         ]
-        read_only_fields = ['admin', 'admin_name', 'created_at']
+        read_only_fields = ['admin', 'admin_name', 'stf_no', 'created_at']
 
     def get_admin_name(self, obj):
         if obj.admin:
             name = obj.admin.get_full_name()
             return name if name.strip() else obj.admin.username
         return ''
+
+    def get_stf_no(self, obj):
+        ticket = getattr(obj, 'ticket', None)
+        return getattr(ticket, 'stf_no', None) if ticket else None
 
 
 class FeedbackRatingSerializer(serializers.ModelSerializer):
