@@ -1,8 +1,9 @@
 -- Pandoc Lua filter for cleaner DOCX layout.
 -- 1) Keep images consistently sized and centered.
 -- 2) Insert page breaks before each level-2 section (except the first) for clearer module/stage separation.
+-- 3) Remove accidental empty paragraphs that create inconsistent vertical gaps.
 
-local MAX_IMAGE_WIDTH = "15.5cm"
+local MAX_IMAGE_WIDTH = "14cm"
 
 function Image(img)
   if not img.attributes["width"] and not img.attributes["height"] then
@@ -10,6 +11,13 @@ function Image(img)
   end
   img.attributes["fig-align"] = "center"
   return img
+end
+
+function Para(para)
+  if #para.content == 0 then
+    return {}
+  end
+  return para
 end
 
 function Pandoc(doc)
