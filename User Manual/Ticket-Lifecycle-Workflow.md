@@ -165,7 +165,19 @@ Explanation: Final record where supervisor confirms successful closure and quali
 ## Stage 4: Technical Execution
 
 Visual Flow:
-`Assigned -> Technician Starts Work -> Diagnose and Resolve -> Update Notes -> Upload Proof -> Request Closure`
+`Assigned -> Open Ticket Details -> Start Work -> In Progress -> Fill Required Work Fields -> Choose Next Action`
+
+Technical Decision Flow:
+`Choose Next Action => [Resolved] Resolve -> Confirm Resolve -> Pending Closure`
+
+Observation Decision Flow:
+`Choose Next Action => [Needs Monitoring] Submit for Observation -> Confirm Submit -> For Observation`
+
+Escalation Decision Flow:
+`Choose Next Action => [Cannot Resolve at Current Level] Escalate => [Internal] Add Notes/Reason -> Submit Escalation -> Escalated`
+
+External Escalation Decision Flow:
+`Choose Next Action => [Cannot Resolve at Current Level] Escalate => [External] Enter Distributor/Vendor Name + Notes/Reason -> Submit Escalation -> Escalated External`
 
 ### Screens and Explanation
 ![Technical Dashboard](Technical%20Side/Technical%20Dashboard.png)
@@ -174,26 +186,68 @@ Explanation: Technician dashboard for work visibility, priorities, and assignmen
 ![Technical Assigned Tickets](Technical%20Side/Technical%20Assigned%20tickets.png)
 Explanation: Assigned ticket worklist where technician opens and updates ticket progress.
 
+![Technical Viewing Ticket (Assigned)](Technical%20Side/Technical%20viewing%20ticket.png)
+Explanation: Assigned-state ticket details page where technician reviews context and starts execution.
+
+![Technical Start Work Confirmation](Technical%20Side/Technical%20start%20work.png)
+Explanation: Start Work confirmation modal that records the technician time-in and moves activity into active execution.
+
+![Technical In Progress Ticket](Technical%20Side/Technical%20in%20progress%20ticket.png)
+Explanation: In-progress work form where technician encodes action taken, remarks, attachments, and status of job.
+
+![Technical In Progress Ticket (Extended)](Technical%20Side/Technical%20in%20progress%20ticket2.png)
+Explanation: Extended in-progress area including product details and digital signature capture required for formal submission.
+
+![Technical Required Fields Before Resolve](Technical%20Side/Technical%20need%20to%20fill%20in%20before%20resolve.png)
+Explanation: Example of completed required inputs before triggering Resolve action.
+
+![Technical Resolve Confirmation](Technical%20Side/Technical%20Resolve%20ticket.png)
+Explanation: Resolve confirmation modal shown before sending the ticket to supervisor closure review.
+
+![Technical Submit for Observation](Technical%20Side/Technical%20for%20submit%20for%20observation.png)
+Explanation: Observation confirmation modal used when issue behavior requires monitoring before final closure.
+
+![Technical Escalate Modal (Internal)](Technical%20Side/Technical%20eslacating%20ticket%20modal%20internal.png)
+Explanation: Internal escalation modal where technician routes ticket to supervisor/admin with required notes/reason.
+
+![Technical Escalate Modal (External)](Technical%20Side/Technical%20escalate%20ticket%20external.png)
+Explanation: External escalation modal where technician routes ticket to outside vendor/distributor and must provide distributor/vendor name plus notes/reason.
+
 ### Detailed Steps
 29. Technician receives assignment.
-30. Technician opens ticket and starts work (`In Progress`).
-31. Technician performs diagnosis and corrective action.
-32. Technician updates work notes and remarks.
-33. Technician uploads proof/evidence attachments.
-34. Technician submits closure request.
+30. Technician opens assigned ticket details and reviews full ticket context.
+31. Technician clicks Start Work and confirms in Start Work modal.
+32. System records time-in and ticket moves to active `In Progress` state.
+33. Technician performs diagnosis and corrective action.
+34. Technician completes `Action Taken` and `Remarks` fields.
+35. Technician uploads required attachments (screenshot/picture and recording as applicable).
+36. Technician selects `Status of Job` based on actual outcome (`Completed`, `Under Warranty`, `For Quotation`, `Pending`, `Chargeable`, `Under Contract`).
+37. Technician completes digital signature section.
+38. Technician chooses one of three paths: Resolve, Submit for Observation, or Escalate.
+39. If resolved, technician clicks Resolve and confirms in Resolve modal.
+40. Ticket proceeds to supervisor review path (`Pending Closure`).
 
-## Stage 5: Branching During Work (Escalation, Observation, External)
+## Stage 5: Branching During Work (Escalation and Observation Control)
 
-Visual Flow:
-`In Progress => [Cannot Resolve] Escalate -> Supervisor Reassess/Reassign -> Back to In Progress`
+Escalation Branch Flow:
+`In Progress => [Cannot Resolve at Current Level] Open Escalate Modal => [Internal] Add Notes/Reason -> Submit Escalation -> Supervisor Reassess/Reassign`
+
+External Escalation Branch:
+`In Progress => [Needs Third-party Support] Open Escalate Modal => [External] Enter Distributor/Vendor Name + Notes/Reason -> Submit Escalation -> Supervisor Tracks External Resolution`
 
 Observation Branch:
-`In Progress => [Needs Monitoring] For Observation -> Monitor Result -> In Progress or Pending Closure`
-
-External Branch:
-`In Progress => [Third-party Needed] Escalated External -> Track Updates -> In Progress or Pending Closure`
+`In Progress => [Needs Monitoring] Submit for Observation -> Confirm Submit -> For Observation -> Monitor Result -> Back to In Progress or Move to Pending Closure`
 
 ### Screens and Explanation
+![Technical Escalate Modal Internal](Technical%20Side/Technical%20eslacating%20ticket%20modal%20internal.png)
+Explanation: Internal escalation action window with mandatory notes/reason before submit.
+
+![Technical Escalate Modal External](Technical%20Side/Technical%20escalate%20ticket%20external.png)
+Explanation: External escalation action window requiring distributor/vendor name and notes/reason before submit.
+
+![Technical Submit for Observation Modal](Technical%20Side/Technical%20for%20submit%20for%20observation.png)
+Explanation: Confirmation modal for moving ticket into observation state.
+
 ![Technical Escalation History](Technical%20Side/Technical%20Escalation%20History.png)
 Explanation: Technician escalation evidence trail showing why escalation was raised.
 
@@ -201,12 +255,15 @@ Explanation: Technician escalation evidence trail showing why escalation was rai
 Explanation: Supervisor reassessment and reassignment reference for escalated tickets.
 
 ### Detailed Steps
-35. If unresolved at current level, technician escalates internally.
-36. Supervisor validates escalation reason and context.
-37. Supervisor reassigns or redirects based on capability fit.
-38. Ticket returns to active work path.
-39. If monitoring is required, route ticket to `For Observation`.
-40. If third-party action is required, route as external escalation and monitor updates.
+41. If unresolved at current level, technician opens Escalate modal.
+42. For internal escalation, technician selects `Internal` and enters notes/reason.
+43. For external escalation, technician selects `External`, enters distributor/vendor name, and adds notes/reason.
+44. Technician submits escalation and ticket moves to `Escalated` or `Escalated External` path.
+45. Supervisor validates escalation reason, and for external cases validates vendor/distributor context.
+46. Supervisor reassigns/redirects for internal escalation, or tracks third-party progress for external escalation.
+47. Ticket returns to active execution path when reassigned or when external updates allow continued work.
+48. If monitoring is required instead, technician submits ticket for observation.
+49. Observation outcome routes ticket back to `In Progress` or forward to `Pending Closure`.
 
 ## Stage 6: Closure Request and Supervisor Review
 
@@ -221,12 +278,12 @@ Explanation: Supervisor review queue for closure requests awaiting final validat
 Explanation: Final closure confirmation list and post-resolution history check.
 
 ### Detailed Steps
-41. Ticket moves to `Pending Closure` after technician request.
-42. Supervisor reviews proof and work notes for completeness and accuracy.
-43. Supervisor confirms the outcome matches original issue scope.
-44. Supervisor submits technical feedback/rating.
-45. Supervisor closes ticket and confirms status `Closed`.
-46. Supervisor verifies ticket appears in completed queue/history.
+50. Ticket moves to `Pending Closure` after technician request.
+51. Supervisor reviews proof and work notes for completeness and accuracy.
+52. Supervisor confirms the outcome matches original issue scope.
+53. Supervisor submits technical feedback/rating.
+54. Supervisor closes ticket and confirms status `Closed`.
+55. Supervisor verifies ticket appears in completed queue/history.
 
 ## Stage 7: Knowledge Capture (Optional but Recommended)
 
@@ -241,10 +298,10 @@ Explanation: Upload area where supervisor selects resolved-ticket evidence for p
 Explanation: Publication page for adding title, summary, and tags to reusable solutions.
 
 ### Detailed Steps
-47. Open attachment repository from resolved tickets.
-48. Select reusable and valid proof file.
-49. Publish as knowledge content with clear tags and description.
-50. Confirm published item is searchable by technical staff.
+56. Open attachment repository from resolved tickets.
+57. Select reusable and valid proof file.
+58. Publish as knowledge content with clear tags and description.
+59. Confirm published item is searchable by technical staff.
 
 ## Supervisor Resolution Gate (Mandatory)
 1. Ticket is in `Pending Closure` before final close.
