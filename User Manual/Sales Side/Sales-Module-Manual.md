@@ -1,7 +1,7 @@
 # Sales Module User Manual
 
 ## 1. Role Objective
-The Sales role is responsible for accurate ticket intake, client call verification, and priority setup before ticket handoff to Supervisor.
+The Sales role is responsible for accurate ticket intake, client call verification, priority setup, and post-handoff resolution monitoring until ticket completion.
 
 ## 2. Module List (Sales)
 1. Login
@@ -13,6 +13,7 @@ The Sales role is responsible for accurate ticket intake, client call verificati
 7. Device/Equipment Categories
 8. Types of Service (view/selection support during ticket creation)
 9. Closing and Completed Ticket Views (monitoring)
+10. Sales Resolution Monitoring Workflow
 
 ## 3. Login Module
 ![Sales Login](Sales%20login%20page.png)
@@ -114,11 +115,22 @@ Flow Line H4: Monitor ticket in Sales views until closure.
 Purpose:
 - View tickets created or visible to Sales scope.
 - Search and filter by ticket ID, subject, or client.
+- Monitor resolution progress after supervisor and technical handling.
 
 Steps:
 1. Use search/filter for quick lookup.
 2. Open ticket details from action column.
 3. Confirm status progression after supervisor/technical actions.
+4. Track whether ticket is still `Pending`, already in `For Observation`, or moving to `Pending Closure`.
+5. Ensure high-priority tickets are not stalled and follow up when progress is delayed.
+
+### 6.1 Resolution Monitoring in Tickets Module
+Resolution Flow Lines:
+- Flow Line R1: Open ticket from Sales list after handoff.
+- Flow Line R2: Validate ticket moved from intake state to operational state (`In Progress` or equivalent active handling state).
+- Flow Line R3: Check if ticket transitions to `Pending Closure` after technical resolution.
+- Flow Line R4: If ticket returns to escalation path, document follow-up and coordinate with supervisor.
+- Flow Line R5: Confirm final movement to `Closed` in ticket history.
 
 ## 7. Clients Module
 ![Sales Clients](Sales%20Clients.png)
@@ -176,6 +188,22 @@ Usage in Sales Flow:
 Purpose:
 - Monitor tickets awaiting closure review and finalized tickets.
 
+Closing View Steps:
+1. Open `Closing Tickets` to see tickets in supervisor review phase.
+2. Confirm key details (client, priority, assignee, and SLA context).
+3. Flag overdue or blocked tickets for follow-up.
+
+Completed View Steps:
+1. Open `Completed Tickets` to verify final closure.
+2. Confirm the resolved ticket appears in completed history.
+3. Use completed records for client updates and reference.
+
+Sales Resolution Flow Lines (Closing to Completed):
+- Flow Line C1: Ticket enters `Closing Tickets` after technical closure request.
+- Flow Line C2: Supervisor validates evidence and finalizes closure.
+- Flow Line C3: Ticket moves to `Completed Tickets` once closed.
+- Flow Line C4: Sales confirms final outcome and communicates completion to stakeholders as needed.
+
 ## 12. Data Accuracy Rules for Sales
 1. Do not submit incomplete client identity fields.
 2. Ensure product serial/model is accurate when available.
@@ -194,3 +222,20 @@ Flow Line S4: Review and submit ticket.
 Flow Line S5: Perform call verification and priority setup.
 
 Flow Line S6: Confirm ticket for supervisor assignment.
+
+Flow Line S7: Monitor ticket progression in Tickets module.
+
+Flow Line S8: Track closure queue in Closing Tickets.
+
+Flow Line S9: Confirm finalized result in Completed Tickets.
+
+## 14. Sales Resolution Monitoring Workflow (Per Module)
+Module Line M1 (Dashboard): Track pending and escalated counts daily.
+
+Module Line M2 (Tickets): Verify movement from active handling to closure path.
+
+Module Line M3 (Closing Tickets): Watch tickets waiting for supervisor final decision.
+
+Module Line M4 (Completed Tickets): Confirm closure completion and archive-ready status.
+
+Module Line M5 (Clients/Products): Ensure resolved record context remains accurate for future ticket intake.

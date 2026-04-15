@@ -1,7 +1,7 @@
 # Supervisor Module User Manual
 
 ## 1. Role Objective
-The Supervisor (Admin) role manages operational control from assignment through closure, including escalations, quality checks, and knowledge publication.
+The Supervisor (Admin) role manages operational control from assignment through resolution and closure, including escalations, quality checks, and knowledge publication.
 
 ## 2. Module List (Supervisor)
 1. Login
@@ -54,6 +54,20 @@ Key Actions:
 1. Search/filter by STF number, client, status, priority.
 2. Open ticket details for assignment, review, and closure decisions.
 3. Track `Open`, `In Progress`, `Pending Closure`, `Escalated`, `Closed` states.
+4. Resolve stuck tickets by reassignment, escalation handling, or closure decision.
+
+### 5.1 Resolution Routing by Ticket State
+State Line T1 (`Open`): Validate ticket quality and assign technician.
+
+State Line T2 (`In Progress`): Monitor updates, SLA, and intervention needs.
+
+State Line T3 (`Escalated`): Reassess scope and reassign to correct technical resource.
+
+State Line T4 (`For Observation`): Track monitoring outcome and return to active or close when appropriate.
+
+State Line T5 (`Pending Closure`): Perform final review and feedback before closing.
+
+State Line T6 (`Closed`): Confirm closure quality and optionally publish to knowledge base.
 
 ## 6. Create Ticket Module (Supervisor Intake)
 
@@ -106,6 +120,23 @@ Escalation Decision Flow Lines:
 - Flow Line E3: If external support is needed, escalation is tracked as external.
 - Flow Line E4: Ticket re-enters active workflow until closure criteria are met.
 
+### 7.1 Detailed Supervisor Resolution Procedure
+Resolution Line R1: Open ticket in `Pending Closure` queue.
+
+Resolution Line R2: Validate technical action notes and remarks for completeness.
+
+Resolution Line R3: Review uploaded proof attachments for quality and relevance.
+
+Resolution Line R4: Check ticket outcome against original issue description.
+
+Resolution Line R5: Submit required technical staff feedback/rating.
+
+Resolution Line R6: Close ticket and confirm status changed to `Closed`.
+
+Resolution Line R7: Verify ticket appears in completed history.
+
+Resolution Line R8: Publish reusable resolution evidence to Knowledge Hub when applicable.
+
 ## 8. Escalation Module
 ![Supervisor Escalated Tickets](Supervisor%20Escalated%20tickets.png)
 ![Supervisor Escalation Logs](Supervisor%20Escalation%20logs.png)
@@ -117,6 +148,13 @@ Steps:
 1. Review reassignment records.
 2. Review escalation history (internal/external tags).
 3. Take action: reassign, monitor, or route externally.
+
+Escalation-to-Resolution Lines:
+- Flow Line ER1: Receive escalated ticket in escalation view.
+- Flow Line ER2: Confirm escalation reason and context.
+- Flow Line ER3: Assign best-fit technician or continue external tracking.
+- Flow Line ER4: Monitor returned ticket until it reaches `Pending Closure`.
+- Flow Line ER5: Complete final closure procedure when ticket is resolvable.
 
 ## 9. Knowledge Hub Module
 ![Supervisor Knowledge Hub Upload](Supervisor%20knowledge%20hub%20upload.png)
@@ -189,6 +227,12 @@ Purpose:
 Purpose:
 - Analyze monthly volume, SLA trends, and ticket distribution.
 
+Resolution KPIs to Review:
+1. Resolved versus pending trend.
+2. Escalation recovery rate.
+3. Closure turnaround time.
+4. SLA compliance performance.
+
 ## 17. Settings Module
 ![Supervisor Settings](Supervisor%20settings.png)
 
@@ -213,3 +257,14 @@ Flow Line S4: Handle escalation or observation branches when needed.
 Flow Line S5: Review closure request and submit feedback.
 
 Flow Line S6: Close ticket and optionally publish knowledge proof.
+
+## 20. Supervisor Resolving Ticket Workflow (Per Module)
+Module Line M1 (Tickets): Route each ticket to the correct next action by state.
+
+Module Line M2 (Escalation): Convert escalated tickets back into active resolution path.
+
+Module Line M3 (Closing Tickets): Apply review checklist and finalize closure.
+
+Module Line M4 (Completed Tickets): Validate closure completion and audit consistency.
+
+Module Line M5 (Knowledge Hub): Publish reusable closure evidence for future resolutions.

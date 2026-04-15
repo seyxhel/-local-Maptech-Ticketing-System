@@ -1,7 +1,7 @@
 # Technical Staff Module User Manual
 
 ## 1. Role Objective
-Technical Staff (Employee) execute assigned tickets, provide technical resolution, escalate when necessary, and submit complete closure evidence.
+Technical Staff (Employee) execute assigned tickets, deliver technical resolution, escalate when necessary, and submit complete closure evidence for supervisor approval.
 
 ## 2. Module List (Technical Staff)
 1. Login
@@ -43,6 +43,20 @@ Steps:
 1. Filter by status when needed.
 2. Open ticket details from action column.
 3. Begin or continue execution based on current ticket state.
+4. Move ticket toward closure by updating findings, action details, and proof evidence.
+
+### 5.1 Resolving Ticket in Assigned Tickets Module
+Resolution Line A1: Open assigned ticket and confirm problem statement.
+
+Resolution Line A2: Start or continue `In Progress` work.
+
+Resolution Line A3: Record diagnosis and action taken clearly.
+
+Resolution Line A4: Update required ticket fields before requesting closure.
+
+Resolution Line A5: Upload proof evidence that demonstrates resolution.
+
+Resolution Line A6: Submit closure request and wait for supervisor review.
 
 ## 6. Technical Execution Workflow (Core)
 
@@ -54,6 +68,17 @@ Execution Flow Lines:
 - Flow Line T5: Upload proof attachments for actions performed.
 - Flow Line T6: Request closure when solution is complete.
 - Flow Line T7: Wait for supervisor review and closure confirmation.
+
+### 6.1 Closure Readiness Checklist (Technical)
+Checklist Line C1: Action notes are complete and clear.
+
+Checklist Line C2: Remarks explain final system condition.
+
+Checklist Line C3: Evidence files are attached and readable.
+
+Checklist Line C4: Ticket fields are updated to match actual result.
+
+Checklist Line C5: Closure request is submitted only when issue is resolved or properly documented for observation.
 
 Escalation Branch Lines:
 - Flow Line E1: If scope exceeds capability, escalate internally.
@@ -74,6 +99,12 @@ Steps:
 1. Open escalation view.
 2. Review escalation type, destination, and date.
 3. Confirm whether reassignment is pending or resolved.
+
+Escalation-to-Resolution Lines:
+- Flow Line ER1: Escalate ticket when resolution cannot be completed at current level.
+- Flow Line ER2: Provide clear escalation notes to avoid repeat diagnosis.
+- Flow Line ER3: Monitor reassignment outcome.
+- Flow Line ER4: Resume work if ticket returns to you and continue toward closure.
 
 ## 8. Knowledge Hub Module
 ![Technical Knowledge Hub](Technical%20Knowledge%20Hub.png)
@@ -126,4 +157,17 @@ Flow Line R3: Work evidence documented and uploaded.
 
 Flow Line R4: Closure requested or escalation submitted.
 
-Flow Line R5: Ticket finalized by supervisor after review.
+Flow Line R5: Supervisor reviews closure request and confirms final decision.
+
+Flow Line R6: Ticket is finalized as `Closed` or returned for further action.
+
+## 14. Technical Resolving Ticket Workflow (Per Module)
+Module Line M1 (Dashboard): Identify priority and SLA urgency before starting work.
+
+Module Line M2 (Assigned Tickets): Execute diagnosis and document every key action.
+
+Module Line M3 (Escalation): Route blocked tickets quickly with clear context.
+
+Module Line M4 (Knowledge Hub): Reuse historical fixes to shorten resolution time.
+
+Module Line M5 (Notifications): Respond immediately to reassignment and closure feedback events.
