@@ -1585,6 +1585,7 @@ export function TicketView() {
     const ticketCreatedByValue = ticket.createdBy || 'N/A';
     const jobStatusValue = ticket.jobStatus || 'N/A';
     const signedByValue = ticket.signedByName || 'N/A';
+    const acknowledgedByPlaceholder = '________________________________';
     const escLogs = btData.escalation_logs || [];
     const atts = btData.attachments || [];
     const body = `
@@ -1653,12 +1654,22 @@ export function TicketView() {
       <div class="signature-section">
         <div class="signature-row">
           <div class="signature-item">
-            <span class="info-label">Signed By:</span>
+            <span class="info-label">Prepared By:</span>
             <span class="info-value">${signedByValue}</span>
           </div>
           <div class="signature-item">
             <span class="info-label">Signature:</span>
             ${ticket.signature ? `<div class="signature-box"><img src="${ticket.signature}" alt="Signature" /></div>` : '<span class="info-value">N/A</span>'}
+          </div>
+        </div>
+        <div class="signature-row" style="margin-top:12px;">
+          <div class="signature-item">
+            <span class="info-label">Acknowledged By (Client Name):</span>
+            <div class="signature-box"><span class="info-value">${acknowledgedByPlaceholder}</span></div>
+          </div>
+          <div class="signature-item">
+            <span class="info-label">Client Signature:</span>
+            <div class="signature-box">&nbsp;</div>
           </div>
         </div>
       </div>
@@ -1700,6 +1711,8 @@ export function TicketView() {
       const jobStatusValue = ticket.jobStatus || 'N/A';
       const signatureValue = ticket.signature ? 'Attached' : 'N/A';
       const signedByValue = ticket.signedByName || 'N/A';
+      const acknowledgedByValue = '________________________________';
+      const clientSignatureValue = '(wet signature on printed copy)';
 
       // Color palette
       const C = {
@@ -1859,6 +1872,7 @@ export function TicketView() {
         detailRow(R, 'Observation', ticket.observation); rowHeights[R] = { hpt: Math.max(22, Math.ceil(ticket.observation.length / 40) * 14) }; R++;
       }
       detailRow(R, 'Signed By', signedByValue, 'Signature', signatureValue); rowHeights[R] = { hpt: 22 }; R++;
+      detailRow(R, 'Acknowledged By (Client Name)', acknowledgedByValue, 'Client Signature', clientSignatureValue); rowHeights[R] = { hpt: 22 }; R++;
       mergeAll(R, '', C.WHITE, C.WHITE, { border: false }); rowHeights[R] = { hpt: 14 }; R++;
 
       // ─── ESCALATION (if any) ───
@@ -2396,7 +2410,7 @@ export function TicketView() {
                     <img src={signatureData} alt="Digital Signature" className="max-h-24 mx-auto" />
                   </div>
                   {signedByName && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 text-center">Signed by: <span className="font-medium text-gray-700 dark:text-gray-300">{signedByName}</span></p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 text-center">Prepared by: <span className="font-medium text-gray-700 dark:text-gray-300">{signedByName}</span></p>
                   )}
                 </div>
               ) : canEdit ? (

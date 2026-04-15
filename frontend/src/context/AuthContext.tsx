@@ -55,7 +55,7 @@ function roleToPath(role: Role): string {
   switch (role) {
     case 'superadmin': return '/superadmin/dashboard';
     case 'admin': return '/admin/dashboard';
-    case 'sales': return '/sales/tickets';
+    case 'sales': return '/sales/dashboard';
     case 'employee': return '/technical-staff/dashboard';
     case null:
     default: return '/login';
@@ -64,6 +64,9 @@ function roleToPath(role: Role): string {
 
 function normalizeRedirectPath(role: Role, path?: string): string {
   if (!path) return roleToPath(role);
+  if (role === 'sales' && path === '/sales/tickets') {
+    return roleToPath(role);
+  }
   if (role === 'sales' && path.startsWith('/admin')) {
     return path.replace('/admin', '/sales');
   }
