@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
+﻿import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
@@ -150,6 +150,84 @@ function priorityBadgeClass(priority?: string | null): string {
 
 function getErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
+}
+
+type CallContactOption = {
+  key: string;
+  name: string;
+  mobile: string;
+  landline: string;
+  phoneNumber: string;
+  source: 'primary' | 'additional';
+};
+
+function normalizePhone(value: string | null | undefined): string {
+  return String(value || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function parseAdditionalContactsFromDescription(description: string | null | undefined): CallContactOption[] {
+  const text = String(description || '');
+  if (!text) return [];
+
+  const marker = 'Additional Contacts:';
+  const markerIndex = text.indexOf(marker);
+  if (markerIndex === -1) return [];
+
+  const block = text.slice(markerIndex + marker.length);
+  const lines = block
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter((line) => /^\d+\./.test(line));
+
+  return lines.map((line, index) => {
+    const entry = line.replace(/^\d+\.\s*/, '').trim();
+    const parts = entry.split('|').map((part) => part.trim());
+    const name = parts[0] && parts[0] !== '-' ? parts[0] : `Additional Contact ${index + 1}`;
+
+    const telPart = parts.find((part) => /^tel\s*:/i.test(part)) || '';
+    const mobilePart = parts.find((part) => /^mobile\s*:/i.test(part)) || '';
+
+    const landline = normalizePhone(telPart.replace(/^tel\s*:/i, '').replace(/^-$/, ''));
+    const mobile = normalizePhone(mobilePart.replace(/^mobile\s*:/i, '').replace(/^-$/, ''));
+    const phoneNumber = mobile || landline;
+
+    return {
+      key: `additional-${index}`,
+      name,
+      mobile,
+      landline,
+      phoneNumber,
+      source: 'additional',
+    };
+  });
+}
+
+function buildCallContactOptions(btData: BackendTicket | null, ticket: { contact: string; mobile: string; landline: string; description: string }): CallContactOption[] {
+  const primaryName = String(btData?.contact_person || ticket.contact || '').trim() || 'Primary Contact';
+  const primaryMobile = normalizePhone(btData?.mobile_no || ticket.mobile);
+  const primaryLandline = normalizePhone(btData?.landline || ticket.landline);
+
+  const primary: CallContactOption = {
+    key: 'primary',
+    name: primaryName,
+    mobile: primaryMobile,
+    landline: primaryLandline,
+    phoneNumber: primaryMobile || primaryLandline,
+    source: 'primary',
+  };
+
+  const additional = parseAdditionalContactsFromDescription(btData?.description_of_problem || ticket.description);
+  const seen = new Set<string>();
+
+  return [primary, ...additional].filter((contact) => {
+    const key = `${contact.name.toLowerCase()}::${contact.mobile}::${contact.landline}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function renderTrackerIcon(key: string, state: TrackerStepState): React.ReactElement {
@@ -823,6 +901,7 @@ export function TicketView() {
   const [holdOffset, setHoldOffset] = useState(0);
   const [reassignModalStep, setReassignModalStep] = useState<ReassignModalStep>('assign');
   const [activeTicketCall, setActiveTicketCall] = useState<CallLog | null>(null);
+  const [selectedCallContactKey, setSelectedCallContactKey] = useState('');
 
   // Show reassign when: ticket is Escalated (admin handles escalation),
   // OR the employee hasn't clicked Start Work yet (time_in is null),
@@ -837,6 +916,34 @@ export function TicketView() {
   const canSalesCallWorkflow = isSales && !!btData && !btData.confirmed_by_admin && !btData.priority && btData.created_by?.id === user?.id && ticket.status !== 'Closed';
   const hasCallPriorityWorkflow = needsCallPriorityWorkflow || canSalesCallWorkflow;
   const canSetPriorityInCallWorkflow = isAdmin || canSalesCallWorkflow;
+
+  const callContactOptions = useMemo(
+    () => buildCallContactOptions(btData, {
+      contact: ticket.contact,
+      mobile: ticket.mobile,
+      landline: ticket.landline,
+      description: ticket.description,
+    }),
+    [btData, ticket.contact, ticket.mobile, ticket.landline, ticket.description],
+  );
+
+  const selectedCallContact = useMemo(() => {
+    if (!callContactOptions.length) return null;
+    return callContactOptions.find((contact) => contact.key === selectedCallContactKey) || callContactOptions[0];
+  }, [callContactOptions, selectedCallContactKey]);
+
+  useEffect(() => {
+    if (!callContactOptions.length) {
+      setSelectedCallContactKey('');
+      return;
+    }
+
+    const hasSelected = callContactOptions.some((contact) => contact.key === selectedCallContactKey);
+    if (!hasSelected) {
+      const withPhone = callContactOptions.find((contact) => Boolean(contact.phoneNumber));
+      setSelectedCallContactKey((withPhone || callContactOptions[0]).key);
+    }
+  }, [callContactOptions, selectedCallContactKey]);
 
   const filteredEmployees = [...employees]
     .sort((a, b) => a.active_ticket_count - b.active_ticket_count)
@@ -874,6 +981,7 @@ export function TicketView() {
     setHoldStartTime(null);
     setHoldOffset(0);
     setReassignModalStep('assign');
+    setSelectedCallContactKey('');
   };
 
   const openReassignModal = () => {
@@ -916,6 +1024,14 @@ export function TicketView() {
       toast.error(`Call already in progress by ${activeTicketCall.admin_name || 'another user'}.`);
       return;
     }
+    if (!selectedCallContact) {
+      toast.error('No contact person available for calling.');
+      return;
+    }
+    if (!selectedCallContact.phoneNumber) {
+      toast.error('Selected contact has no mobile or landline number. Please choose another contact.');
+      return;
+    }
     setCallCompleted(false);
     setCallTimer(0);
     setCallOnHold(false);
@@ -924,8 +1040,8 @@ export function TicketView() {
     try {
       const log = await createCallLog({
         ticket: backendTicketId,
-        client_name: btData.client || ticket.client || 'Client',
-        phone_number: btData.mobile_no || btData.landline || '',
+        client_name: selectedCallContact.name || btData.client || ticket.client || 'Client',
+        phone_number: selectedCallContact.phoneNumber,
         call_start: new Date().toISOString(),
       });
       setCallLogId(log.id);
@@ -3799,7 +3915,7 @@ export function TicketView() {
                 <button
                   onClick={handleStartCall}
                   className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-colors mb-5 ${callCompleted ? 'bg-gray-100 dark:bg-gray-700 text-green-600 dark:text-green-400 cursor-default' : 'bg-[#3BC25B] hover:bg-[#2ea34a] text-white'}`}
-                  disabled={callCompleted || (!!activeTicketCall && activeTicketCall.admin !== user?.id)}
+                  disabled={callCompleted || (!!activeTicketCall && activeTicketCall.admin !== user?.id) || !selectedCallContact?.phoneNumber}
                 >
                   {callCompleted ? (
                     <><CheckCircle className="w-4 h-4" /> Call Completed</>
@@ -3807,6 +3923,31 @@ export function TicketView() {
                     <><Phone className="w-4 h-4" /> Call Client</>
                   )}
                 </button>
+
+                <div className="mb-5">
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    Who to call
+                  </label>
+                  <select
+                    value={selectedCallContactKey}
+                    onChange={(e) => setSelectedCallContactKey(e.target.value)}
+                    disabled={!!callStartTime}
+                    className="w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-[#3BC25B] outline-none disabled:opacity-60"
+                  >
+                    {callContactOptions.map((contact) => (
+                      <option key={contact.key} value={contact.key}>
+                        {`${contact.name} - ${contact.phoneNumber || 'No number'}`}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedCallContact && (
+                    <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                      {selectedCallContact.source === 'primary' ? 'Primary contact' : 'Additional contact'}
+                      {selectedCallContact.mobile ? ` | Mobile: ${selectedCallContact.mobile}` : ''}
+                      {selectedCallContact.landline ? ` | Landline: ${selectedCallContact.landline}` : ''}
+                    </p>
+                  )}
+                </div>
 
                 {!!activeTicketCall && activeTicketCall.admin !== user?.id && (
                   <div className="mb-4 px-3 py-2 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700 text-amber-800 dark:text-amber-300 text-xs font-medium">
@@ -3861,7 +4002,11 @@ export function TicketView() {
                   <Phone className="w-10 h-10 text-white animate-bounce" />
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Call Connected</h3>
-                <p className="text-gray-500 dark:text-gray-400 mb-2">{btData?.contact_person || ticket.client || 'Client'} — {btData?.mobile_no || btData?.landline || ticket.mobile || 'N/A'}</p>
+                <p className="text-gray-500 dark:text-gray-400 mb-2">
+                  {selectedCallContact?.name || btData?.contact_person || ticket.client || 'Client'}
+                  {' - '}
+                  {selectedCallContact?.phoneNumber || btData?.mobile_no || btData?.landline || ticket.mobile || 'N/A'}
+                </p>
                 <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium mb-4 ${callOnHold ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400' : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'}`}>
                   <span className={`w-2 h-2 rounded-full ${callOnHold ? 'bg-yellow-500' : 'bg-green-500 animate-pulse'}`} /> {callOnHold ? 'On Hold' : 'Ongoing Call'}
                 </div>

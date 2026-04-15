@@ -146,6 +146,15 @@ type AdditionalContact = {
   email: string;
 };
 
+type CallTargetOption = {
+  key: string;
+  name: string;
+  mobile: string;
+  landline: string;
+  phoneNumber: string;
+  source: 'primary' | 'additional';
+};
+
 type AdditionalProductDetails = {
   client_purchase_no: string;
   maptech_dr: string;
@@ -309,6 +318,7 @@ export default function AdminCreateTicket() {
   const [holdOffset, setHoldOffset] = useState(0); // accumulated hold time in ms
   const [holdStartTime, setHoldStartTime] = useState<number | null>(null); // when hold started (ms)
   const [callEndTime, setCallEndTime] = useState<Date | null>(null);
+  const [selectedCallTargetKey, setSelectedCallTargetKey] = useState('');
   const [isAssigning, setIsAssigning] = useState(false);
 
   // Employee working tickets (for expanded assign modal)
@@ -318,6 +328,59 @@ export default function AdminCreateTicket() {
   const canAssignExternal = !(callCompleted && !!priorityLevel);
   const selectedProduct = selectedProductId ? products.find((p) => p.id === selectedProductId) ?? null : null;
   const selectedClient = selectedClientId ? existingClients.find((c) => c.id === selectedClientId) ?? null : null;
+  const callTargetOptions = useMemo<CallTargetOption[]>(() => {
+    const primaryMobile = (contactValues.mobile || '').trim();
+    const primaryLandline = (contactValues.landline || '').trim();
+    const targets: CallTargetOption[] = [{
+      key: 'primary',
+      name: (contactValues.contactPerson || '').trim() || 'Primary Contact',
+      mobile: primaryMobile,
+      landline: primaryLandline,
+      phoneNumber: primaryMobile || primaryLandline,
+      source: 'primary',
+    }];
+
+    additionalContacts.forEach((contact, index) => {
+      const mobile = (contact.mobile || '').trim();
+      const landline = (contact.telephone || '').trim();
+      const name = (contact.contact_person || '').trim() || `Additional Contact ${index + 1}`;
+      targets.push({
+        key: `additional-${index}`,
+        name,
+        mobile,
+        landline,
+        phoneNumber: mobile || landline,
+        source: 'additional',
+      });
+    });
+
+    const seen = new Set<string>();
+    return targets.filter((target) => {
+      const dedupeKey = `${target.name.toLowerCase()}::${target.mobile}::${target.landline}`;
+      if (seen.has(dedupeKey)) return false;
+      seen.add(dedupeKey);
+      return true;
+    });
+  }, [contactValues.contactPerson, contactValues.mobile, contactValues.landline, additionalContacts]);
+
+  const selectedCallTarget = useMemo(() => {
+    if (!callTargetOptions.length) return null;
+    return callTargetOptions.find((target) => target.key === selectedCallTargetKey) || callTargetOptions[0];
+  }, [callTargetOptions, selectedCallTargetKey]);
+
+  useEffect(() => {
+    if (!callTargetOptions.length) {
+      setSelectedCallTargetKey('');
+      return;
+    }
+
+    const stillExists = callTargetOptions.some((target) => target.key === selectedCallTargetKey);
+    if (!stillExists) {
+      const withPhone = callTargetOptions.find((target) => Boolean(target.phoneNumber));
+      setSelectedCallTargetKey((withPhone || callTargetOptions[0]).key);
+    }
+  }, [callTargetOptions, selectedCallTargetKey]);
+
   const currentSalesRepName = useMemo(() => {
     if (!isSalesUser) return '';
     const first = (user?.first_name || '').trim();
@@ -888,10 +951,19 @@ export default function AdminCreateTicket() {
     setHoldStartTime(null);
     setCallEndTime(null);
     setPriorityLevel('');
+    setSelectedCallTargetKey('');
   };
 
   /** Start call from the STF details modal */
   const handleStartCall = async () => {
+    if (!selectedCallTarget) {
+      toast.error('No contact person available for calling.');
+      return;
+    }
+    if (!selectedCallTarget.phoneNumber) {
+      toast.error('Selected contact has no mobile or landline number. Please choose another contact.');
+      return;
+    }
     setModalStep('ongoing');
     setCallTimer(0);
     setCallOnHold(false);
@@ -899,8 +971,8 @@ export default function AdminCreateTicket() {
     setCallEndTime(null);
     try {
       const log = await createCallLog({
-        client_name: contactValues.client,
-        phone_number: contactValues.mobile,
+        client_name: selectedCallTarget.name,
+        phone_number: selectedCallTarget.phoneNumber,
         call_start: new Date().toISOString(),
       });
       setCallLogId(log.id);
@@ -2509,7 +2581,11 @@ export default function AdminCreateTicket() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <button
                       type="button"
-                      onClick={() => setClientAvailabilityChoice('available')}
+                      onClick={() => {
+                        if (callCompleted) return;
+                        setClientAvailabilityChoice('available');
+                      }}
+                      disabled={callCompleted}
                       className={`px-3 py-2.5 rounded-xl border-2 text-xs font-bold transition-all ${clientAvailabilityChoice === 'available' ? 'border-[#3BC25B] bg-[#3BC25B] text-white ring-2 ring-green-200 dark:ring-green-900/50' : 'border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:border-[#3BC25B]'}`}
                     >
                       Client is Available Now
@@ -2517,22 +2593,49 @@ export default function AdminCreateTicket() {
                     <button
                       type="button"
                       onClick={() => {
+                        if (callCompleted) return;
                         setClientAvailabilityChoice('unavailable');
                         resetCallWorkflowState();
                       }}
-                      className={`px-3 py-2.5 rounded-xl border-2 text-xs font-bold transition-all ${clientAvailabilityChoice === 'unavailable' ? 'border-amber-500 bg-amber-500 text-white ring-2 ring-amber-200 dark:ring-amber-900/50' : 'border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:border-amber-400'}`}
+                      disabled={callCompleted}
+                      className={`px-3 py-2.5 rounded-xl border-2 text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${clientAvailabilityChoice === 'unavailable' ? 'border-amber-500 bg-amber-500 text-white ring-2 ring-amber-200 dark:ring-amber-900/50' : 'border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:border-amber-400'}`}
                     >
                       Client is Not Currently Available
                     </button>
                   </div>
                 </div>
 
+                {clientAvailabilityChoice === 'available' && (
+                  <div className="mb-5">
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Who to call</label>
+                    <select
+                      value={selectedCallTargetKey}
+                      onChange={(e) => setSelectedCallTargetKey(e.target.value)}
+                      disabled={!!callStartTime}
+                      className="w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-[#3BC25B] outline-none disabled:opacity-60"
+                    >
+                      {callTargetOptions.map((target) => (
+                        <option key={target.key} value={target.key}>
+                          {`${target.name} - ${target.phoneNumber || 'No number'}`}
+                        </option>
+                      ))}
+                    </select>
+                    {selectedCallTarget && (
+                      <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                        {selectedCallTarget.source === 'primary' ? 'Primary contact' : 'Additional contact'}
+                        {selectedCallTarget.mobile ? ` | Mobile: ${selectedCallTarget.mobile}` : ''}
+                        {selectedCallTarget.landline ? ` | Landline: ${selectedCallTarget.landline}` : ''}
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 {/* Call Client button - only show if client is available */}
                 {clientAvailabilityChoice === 'available' && (
                   <button
                     onClick={handleStartCall}
                     className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-colors mb-5 ${callCompleted ? 'bg-gray-100 dark:bg-gray-700 text-green-600 dark:text-green-400 cursor-default' : 'bg-[#3BC25B] hover:bg-[#2ea34a] text-white'}`}
-                    disabled={callCompleted}
+                    disabled={callCompleted || !selectedCallTarget?.phoneNumber}
                   >
                     {callCompleted ? (
                       <><CheckCircle2 className="w-4 h-4" /> Call Completed</>
@@ -2603,7 +2706,7 @@ export default function AdminCreateTicket() {
                         <div className="w-2 h-2 rounded-full bg-green-500 mt-1" />
                         <div>
                           <div className="font-medium">Call Connected</div>
-                          <div className="text-xs text-gray-500">{callStartTime ? callStartTime.toLocaleString() : '—'} • {contactValues.mobile || '—'}</div>
+                          <div className="text-xs text-gray-500">{callStartTime ? callStartTime.toLocaleString() : '—'} • {selectedCallTarget?.phoneNumber || '—'}</div>
                         </div>
                       </div>
                       <div className="flex items-start gap-3">
@@ -2644,7 +2747,7 @@ export default function AdminCreateTicket() {
                   <Phone className="w-10 h-10 text-white animate-bounce" />
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Call Connected</h3>
-                <p className="text-gray-500 dark:text-gray-400 mb-2">{contactValues.contactPerson || 'Client'} — {contactValues.mobile || 'N/A'}</p>
+                <p className="text-gray-500 dark:text-gray-400 mb-2">{selectedCallTarget?.name || contactValues.contactPerson || 'Client'} — {selectedCallTarget?.phoneNumber || 'N/A'}</p>
                 <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium mb-4 ${callOnHold ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400' : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'}`}>
                   <span className={`w-2 h-2 rounded-full ${callOnHold ? 'bg-yellow-500' : 'bg-green-500 animate-pulse'}`} /> {callOnHold ? 'On Hold' : 'Ongoing Call'}
                 </div>
