@@ -404,7 +404,7 @@ export function TicketView() {
   const { user } = useAuth();
   const isEmployee = user?.role === 'employee';
   const isSales = user?.role === 'sales';
-  const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+  const isAdmin = user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'supervisor';
   const routeBase = user?.role === 'sales' ? '/sales' : '/admin';
   const { search } = useLocation();
   const params = new URLSearchParams(search);
@@ -2227,7 +2227,7 @@ export function TicketView() {
               )}
             </div>
 
-            {/* Product Details & Digital Signature — hidden for employee until Start Work is clicked; always shown for admin processing escalated */}
+            {/* Product Details — hidden for employee until Start Work is clicked; always shown for admin processing escalated */}
             {(!isAssignedEmployee || !!btData?.time_in || isAdminProcessingEscalated) && <>
             {/* Product Details Section — editable by assigned employee, read-only for others */}
             <div className="mt-6 pt-5 border-t border-gray-200 dark:border-gray-700">
@@ -2442,37 +2442,6 @@ export function TicketView() {
               )}
             </div>
 
-            {/* ── Digital Signature Section ── */}
-            <div className="mt-6 pt-5 border-t border-gray-200 dark:border-gray-700">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#0E8F79] mb-3 flex items-center gap-2">
-                <PenLine className="w-4 h-4" /> Digital Signature <span className="text-red-500">*</span>
-              </h3>
-              {signatureData ? (
-                <div className="space-y-2">
-                  <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
-                    <img src={signatureData} alt="Digital Signature" className="max-h-24 mx-auto" />
-                  </div>
-                  {signedByName && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 text-center">Prepared by: <span className="font-medium text-gray-700 dark:text-gray-300">{signedByName}</span></p>
-                  )}
-                </div>
-              ) : canEdit ? (
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Your Name</label>
-                    <input
-                      value={signedByName}
-                      onChange={(e) => setSignedByName(e.target.value)}
-                      placeholder="Enter your full name"
-                      className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 outline-none focus:ring-2 focus:ring-[#0E8F79]/30 focus:border-[#0E8F79]"
-                    />
-                  </div>
-                  <SignaturePad onSave={(data) => setSignatureData(data)} />
-                </div>
-              ) : (
-                <p className="text-sm text-gray-400 italic p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">No signature captured yet</p>
-              )}
-            </div>
             </>}
 
           </Card>
@@ -2774,6 +2743,38 @@ export function TicketView() {
                 </button>
               ))}
             </div>
+          </Card>
+
+          {/* Digital Signature */}
+          <Card>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-[#0E8F79] mb-3 flex items-center gap-2">
+              <PenLine className="w-4 h-4" /> Digital Signature <span className="text-red-500">*</span>
+            </h3>
+            {signatureData ? (
+              <div className="space-y-2">
+                <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                  <img src={signatureData} alt="Digital Signature" className="max-h-24 mx-auto" />
+                </div>
+                {signedByName && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 text-center">Prepared by: <span className="font-medium text-gray-700 dark:text-gray-300">{signedByName}</span></p>
+                )}
+              </div>
+            ) : canEdit ? (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Your Name</label>
+                  <input
+                    value={signedByName}
+                    onChange={(e) => setSignedByName(e.target.value)}
+                    placeholder="Enter your full name"
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 outline-none focus:ring-2 focus:ring-[#0E8F79]/30 focus:border-[#0E8F79]"
+                  />
+                </div>
+                <SignaturePad onSave={(data) => setSignatureData(data)} />
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400 italic p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">No signature captured yet</p>
+            )}
           </Card>
           </>}
 
