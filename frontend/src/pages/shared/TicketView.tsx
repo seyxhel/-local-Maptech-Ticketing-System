@@ -1297,12 +1297,14 @@ export function TicketView() {
   const hasRemarks = remarksText.trim().length > 0;
   const hasJobStatus = jobStatus.trim().length > 0;
   const hasRequiredAttachment = uploadedAttachments.length > 0;
-  const canResolveTicket = hasActionTaken && hasRemarks && hasJobStatus && hasRequiredAttachment;
+  const hasSignature = Boolean(signatureData);
+  const canResolveTicket = hasActionTaken && hasRemarks && hasJobStatus && hasRequiredAttachment && hasSignature;
   const missingResolveFields = [
     !hasActionTaken ? 'Action Taken' : '',
     !hasRemarks ? 'Remarks' : '',
     !hasRequiredAttachment ? 'Required Attachment' : '',
     !hasJobStatus ? 'Status of Job' : '',
+    !hasSignature ? 'Digital Signature' : '',
   ].filter(Boolean);
 
   const [savingProductDetails, setSavingProductDetails] = useState(false);
@@ -2443,7 +2445,7 @@ export function TicketView() {
             {/* ── Digital Signature Section ── */}
             <div className="mt-6 pt-5 border-t border-gray-200 dark:border-gray-700">
               <h3 className="text-xs font-bold uppercase tracking-wider text-[#0E8F79] mb-3 flex items-center gap-2">
-                <PenLine className="w-4 h-4" /> Digital Signature
+                <PenLine className="w-4 h-4" /> Digital Signature <span className="text-red-500">*</span>
               </h3>
               {signatureData ? (
                 <div className="space-y-2">
