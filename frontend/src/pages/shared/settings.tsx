@@ -7,6 +7,7 @@ import { changePassword, updateProfile } from '../../services/authService';
 import { fetchRetentionPolicy, updateRetentionPolicy, type RetentionPolicyData } from '../../services/api';
 import { toast } from 'sonner';
 import { ProfilePhotoSection } from '../../components/profile/ProfilePhotoSection';
+import { getRoleMeta } from './settingsRoleMeta';
 import {
   validatePassword,
   validateConfirmPassword,
@@ -19,43 +20,11 @@ import {
   type PasswordRules,
 } from '../../utils/validation';
 
-type RoleMeta = {
-  subtitle: string;
-  department: string;
-  roleLabel: string;
-};
-
-const ROLE_META: Record<string, RoleMeta> = {
-  superadmin: {
-    subtitle: 'Manage your super admin account settings',
-    department: 'Administration',
-    roleLabel: 'Super Administrator',
-  },
-  admin: {
-    subtitle: 'Manage your supervisor account settings',
-    department: 'Administration',
-    roleLabel: 'Supervisor',
-  },
-  sales: {
-    subtitle: 'Manage your sales account settings',
-    department: 'Sales',
-    roleLabel: 'Sales Representative',
-  },
-  employee: {
-    subtitle: 'Manage your account settings',
-    department: 'Technical Support',
-    roleLabel: 'Technical Staff',
-  },
-};
-
 export default function SharedSettings() {
   const { user, updateUser } = useAuth();
   const role = user?.role || '';
-  const roleMeta = ROLE_META[role] || {
-    subtitle: 'Manage your account settings',
-    department: 'General',
-    roleLabel: 'User',
-  };
+  const roleMeta = getRoleMeta(role);
+  const canEditPersonalDetails = role === 'superadmin';
 
   const [editing, setEditing] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
@@ -81,6 +50,7 @@ export default function SharedSettings() {
   }, [editing, user?.first_name, user?.middle_name, user?.last_name, user?.suffix, user?.phone]);
 
   const startEdit = () => {
+    if (!canEditPersonalDetails) return;
     setForm({
       first_name: user?.first_name || '',
       middle_name: user?.middle_name || '',
@@ -254,6 +224,7 @@ export default function SharedSettings() {
   const inputClass = 'w-full bg-transparent outline-none text-sm text-gray-900 dark:text-white placeholder-gray-400';
   const boxEdit = 'flex items-center gap-2 px-3 py-2.5 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus-within:ring-2 focus-within:ring-[#3BC25B]';
   const boxReadonly = 'flex items-center gap-2 px-3 py-2.5 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700';
+  const isEditingPersonalDetails = canEditPersonalDetails && editing;
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -267,7 +238,7 @@ export default function SharedSettings() {
 
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Personal Details</h2>
-          {!editing ? (
+          {canEditPersonalDetails && !isEditingPersonalDetails ? (
             <button
               type="button"
               onClick={startEdit}
@@ -275,7 +246,7 @@ export default function SharedSettings() {
             >
               <Pencil className="w-4 h-4" /> Edit
             </button>
-          ) : (
+          ) : canEditPersonalDetails ? (
             <button
               type="button"
               onClick={cancelEdit}
@@ -283,10 +254,10 @@ export default function SharedSettings() {
             >
               <X className="w-4 h-4" /> Cancel
             </button>
-          )}
+          ) : null}
         </div>
 
-        {!editing ? (
+        {!isEditingPersonalDetails ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {readonlyFields.map((field) => (
               <div key={field.label}>
