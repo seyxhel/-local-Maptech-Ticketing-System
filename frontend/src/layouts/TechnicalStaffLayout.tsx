@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { Layout } from '../components/layout/Layout';
 import type { NavItem } from '../components/layout/Sidebar';
-import { LayoutDashboard, Ticket, BookOpen, ArrowUpRight, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, Ticket, BookOpen, ArrowUpRight, BarChart3, Settings } from 'lucide-react';
 import { NetworkErrorModal, useNetworkStatus } from '../shared';
 
 const NAV_ITEMS: NavItem[] = [
@@ -13,6 +13,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'reports', label: 'Reports', icon: BarChart3, path: '/technical-staff/reports' },
   { id: 'escalation', label: 'Escalation', icon: ArrowUpRight, path: '/technical-staff/escalation' },
   { id: 'knowledge-hub', label: 'Knowledge Hub', icon: BookOpen, path: '/technical-staff/knowledge-hub' },
+  { id: 'settings', label: 'Settings', icon: Settings, path: '/technical-staff/settings' },
 ];
 
 

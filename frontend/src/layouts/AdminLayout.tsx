@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { Layout } from '../components/layout/Layout';
 import type { NavItem } from '../components/layout/Sidebar';
-import { LayoutDashboard, Ticket, ShieldAlert, PauseCircle, BarChart3, PlusCircle, ScrollText, BookOpen, Settings2, Package, Users, Monitor, Upload, FileCheck, Archive, Shield, PhoneCall, CheckCircle2 } from 'lucide-react';
+import { LayoutDashboard, Ticket, ShieldAlert, PauseCircle, BarChart3, PlusCircle, ScrollText, BookOpen, Settings2, Package, Users, Monitor, Upload, FileCheck, Archive, Shield, PhoneCall, CheckCircle2, Settings } from 'lucide-react';
 import { NetworkErrorModal, useNetworkStatus } from '../shared';
 
 const NAV_ITEMS: NavItem[] = [
@@ -49,6 +49,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'clients', label: 'Clients', icon: Users, path: '/admin/clients' },
   { id: 'types-of-service', label: 'Types of Service', icon: Settings2, path: '/admin/types-of-service' },
   { id: 'reports', label: 'Reports', icon: BarChart3, path: '/admin/reports' },
+  { id: 'settings', label: 'Settings', icon: Settings, path: '/admin/settings' },
 ];
 
 export function AdminLayout() {

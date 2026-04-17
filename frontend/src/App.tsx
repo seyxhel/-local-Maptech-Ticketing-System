@@ -16,7 +16,6 @@ import { SalesLayout } from './layouts/SalesLayout';
 import SuperAdminDashboard from './pages/superadmin/dashboard';
 import SuperAdminUsers from './pages/superadmin/users';
 import SuperAdminReports from './pages/superadmin/reports';
-import SuperAdminSettings from './pages/superadmin/settings';
 import SuperAdminAuditLogs from './pages/superadmin/audit-logs';
 import SuperAdminCallLogs from './pages/superadmin/call-logs';
 import SuperAdminEscalationLogs from './pages/superadmin/escalation-logs';
@@ -32,7 +31,6 @@ import AdminEscalation from './pages/admin/escalation';
 import AdminReports from './pages/admin/reports';
 import AdminCreateTicket from './pages/admin/create-ticket';
 import AdminTicketDetails from './pages/admin/ticket-details';
-import AdminSettings from './pages/admin/settings';
 import AdminAuditLogs from './pages/admin/audit-logs';
 import AdminCallLogs from './pages/admin/call-logs';
 import AdminKnowledgeHub from './pages/admin/knowledge-hub';
@@ -47,16 +45,15 @@ import SalesTicketDetails from './pages/sales/ticket-details';
 import SalesProducts from './pages/sales/products';
 import SalesClients from './pages/sales/clients';
 import SalesCategories from './pages/sales/categories';
-import SalesSettings from './pages/sales/settings';
 import SalesDashboard from './pages/sales/dashboard';
 
 import TechnicalStaffDashboard from './pages/technical-staff/dashboard';
 import TechnicalStaffMyTickets from './pages/technical-staff/my-tickets';
 import TechnicalStaffTicketDetails from './pages/technical-staff/ticket-details';
 import TechnicalStaffKnowledgeHub from './pages/technical-staff/knowledge-base';
-import TechnicalStaffSettings from './pages/technical-staff/settings';
 import TechnicalStaffEscalation from './pages/technical-staff/escalation';
 import TechnicalStaffReports from './pages/technical-staff/reports';
+import SharedSettings from './pages/shared/settings';
 
 
 
@@ -98,7 +95,7 @@ export function App() {
               <Route path="escalation-logs" element={<SuperAdminEscalationLogs />} />
               <Route path="reports" element={<SuperAdminReports />} />
               <Route path="technical-staff-ratings" element={<SuperAdminEmployeeRatings />} />
-              <Route path="settings" element={<SuperAdminSettings />} />
+              <Route path="settings" element={<SharedSettings />} />
             </Route>
 
             <Route
@@ -131,7 +128,7 @@ export function App() {
               <Route path="products" element={<AdminProducts />} />
               <Route path="device-equipment" element={<AdminDeviceEquipment />} />
               <Route path="clients" element={<AdminClients />} />
-              <Route path="settings" element={<AdminSettings />} />
+              <Route path="settings" element={<SharedSettings />} />
             </Route>
 
             <Route
@@ -151,7 +148,7 @@ export function App() {
               <Route path="device-equipment" element={<SalesCategories />} />
               <Route path="categories" element={<SalesCategories />} />
               <Route path="clients" element={<SalesClients />} />
-              <Route path="settings" element={<SalesSettings />} />
+              <Route path="settings" element={<SharedSettings />} />
             </Route>
 
             <Route
@@ -169,7 +166,7 @@ export function App() {
               <Route path="ticket-details" element={<TechnicalStaffTicketDetails />} />
               <Route path="escalation" element={<TechnicalStaffEscalation />} />
               <Route path="knowledge-hub" element={<TechnicalStaffKnowledgeHub />} />
-              <Route path="settings" element={<TechnicalStaffSettings />} />
+              <Route path="settings" element={<SharedSettings />} />
             </Route>
 
             <Route path="/employee/*" element={<Navigate to="/technical-staff/dashboard" replace />} />

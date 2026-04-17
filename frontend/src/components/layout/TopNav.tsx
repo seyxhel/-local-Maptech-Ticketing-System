@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Bell, Sun, Moon, Menu, Settings } from 'lucide-react';
+import { Bell, Sun, Moon, Menu } from 'lucide-react';
 import { NotificationPanel, backendToNotificationItem } from '../NotificationPanel';
 import type { NotificationItem } from '../NotificationPanel';
 import { NotificationSocket } from '../../services/notificationService';
@@ -166,12 +166,6 @@ export function TopNav({
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
   const badgeLabel = unreadCount > 99 ? '99+' : unreadCount > 0 ? String(unreadCount) : null;
-  const showSettings = true;
-  const goToSettings = () => {
-    const rolePathMap: Record<string, string> = { 'Technical Staff': 'technical-staff', SuperAdmin: 'superadmin', Admin: 'admin', Employee: 'technical-staff', Client: 'client', Sales: 'sales' };
-    const segment = rolePathMap[role] || role.toLowerCase();
-    onNavigate?.(`/${segment}/settings`);
-  };
 
   return (
     <>
@@ -240,7 +234,7 @@ export function TopNav({
           <div className="flex items-center gap-1 sm:gap-1.5">
             <div
               className="w-9 h-9 rounded-full overflow-hidden bg-gradient-to-br from-[#63D44A] to-[#0E8F79] flex items-center justify-center text-white text-xs font-bold flex-shrink-0 relative"
-              title={showSettings ? 'Profile settings' : undefined}
+              title="Profile"
             >
               {getInitials(authUser, role)}
               {authUser?.profile_picture_url && (
@@ -253,15 +247,6 @@ export function TopNav({
                 />
               )}
             </div>
-            {showSettings && (
-              <button
-                onClick={goToSettings}
-                className="inline-flex p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                title="Settings"
-              >
-                <Settings className="w-4 h-4" />
-              </button>
-            )}
           </div>
         </div>
       </div>

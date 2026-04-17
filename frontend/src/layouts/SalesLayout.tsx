@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { Layout } from '../components/layout/Layout';
 import type { NavItem } from '../components/layout/Sidebar';
-import { Ticket, PlusCircle, Package, Users, Monitor, LayoutDashboard } from 'lucide-react';
+import { Ticket, PlusCircle, Package, Users, Monitor, LayoutDashboard, Settings } from 'lucide-react';
 import { NetworkErrorModal, useNetworkStatus } from '../shared';
 
 const NAV_ITEMS: NavItem[] = [
@@ -13,6 +13,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'clients', label: 'Clients', icon: Users, path: '/sales/clients' },
   { id: 'products', label: 'Products', icon: Package, path: '/sales/products' },
   { id: 'categories', label: 'Categories', icon: Monitor, path: '/sales/categories' },
+  { id: 'settings', label: 'Settings', icon: Settings, path: '/sales/settings' },
 ];
 
 export function SalesLayout() {
