@@ -37,6 +37,15 @@ function getLocalDatetimeValue(date = new Date()) {
   return localDate.toISOString().slice(0, 16);
 }
 
+function getLocalDateStartValue(date = new Date()) {
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return `${localDate.toISOString().slice(0, 10)}T00:00`;
+}
+
+function getDatePart(value: string) {
+  return value.slice(0, 10);
+}
+
 const VISIBILITY_LABELS: Record<string, string> = {
   all: 'All (Supervisors, Technicians & Sales)',
   admin: 'Supervisors Only',
@@ -127,7 +136,7 @@ export default function SuperAdminDashboard() {
       toast.error('Title and description are required.');
       return;
     }
-    if (!editingId && formData.start_date && formData.start_date < getLocalDatetimeValue()) {
+    if (!editingId && formData.start_date && getDatePart(formData.start_date) < getDatePart(getLocalDatetimeValue())) {
       toast.error('Start date cannot be in the past.');
       return;
     }
@@ -251,7 +260,7 @@ export default function SuperAdminDashboard() {
       .slice(0, 6);
   }, [tickets]);
 
-  const startDateMin = editingId ? undefined : getLocalDatetimeValue();
+  const startDateMin = editingId ? undefined : getLocalDateStartValue();
 
   if (loadingDashboard) {
     return (

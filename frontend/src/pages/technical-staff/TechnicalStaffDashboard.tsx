@@ -152,10 +152,12 @@ export function TechnicalStaffDashboard({ onNavigate }: TechnicalStaffDashboardP
 
   return (
     <div className="space-y-6">
+      <AnnouncementBanner />
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            My Workspace
+            My Dashboard
           </h1>
           <p className="text-gray-500 dark:text-gray-400">
             Welcome back, {firstName}. You have {activeTickets.length} tickets needing attention.
@@ -166,8 +168,6 @@ export function TechnicalStaffDashboard({ onNavigate }: TechnicalStaffDashboardP
           Status: Online
         </div>
       </div>
-
-      <AnnouncementBanner />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <StatCard

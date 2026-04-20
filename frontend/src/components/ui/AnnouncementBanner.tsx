@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Info, AlertTriangle, CheckCircle, AlertOctagon, X } from 'lucide-react';
+import { Info, AlertTriangle, CheckCircle, AlertOctagon } from 'lucide-react';
 import { fetchAnnouncements } from '../../services/api';
 import type { AnnouncementData } from '../../services/api';
 
@@ -32,7 +32,6 @@ const TYPE_STYLES: Record<string, { bg: string; border: string; icon: string; ic
 
 export function AnnouncementBanner() {
   const [announcements, setAnnouncements] = useState<AnnouncementData[]>([]);
-  const [dismissed, setDismissed] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     fetchAnnouncements()
@@ -40,13 +39,16 @@ export function AnnouncementBanner() {
       .catch(() => undefined);
   }, []);
 
-  const visible = announcements.filter((a) => !dismissed.has(a.id));
-
-  if (visible.length === 0) return null;
+  if (announcements.length === 0) return null;
 
   return (
     <div className="space-y-3">
-      {visible.map((ann) => {
+      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-gray-400 dark:text-gray-500">
+        <span className="h-px flex-1 bg-gray-200 dark:bg-gray-700" />
+        <span>Announcement</span>
+        <span className="h-px flex-1 bg-gray-200 dark:bg-gray-700" />
+      </div>
+      {announcements.map((ann) => {
         const style = TYPE_STYLES[ann.announcement_type] || TYPE_STYLES.info;
         const Icon = style.iconComponent;
         return (
@@ -61,12 +63,6 @@ export function AnnouncementBanner() {
                 {ann.description}
               </p>
             </div>
-            <button
-              onClick={() => setDismissed((prev) => new Set(prev).add(ann.id))}
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 flex-shrink-0"
-            >
-              <X className="w-4 h-4" />
-            </button>
           </div>
         );
       })}

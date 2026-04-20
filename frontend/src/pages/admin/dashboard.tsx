@@ -211,6 +211,8 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-6">
+      <AnnouncementBanner />
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Supervisor Dashboard</h1>
@@ -218,8 +220,6 @@ export default function AdminDashboard() {
         </div>
         <GreenButton onClick={() => navigate('/admin/create-ticket')}>+ Create Ticket</GreenButton>
       </div>
-
-      <AnnouncementBanner />
 
       <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
         <StatCard title="Total Tickets" value={String(stats?.total ?? tickets.length)} icon={Building2} color="blue" subtext="All visible tickets" />
