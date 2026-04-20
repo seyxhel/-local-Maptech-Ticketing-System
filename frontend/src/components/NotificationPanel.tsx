@@ -165,11 +165,13 @@ export function NotificationPanel({
 
   const handleDeleteNotification = (e: React.MouseEvent, itemId: number) => {
     e.stopPropagation();
+    if (!confirm('Are you sure you want to delete this notification?')) return;
     onDelete(itemId);
   };
 
   const handleClearAll = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!confirm('Are you sure you want to clear all notifications?')) return;
     onClearAll();
   };
 

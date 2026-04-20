@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { StatCard } from '../../components/ui/StatCard';
 import { GreenButton } from '../../components/ui/GreenButton';
-import { Users, UserCheck, UserCog, UserPlus, Plus, Pencil, Trash2, Megaphone } from 'lucide-react';
+import { Users, UserCheck, UserCog, UserPlus, Plus, Pencil, Trash2, Megaphone, X } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   fetchTickets,
@@ -63,6 +63,8 @@ export default function SuperAdminDashboard() {
   const [announcements, setAnnouncements] = useState<AnnouncementData[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<AnnouncementData | null>(null);
+  const [deletingAnnouncement, setDeletingAnnouncement] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -166,13 +168,28 @@ export default function SuperAdminDashboard() {
     }
   }
 
-  async function handleDelete(id: number) {
+  function requestDelete(announcement: AnnouncementData) {
+    setDeleteTarget(announcement);
+  }
+
+  function closeDeleteModal() {
+    if (deletingAnnouncement) return;
+    setDeleteTarget(null);
+  }
+
+  async function handleDeleteConfirmed() {
+    if (!deleteTarget) return;
+
+    setDeletingAnnouncement(true);
     try {
-      await deleteAnnouncement(id);
+      await deleteAnnouncement(deleteTarget.id);
       toast.success('Announcement deleted.');
       loadAnnouncements();
     } catch {
       toast.error('Failed to delete announcement.');
+    } finally {
+      setDeletingAnnouncement(false);
+      setDeleteTarget(null);
     }
   }
 
@@ -651,7 +668,7 @@ export default function SuperAdminDashboard() {
                       <Pencil className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => handleDelete(ann.id)}
+                      onClick={() => requestDelete(ann)}
                       className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -663,6 +680,57 @@ export default function SuperAdminDashboard() {
           </div>
         )}
       </Card>
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-gray-700">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                  <Trash2 className="w-5 h-5 text-red-600 dark:text-red-400" />
+                </div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Delete Announcement</h2>
+              </div>
+              <button
+                onClick={closeDeleteModal}
+                disabled={deletingAnnouncement}
+                className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300 transition-colors disabled:opacity-50"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5">
+              <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
+                Are you sure you want to delete this announcement?
+              </p>
+              <p className="mt-2 text-sm font-semibold text-gray-900 dark:text-white break-words">
+                {deleteTarget.title}
+              </p>
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                This action cannot be undone.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-3 px-5 pb-5">
+              <button
+                onClick={closeDeleteModal}
+                disabled={deletingAnnouncement}
+                className="px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteConfirmed}
+                disabled={deletingAnnouncement}
+                className="px-4 py-2.5 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors shadow-sm disabled:opacity-50"
+              >
+                {deletingAnnouncement ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>);
 
 }

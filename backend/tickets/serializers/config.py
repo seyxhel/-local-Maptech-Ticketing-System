@@ -10,7 +10,7 @@ class RetentionPolicySerializer(serializers.ModelSerializer):
         model = RetentionPolicy
         fields = [
             'id', 'audit_log_retention_days', 'call_log_retention_days',
-            'updated_at', 'updated_by', 'updated_by_name',
+            'escalation_log_retention_days', 'updated_at', 'updated_by', 'updated_by_name',
         ]
         read_only_fields = ['id', 'updated_at', 'updated_by', 'updated_by_name']
 

@@ -9,6 +9,10 @@ import {
   RefreshCw,
   User,
   GitBranch,
+  FileDown,
+  FileSpreadsheet,
+  Download,
+  ChevronDown,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -18,6 +22,10 @@ import {
   type EscalationLog,
   type AuditLogEntry,
 } from '../../services/api';
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+import XLSXStyle from 'xlsx-js-style';
+import { buildPdfDocument, openPrintWindow } from '../../utils/pdfTemplate';
 
 const ITEMS_PER_PAGE = 4;
 type FilterType = 'All' | 'Internal' | 'External';
@@ -35,6 +43,10 @@ export default function AdminEscalation() {
   const [filterType, setFilterType] = useState<FilterType>('All');
   const [currentPage, setCurrentPage] = useState(1);
   const [reassignPage, setReassignPage] = useState(1);
+
+  /* ── Export ── */
+  const [exporting, setExporting] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -66,6 +78,207 @@ export default function AdminEscalation() {
     loadData();
   }, [loadData]);
 
+  const formatDate = (iso: string) => {
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) +
+      ' ' + d.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const exportToXLSX = async () => {
+    if (!logs.length && !reassignLogs.length) {
+      toast.error('No escalation or reassign logs to export.');
+      return;
+    }
+    setExporting(true);
+    try {
+      const dateStr = new Date().toISOString().split('T')[0];
+      const wb = XLSXStyle.utils.book_new();
+
+      // ── Sheet 1: Escalation Logs ──
+      const ws1: Record<string, unknown> = {};
+      const colWidths1 = [20, 18, 15, 15, 25, 30, 18];
+      ws1['!cols'] = colWidths1.map((w) => ({ wch: w }));
+
+      const headerRow1: (string | { t: string; v: string; s: Record<string, unknown> })[] = [
+        { t: 's', v: 'Ticket Number', s: { font: { bold: true, color: { rgb: 'FFFFFFFF' } }, fill: { fgColor: { rgb: '154734' } }, alignment: { horizontal: 'center' } } },
+        { t: 's', v: 'Type', s: { font: { bold: true, color: { rgb: 'FFFFFFFF' } }, fill: { fgColor: { rgb: '154734' } }, alignment: { horizontal: 'center' } } },
+        { t: 's', v: 'From User', s: { font: { bold: true, color: { rgb: 'FFFFFFFF' } }, fill: { fgColor: { rgb: '154734' } }, alignment: { horizontal: 'center' } } },
+        { t: 's', v: 'To User', s: { font: { bold: true, color: { rgb: 'FFFFFFFF' } }, fill: { fgColor: { rgb: '154734' } }, alignment: { horizontal: 'center' } } },
+        { t: 's', v: 'External Recipient', s: { font: { bold: true, color: { rgb: 'FFFFFFFF' } }, fill: { fgColor: { rgb: '154734' } }, alignment: { horizontal: 'center' } } },
+        { t: 's', v: 'Notes', s: { font: { bold: true, color: { rgb: 'FFFFFFFF' } }, fill: { fgColor: { rgb: '154734' } }, alignment: { horizontal: 'center' } } },
+        { t: 's', v: 'Date', s: { font: { bold: true, color: { rgb: 'FFFFFFFF' } }, fill: { fgColor: { rgb: '154734' } }, alignment: { horizontal: 'center' } } },
+      ];
+
+      ws1['A1'] = headerRow1[0];
+      ws1['B1'] = headerRow1[1];
+      ws1['C1'] = headerRow1[2];
+      ws1['D1'] = headerRow1[3];
+      ws1['E1'] = headerRow1[4];
+      ws1['F1'] = headerRow1[5];
+      ws1['G1'] = headerRow1[6];
+
+      logs.forEach((log, idx) => {
+        const rowNum = idx + 2;
+        const stfNo = ticketMap[log.ticket] || `Ticket #${log.ticket}`;
+        const fromUser = log.from_user ? userName(log.from_user) : '';
+        const toUser = log.to_user ? userName(log.to_user) : '';
+
+        const bgColor = idx % 2 === 0 ? 'F5F5F5' : 'FFFFFF';
+        const cellStyle = {
+          fill: { fgColor: { rgb: bgColor } },
+          alignment: { horizontal: 'left', wrapText: true },
+          border: { bottom: { style: 'thin', color: { rgb: 'D3D3D3' } } },
+        };
+
+        ws1[`A${rowNum}`] = { t: 's', v: stfNo, s: cellStyle };
+        ws1[`B${rowNum}`] = { t: 's', v: log.escalation_type === 'internal' ? 'Internal' : 'External', s: cellStyle };
+        ws1[`C${rowNum}`] = { t: 's', v: fromUser, s: cellStyle };
+        ws1[`D${rowNum}`] = { t: 's', v: toUser, s: cellStyle };
+        ws1[`E${rowNum}`] = { t: 's', v: log.to_external || '', s: cellStyle };
+        ws1[`F${rowNum}`] = { t: 's', v: log.notes || '', s: cellStyle };
+        ws1[`G${rowNum}`] = { t: 's', v: formatDate(log.created_at), s: cellStyle };
+      });
+
+      ws1['!ref'] = `A1:G${logs.length + 1}`;
+      XLSXStyle.utils.book_append_sheet(wb, ws1, 'Escalation Logs');
+
+      // ── Sheet 2: Reassign Logs ──
+      const ws2: Record<string, unknown> = {};
+      const colWidths2 = [20, 15, 15, 30, 18];
+      ws2['!cols'] = colWidths2.map((w) => ({ wch: w }));
+
+      const headerRow2: (string | { t: string; v: string; s: Record<string, unknown> })[] = [
+        { t: 's', v: 'Ticket Number', s: { font: { bold: true, color: { rgb: 'FFFFFFFF' } }, fill: { fgColor: { rgb: '154734' } }, alignment: { horizontal: 'center' } } },
+        { t: 's', v: 'Action', s: { font: { bold: true, color: { rgb: 'FFFFFFFF' } }, fill: { fgColor: { rgb: '154734' } }, alignment: { horizontal: 'center' } } },
+        { t: 's', v: 'Actor', s: { font: { bold: true, color: { rgb: 'FFFFFFFF' } }, fill: { fgColor: { rgb: '154734' } }, alignment: { horizontal: 'center' } } },
+        { t: 's', v: 'Activity', s: { font: { bold: true, color: { rgb: 'FFFFFFFF' } }, fill: { fgColor: { rgb: '154734' } }, alignment: { horizontal: 'center' } } },
+        { t: 's', v: 'Date', s: { font: { bold: true, color: { rgb: 'FFFFFFFF' } }, fill: { fgColor: { rgb: '154734' } }, alignment: { horizontal: 'center' } } },
+      ];
+
+      ws2['A1'] = headerRow2[0];
+      ws2['B1'] = headerRow2[1];
+      ws2['C1'] = headerRow2[2];
+      ws2['D1'] = headerRow2[3];
+      ws2['E1'] = headerRow2[4];
+
+      reassignLogs.forEach((log, idx) => {
+        const rowNum = idx + 2;
+        const stfNo = ticketMap[log.entity_id!] || `Ticket #${log.entity_id}`;
+
+        const bgColor = idx % 2 === 0 ? 'F5F5F5' : 'FFFFFF';
+        const cellStyle = {
+          fill: { fgColor: { rgb: bgColor } },
+          alignment: { horizontal: 'left', wrapText: true },
+          border: { bottom: { style: 'thin', color: { rgb: 'D3D3D3' } } },
+        };
+
+        ws2[`A${rowNum}`] = { t: 's', v: stfNo, s: cellStyle };
+        ws2[`B${rowNum}`] = { t: 's', v: log.action, s: cellStyle };
+        ws2[`C${rowNum}`] = { t: 's', v: log.actor_email || 'System', s: cellStyle };
+        ws2[`D${rowNum}`] = { t: 's', v: log.activity, s: cellStyle };
+        ws2[`E${rowNum}`] = { t: 's', v: new Date(log.timestamp).toLocaleString(), s: cellStyle };
+      });
+
+      ws2['!ref'] = `A1:E${reassignLogs.length + 1}`;
+      XLSXStyle.utils.book_append_sheet(wb, ws2, 'Reassign Logs');
+
+      XLSXStyle.writeFile(wb, `escalation_logs_${dateStr}.xlsx`);
+      toast.success('Escalation and reassign logs exported to Excel.');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to export to Excel.');
+    } finally {
+      setExporting(false);
+      setShowExportMenu(false);
+    }
+  };
+
+  const exportToPDF = async () => {
+    if (!logs.length && !reassignLogs.length) {
+      toast.error('No escalation or reassign logs to export.');
+      return;
+    }
+    setExporting(true);
+    try {
+      const dateStr = new Date().toISOString().split('T')[0];
+
+      // Escalation logs table
+      const escalationRows = logs.map((log) => [
+        ticketMap[log.ticket] || `Ticket #${log.ticket}`,
+        log.escalation_type === 'internal' ? 'Internal' : 'External',
+        log.from_user ? userName(log.from_user) : '',
+        log.to_user ? userName(log.to_user) : '',
+        log.to_external || '',
+        log.notes || '',
+        formatDate(log.created_at),
+      ]);
+
+      const escalationTableHtml = `
+        <h2 style="color: #154734; margin-top: 20px;">Escalation Logs</h2>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Ticket Number</th>
+              <th>Type</th>
+              <th>From User</th>
+              <th>To User</th>
+              <th>External Recipient</th>
+              <th>Notes</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${escalationRows.map((row) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join('')}</tr>`).join('')}
+          </tbody>
+        </table>
+      `;
+
+      // Reassign logs table
+      const reassignRows = reassignLogs.map((log) => [
+        ticketMap[log.entity_id!] || `Ticket #${log.entity_id}`,
+        log.action,
+        log.actor_email || 'System',
+        log.activity,
+        new Date(log.timestamp).toLocaleString(),
+      ]);
+
+      const reassignTableHtml = `
+        <h2 style="color: #154734; margin-top: 20px;">Reassign Logs</h2>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Ticket Number</th>
+              <th>Action</th>
+              <th>Actor</th>
+              <th>Activity</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${reassignRows.map((row) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join('')}</tr>`).join('')}
+          </tbody>
+        </table>
+      `;
+
+      const recordSummary = `${logs.length} escalation log(s) and ${reassignLogs.length} reassign log(s)`;
+      const bodyContent = escalationTableHtml + reassignTableHtml;
+      const html = buildPdfDocument(
+        'Escalation & Reassign Logs Report',
+        'Escalation & Reassign Logs Report',
+        bodyContent,
+        recordSummary
+      );
+      await openPrintWindow(html, `escalation_logs_${dateStr}.pdf`);
+      toast.success('Escalation and reassign logs exported to PDF.');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to export to PDF.');
+    } finally {
+      setExporting(false);
+      setShowExportMenu(false);
+    }
+  };
+
   const filtered = logs.filter((item) => {
     if (filterType === 'Internal') return item.escalation_type === 'internal';
     if (filterType === 'External') return item.escalation_type === 'external';
@@ -85,12 +298,48 @@ export default function AdminEscalation() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Ticket Escalation</h1>
           <p className="text-gray-500 dark:text-gray-400">View escalation and reassign logs</p>
         </div>
-        <button
-          onClick={loadData}
-          className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400"
-        >
-          <RefreshCw className="w-4 h-4" /> Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={loadData}
+            className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400"
+          >
+            <RefreshCw className="w-4 h-4" /> Refresh
+          </button>
+          {logs.length > 0 && (
+            <div className="relative">
+              <button
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                disabled={exporting}
+                className="flex items-center gap-1 px-3 py-2 text-sm rounded-lg text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+                title="Export"
+              >
+                <Download className="w-4 h-4" />
+                Export
+                <ChevronDown className="w-3 h-3" />
+              </button>
+              {showExportMenu && (
+                <div className="absolute right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10 min-w-[150px]">
+                  <button
+                    onClick={exportToXLSX}
+                    disabled={exporting}
+                    className="w-full flex items-center gap-2 px-4 py-2 text-sm text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors first:rounded-t-lg disabled:opacity-50"
+                  >
+                    <FileSpreadsheet className="w-4 h-4" />
+                    Excel (XLSX)
+                  </button>
+                  <button
+                    onClick={exportToPDF}
+                    disabled={exporting}
+                    className="w-full flex items-center gap-2 px-4 py-2 text-sm text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors last:rounded-b-lg disabled:opacity-50"
+                  >
+                    <FileDown className="w-4 h-4" />
+                    PDF
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       <Card>

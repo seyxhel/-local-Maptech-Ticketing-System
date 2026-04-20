@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Star, Loader2, AlertCircle, TrendingUp } from 'lucide-react';
+import { Star, Loader2, AlertCircle, TrendingUp, Download, FileDown, FileSpreadsheet, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchUsers, fetchFeedbackRatings, fetchTickets } from '../../services/api';
 import type { BackendTicket, BackendUser, FeedbackRating } from '../../services/api';
 import { Card } from '../../components/ui/Card';
+import { GreenButton } from '../../components/ui/GreenButton';
+import XLSXStyle from 'xlsx-js-style';
+import { buildPdfDocument, openPrintWindow } from '../../utils/pdfTemplate';
 
 interface EmployeeRatingsData {
   employee: {
@@ -14,6 +17,75 @@ interface EmployeeRatingsData {
   ratings: FeedbackRating[];
   averageRating: number;
   totalRatings: number;
+}
+
+function exportToXlsx(employees: EmployeeRatingsData[], generalAverage: number, totalRatings: number) {
+  const now = new Date();
+  const dateStr = now.toISOString().slice(0, 10);
+
+  const summaryRows = [
+    {
+      Section: 'Summary',
+      Metric: 'General Average Rating',
+      Value: generalAverage.toFixed(2),
+    },
+    {
+      Section: 'Summary',
+      Metric: 'Total Feedback Ratings',
+      Value: String(totalRatings),
+    },
+    {
+      Section: 'Summary',
+      Metric: 'Rated Employees',
+      Value: String(employees.length),
+    },
+  ];
+
+  const detailRows = employees.flatMap((emp) =>
+    emp.ratings.map((rating) => ({
+      Employee: emp.employee.name,
+      Email: emp.employee.email || 'N/A',
+      EmployeeAverage: Number(emp.averageRating.toFixed(2)),
+      EmployeeTotalRatings: emp.totalRatings,
+      TicketNo: rating.stf_no || '',
+      Rating: rating.rating,
+      RatingLabel: RATING_LABELS[rating.rating] || '',
+      Comment: rating.comments || '',
+      Reviewer: rating.admin_name || '',
+      RatedAt: new Date(rating.created_at).toLocaleString(),
+    }))
+  );
+
+  const wsSummary = XLSXStyle.utils.json_to_sheet(summaryRows);
+  const wsDetails = XLSXStyle.utils.json_to_sheet(detailRows);
+
+  wsSummary['!cols'] = [{ wch: 14 }, { wch: 24 }, { wch: 16 }];
+  wsDetails['!cols'] = [
+    { wch: 24 },
+    { wch: 28 },
+    { wch: 18 },
+    { wch: 20 },
+    { wch: 14 },
+    { wch: 8 },
+    { wch: 14 },
+    { wch: 42 },
+    { wch: 22 },
+    { wch: 24 },
+  ];
+
+  const wb = XLSXStyle.utils.book_new();
+  XLSXStyle.utils.book_append_sheet(wb, wsSummary, 'Summary');
+  XLSXStyle.utils.book_append_sheet(wb, wsDetails, 'Ratings');
+  XLSXStyle.writeFile(wb, `technical_staff_ratings_${dateStr}.xlsx`);
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
 }
 
 const RATING_LABELS: Record<number, string> = {
@@ -49,6 +121,8 @@ export default function EmployeeRatingsPage() {
   const [employees, setEmployees] = useState<EmployeeRatingsData[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState<EmployeeRatingsData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
   const [generalAverage, setGeneralAverage] = useState(0);
   const [totalRatings, setTotalRatings] = useState(0);
 
@@ -132,6 +206,90 @@ export default function EmployeeRatingsPage() {
     }
   };
 
+  const handleExportXlsx = () => {
+    setShowExportMenu(false);
+    if (employees.length === 0 || totalRatings === 0) {
+      toast.error('No ratings to export.');
+      return;
+    }
+
+    setExporting(true);
+    try {
+      exportToXlsx(employees, generalAverage, totalRatings);
+      toast.success(`Exported ${totalRatings} rating${totalRatings !== 1 ? 's' : ''} to XLSX.`);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Failed to export XLSX';
+      toast.error(msg);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleExportPDF = () => {
+    setShowExportMenu(false);
+    if (employees.length === 0 || totalRatings === 0) {
+      toast.error('No ratings to export.');
+      return;
+    }
+
+    const dateTag = new Date().toISOString().slice(0, 10);
+    const exportedRows = employees.flatMap((emp) =>
+      emp.ratings.map((rating) => ({
+        employeeName: emp.employee.name,
+        employeeEmail: emp.employee.email || 'N/A',
+        ticketNo: rating.stf_no || '',
+        ratingValue: rating.rating,
+        ratingLabel: RATING_LABELS[rating.rating] || '',
+        comment: rating.comments || '\u2014',
+        reviewer: rating.admin_name || '\u2014',
+        ratedAt: new Date(rating.created_at).toLocaleString(),
+      }))
+    );
+
+    const body = `
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">General Average</div><div class="stat-value">${generalAverage.toFixed(2)}</div></div>
+        <div class="stat-card"><div class="stat-label">Total Feedback Ratings</div><div class="stat-value">${totalRatings}</div></div>
+        <div class="stat-card"><div class="stat-label">Rated Employees</div><div class="stat-value">${employees.length}</div></div>
+      </div>
+      <h2>Technical Staff Ratings</h2>
+      <table>
+        <thead><tr><th>#</th><th>Employee</th><th>Email</th><th>Ticket</th><th>Rating</th><th>Label</th><th>Comment</th><th>Reviewer</th><th>Date</th></tr></thead>
+        <tbody>
+          ${exportedRows
+            .map((row, idx) => `
+                <tr>
+                  <td>${idx + 1}</td>
+                  <td>${escapeHtml(row.employeeName)}</td>
+                  <td>${escapeHtml(row.employeeEmail)}</td>
+                  <td>${escapeHtml(row.ticketNo)}</td>
+                  <td><strong>${row.ratingValue}/5</strong></td>
+                  <td>${escapeHtml(row.ratingLabel)}</td>
+                  <td>${escapeHtml(row.comment)}</td>
+                  <td>${escapeHtml(row.reviewer)}</td>
+                  <td>${row.ratedAt}</td>
+                </tr>
+              `)
+            .join('')}
+        </tbody>
+      </table>
+    `;
+
+    const html = buildPdfDocument(
+      'Technical Staff Ratings Report - Maptech Ticketing System',
+      'Technical Staff Ratings Report',
+      body,
+      `${totalRatings} records`
+    );
+
+    void openPrintWindow(html, `technical_staff_ratings_${dateTag}.pdf`)
+      .then(() => toast.success('PDF downloaded.'))
+      .catch((error) => {
+        console.error('PDF export failed:', error);
+        toast.error('PDF export failed.');
+      });
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -144,13 +302,49 @@ export default function EmployeeRatingsPage() {
             Performance feedback from resolved tickets
           </p>
         </div>
-        <button
-          onClick={loadEmployeeRatings}
-          disabled={loading}
-          className="px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
-        >
-          {loading ? 'Refreshing...' : 'Refresh'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={loadEmployeeRatings}
+            disabled={loading}
+            className="px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+          >
+            {loading ? 'Refreshing...' : 'Refresh'}
+          </button>
+
+          <div className="relative">
+            <GreenButton
+              onClick={() => setShowExportMenu((value) => !value)}
+              isLoading={exporting}
+              className="flex items-center gap-2"
+            >
+              <Download className="w-4 h-4" />
+              Export Ratings
+              <ChevronDown className="w-4 h-4 ml-1" />
+            </GreenButton>
+
+            {showExportMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowExportMenu(false)} />
+                <div className="absolute right-0 mt-2 w-48 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 z-50 overflow-hidden">
+                  <button
+                    onClick={handleExportPDF}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    <FileDown className="w-4 h-4 text-red-500" />
+                    Export as PDF
+                  </button>
+                  <button
+                    onClick={handleExportXlsx}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    <FileSpreadsheet className="w-4 h-4 text-[#0E8F79]" />
+                    Export as XLSX
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">

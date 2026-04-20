@@ -1063,6 +1063,41 @@ class EscalationLogViewSet(viewsets.ReadOnlyModelViewSet):
             ).order_by('-created_at')
         return EscalationLog.objects.none()
 
+    @action(detail=False, methods=['get'])
+    def export(self, request):
+        """Export escalation logs as CSV."""
+        import csv
+        from django.http import HttpResponse as DjangoHttpResponse
+
+        qs = self.get_queryset().select_related('ticket', 'from_user', 'to_user')
+        response = DjangoHttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="escalation_logs_{timezone.now().strftime("%Y%m%d_%H%M%S")}.csv"'
+
+        writer = csv.writer(response)
+        writer.writerow(['Ticket Number', 'Escalation Type', 'From User', 'To User', 'External Recipient', 'Notes', 'Created At'])
+        for log in qs[:5000]:
+            from_user_name = ''
+            if log.from_user:
+                full = log.from_user.get_full_name()
+                from_user_name = full if full.strip() else log.from_user.username
+            
+            to_user_name = ''
+            if log.to_user:
+                full = log.to_user.get_full_name()
+                to_user_name = full if full.strip() else log.to_user.username
+
+            writer.writerow([
+                log.ticket.stf_no if log.ticket else '',
+                log.escalation_type,
+                from_user_name,
+                to_user_name,
+                log.to_external or '',
+                log.notes,
+                log.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            ])
+
+        return response
+
 
 @swagger_auto_schema(method='get', tags=['Employees'])
 @api_view(['GET'])

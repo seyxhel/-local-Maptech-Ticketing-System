@@ -64,6 +64,9 @@ const ACTION_OPTIONS = [
   { value: 'CONFIRM', label: 'Confirm' },
   { value: 'STATUS_CHANGE', label: 'Status Change' },
   { value: 'PASSWORD_RESET', label: 'Password Reset' },
+  { value: 'OBSERVE', label: 'Submit for Observation' },
+  { value: 'UNRESOLVED', label: 'Mark Unresolved' },
+  { value: 'LINK', label: 'Link Tickets' },
 ];
 
 const PAGE_SIZE = 15;
@@ -87,6 +90,9 @@ function actionBadge(action: string) {
     CONFIRM: 'bg-lime-50 dark:bg-lime-900/30 text-lime-700 dark:text-lime-300 border-lime-200 dark:border-lime-700',
     STATUS_CHANGE: 'bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-700',
     PASSWORD_RESET: 'bg-pink-50 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300 border-pink-200 dark:border-pink-700',
+    OBSERVE: 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-700',
+    UNRESOLVED: 'bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-700',
+    LINK: 'bg-fuchsia-50 dark:bg-fuchsia-900/30 text-fuchsia-700 dark:text-fuchsia-300 border-fuchsia-200 dark:border-fuchsia-700',
   };
   return map[action] || 'bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-600';
 }
@@ -570,12 +576,25 @@ export function AuditLogs() {
       {retentionPolicy && (
         <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 text-amber-800 dark:text-amber-300 text-sm">
           <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
-          <span>
-            <strong>Retention Policy:</strong>{' '}
-            {retentionPolicy.audit_log_retention_days > 0
-              ? `Audit logs are retained for ${retentionPolicy.audit_log_retention_days} day${retentionPolicy.audit_log_retention_days !== 1 ? 's' : ''} and automatically removed thereafter.`
-              : 'Audit logs are retained indefinitely (no automatic cleanup).'}
-          </span>
+          <div>
+            <p>
+              <strong>Retention Policy:</strong>
+            </p>
+            <ul className="mt-1 space-y-1 ml-4">
+              <li>
+                • Audit logs:{' '}
+                {retentionPolicy.audit_log_retention_days > 0
+                  ? `${retentionPolicy.audit_log_retention_days} day${retentionPolicy.audit_log_retention_days !== 1 ? 's' : ''}`
+                  : 'indefinite'}
+              </li>
+              <li>
+                • Escalation logs:{' '}
+                {retentionPolicy.escalation_log_retention_days > 0
+                  ? `${retentionPolicy.escalation_log_retention_days} day${retentionPolicy.escalation_log_retention_days !== 1 ? 's' : ''}`
+                  : 'indefinite'}
+              </li>
+            </ul>
+          </div>
         </div>
       )}
 

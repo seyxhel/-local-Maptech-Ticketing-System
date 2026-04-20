@@ -4,7 +4,7 @@ from django.utils import timezone
 
 
 class RetentionPolicy(models.Model):
-    """Configurable retention periods for audit logs and call logs.
+    """Configurable retention periods for audit logs, call logs, and escalation logs.
     Only one row should exist (singleton). Use RetentionPolicy.get_policy() to access.
     """
     audit_log_retention_days = models.PositiveIntegerField(
@@ -14,6 +14,10 @@ class RetentionPolicy(models.Model):
     call_log_retention_days = models.PositiveIntegerField(
         default=365,
         help_text='Number of days to retain call logs. 0 means keep forever.',
+    )
+    escalation_log_retention_days = models.PositiveIntegerField(
+        default=365,
+        help_text='Number of days to retain escalation logs. 0 means keep forever.',
     )
     updated_at = models.DateTimeField(auto_now=True)
     updated_by = models.ForeignKey(
@@ -26,7 +30,7 @@ class RetentionPolicy(models.Model):
         verbose_name_plural = 'Retention Policies'
 
     def __str__(self):
-        return f"Retention Policy (Audit: {self.audit_log_retention_days}d, Call: {self.call_log_retention_days}d)"
+        return f"Retention Policy (Audit: {self.audit_log_retention_days}d, Call: {self.call_log_retention_days}d, Escalation: {self.escalation_log_retention_days}d)"
 
     def save(self, *args, **kwargs):
         # Enforce singleton: always use pk=1

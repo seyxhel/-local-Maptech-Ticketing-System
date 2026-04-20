@@ -726,6 +726,12 @@ export async function fetchEscalationLogs(): Promise<EscalationLog[]> {
   return handleResponse<EscalationLog[]>(res);
 }
 
+export async function exportEscalationLogs(format: 'csv' = 'csv'): Promise<Blob> {
+  const res = await apiFetch(`${API_BASE}/escalation-logs/export/?format=${format}`, { headers: authHeaders() });
+  if (!res.ok) throw new Error('Failed to export escalation logs');
+  return res.blob();
+}
+
 // ── Audit Log types & endpoints ──
 
 export interface AuditLogEntry {
@@ -1114,6 +1120,7 @@ export interface RetentionPolicyData {
   id: number;
   audit_log_retention_days: number;
   call_log_retention_days: number;
+  escalation_log_retention_days: number;
   updated_at: string;
   updated_by: number | null;
   updated_by_name: string | null;
@@ -1124,11 +1131,11 @@ export async function fetchRetentionPolicy(): Promise<RetentionPolicyData> {
   const res = await apiFetch(`${API_BASE}/retention-policy/`, { headers: authHeaders() });
   const data = await handleResponse<RetentionPolicyData[] | RetentionPolicyData>(res);
   // ViewSet.list returns an array for router-registered viewsets
-  return Array.isArray(data) ? data[0] ?? { id: 1, audit_log_retention_days: 365, call_log_retention_days: 365, updated_at: '', updated_by: null, updated_by_name: null } : data;
+  return Array.isArray(data) ? data[0] ?? { id: 1, audit_log_retention_days: 365, call_log_retention_days: 365, escalation_log_retention_days: 365, updated_at: '', updated_by: null, updated_by_name: null } : data;
 }
 
 /** Update the retention policy (superadmin only). */
-export async function updateRetentionPolicy(data: { audit_log_retention_days?: number; call_log_retention_days?: number }): Promise<RetentionPolicyData> {
+export async function updateRetentionPolicy(data: { audit_log_retention_days?: number; call_log_retention_days?: number; escalation_log_retention_days?: number }): Promise<RetentionPolicyData> {
   const res = await apiFetch(`${API_BASE}/retention-policy/`, {
     method: 'POST',
     headers: authHeaders(),
