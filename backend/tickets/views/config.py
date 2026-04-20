@@ -53,8 +53,10 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
             Q(end_date__isnull=True) | Q(end_date__gte=now)
         )
 
-        if user.role in ('admin', 'sales'):
+        if user.role == 'admin':
             return qs.filter(visibility__in=['all', 'admin'])
+        elif user.role == 'sales':
+            return qs.filter(visibility__in=['all', 'sales'])
         elif user.role == 'employee':
             return qs.filter(visibility__in=['all', 'employee'])
 

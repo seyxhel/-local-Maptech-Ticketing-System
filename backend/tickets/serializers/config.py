@@ -1,3 +1,4 @@
+from django.utils import timezone
 from rest_framework import serializers
 from ..models import RetentionPolicy, Announcement
 
@@ -39,3 +40,11 @@ class AnnouncementSerializer(serializers.ModelSerializer):
             name = obj.created_by.get_full_name()
             return name if name.strip() else obj.created_by.username
         return None
+
+    def validate_start_date(self, value):
+        now = timezone.now()
+        if value < now:
+            current_start = getattr(self.instance, 'start_date', None)
+            if self.instance is None or not current_start or current_start >= now:
+                raise serializers.ValidationError('Start date cannot be in the past.')
+        return value

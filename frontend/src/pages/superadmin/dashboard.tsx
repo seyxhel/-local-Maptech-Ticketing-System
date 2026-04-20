@@ -32,6 +32,18 @@ function normalize(value: string | null | undefined) {
   return (value || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
 }
 
+function getLocalDatetimeValue(date = new Date()) {
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return localDate.toISOString().slice(0, 16);
+}
+
+const VISIBILITY_LABELS: Record<string, string> = {
+  all: 'All (Supervisors, Technicians & Sales)',
+  admin: 'Supervisors Only',
+  employee: 'Technicians Only',
+  sales: 'Sales Only',
+};
+
 export default function SuperAdminDashboard() {
   const navigate = useNavigate();
   const [tickets, setTickets] = useState<BackendTicket[]>([]);
@@ -113,6 +125,10 @@ export default function SuperAdminDashboard() {
   async function handleSave() {
     if (!formData.title.trim() || !formData.description.trim()) {
       toast.error('Title and description are required.');
+      return;
+    }
+    if (!editingId && formData.start_date && formData.start_date < getLocalDatetimeValue()) {
+      toast.error('Start date cannot be in the past.');
       return;
     }
     try {
@@ -234,6 +250,8 @@ export default function SuperAdminDashboard() {
       .sort((a, b) => b.tickets - a.tickets)
       .slice(0, 6);
   }, [tickets]);
+
+  const startDateMin = editingId ? undefined : getLocalDatetimeValue();
 
   if (loadingDashboard) {
     return (
@@ -528,9 +546,10 @@ export default function SuperAdminDashboard() {
                   onChange={(e) => setFormData({ ...formData, visibility: e.target.value })}
                   className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-[#3BC25B] outline-none"
                 >
-                  <option value="all">All (Supervisors & Technicians)</option>
+                  <option value="all">All (Supervisors, Technicians & Sales)</option>
                   <option value="admin">Supervisors Only</option>
                   <option value="employee">Technicians Only</option>
+                  <option value="sales">Sales Only</option>
                 </select>
               </div>
 
@@ -553,6 +572,7 @@ export default function SuperAdminDashboard() {
                 <input
                   type="datetime-local"
                   value={formData.start_date}
+                  min={startDateMin}
                   onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
                   className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-[#3BC25B] outline-none"
                 />
@@ -601,7 +621,7 @@ export default function SuperAdminDashboard() {
                         {ann.announcement_type.charAt(0).toUpperCase() + ann.announcement_type.slice(1)}
                       </span>
                       <span className="text-xs text-gray-400 dark:text-gray-500">
-                        {ann.visibility === 'all' ? 'All' : ann.visibility === 'admin' ? 'Supervisors' : 'Technicians'}
+                        {VISIBILITY_LABELS[ann.visibility] || ann.visibility}
                       </span>
                       {!ann.is_active && (
                         <span className="text-xs text-gray-400 italic">Inactive</span>

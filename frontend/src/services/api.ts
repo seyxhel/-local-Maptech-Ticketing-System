@@ -1236,7 +1236,7 @@ export interface AnnouncementData {
   title: string;
   description: string;
   announcement_type: 'info' | 'warning' | 'success' | 'critical';
-  visibility: 'all' | 'admin' | 'employee';
+  visibility: 'all' | 'admin' | 'employee' | 'sales';
   is_active: boolean;
   start_date: string;
   end_date: string | null;

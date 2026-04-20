@@ -48,9 +48,10 @@ class Announcement(models.Model):
         ('critical', 'Critical'),
     ]
     VISIBILITY_CHOICES = [
-        ('all', 'All (Supervisors & Technicians)'),
+        ('all', 'All (Supervisors, Technicians & Sales)'),
         ('admin', 'Supervisors Only'),
         ('employee', 'Technicians Only'),
+        ('sales', 'Sales Only'),
     ]
 
     title = models.CharField(max_length=255)
