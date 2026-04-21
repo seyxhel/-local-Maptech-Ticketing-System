@@ -4,6 +4,7 @@ import re
 from ..models import (
     Ticket, TicketTask, TicketAttachment, EscalationLog, AuditLog,
 )
+from tickets.input_security import sanitize_payload
 from users.serializers import UserSerializer
 from .lookup import TypeOfServiceSerializer
 from .client import ClientSerializer
@@ -51,6 +52,18 @@ class TicketSerializer(serializers.ModelSerializer):
     linked_ticket_stfs = serializers.SerializerMethodField()
     was_for_observation = serializers.SerializerMethodField()
     type_of_service_others = serializers.SerializerMethodField()
+
+    text_field_rules = {
+        'description_of_problem': {'max_length': None, 'allow_newlines': True},
+        'action_taken': {'max_length': None, 'allow_newlines': True},
+        'remarks': {'max_length': None, 'allow_newlines': True},
+        'cascade_type': {'max_length': 20},
+        'observation': {'max_length': None, 'allow_newlines': True},
+        'signature': {'max_length': None, 'allow_newlines': True, 'strip_tags': False},
+        'signed_by_name': {'max_length': 200},
+        'external_escalated_to': {'max_length': 300},
+        'external_escalation_notes': {'max_length': None, 'allow_newlines': True},
+    }
 
     # ── Client fields: read-only virtual fields from client_record FK ──
     client = serializers.SerializerMethodField()
@@ -157,6 +170,9 @@ class TicketSerializer(serializers.ModelSerializer):
         read_only_fields = ['stf_no', 'date', 'time_in', 'time_out', 'confirmed_by_admin',
                             'external_escalated_to', 'external_escalation_notes', 'external_escalated_at',
                             'progress_percentage', 'sla_estimated_days']
+
+    def to_internal_value(self, data):
+        return super().to_internal_value(sanitize_payload(data, self.text_field_rules))
 
     def get_linked_ticket_stfs(self, obj):
         return list(obj.linked_tickets.values_list('stf_no', flat=True))
@@ -316,6 +332,36 @@ class AdminCreateTicketSerializer(serializers.ModelSerializer):
     project_title = serializers.CharField(required=False, allow_blank=True, write_only=True)
     client_unavailable_for_call = serializers.BooleanField(required=False, default=False, write_only=True)
 
+    text_field_rules = {
+        'client': {'max_length': 500},
+        'contact_person': {'max_length': 200},
+        'address': {'max_length': None, 'allow_newlines': True},
+        'designation': {'max_length': 200},
+        'landline': {'max_length': 30},
+        'department_organization': {'max_length': 200},
+        'mobile_no': {'max_length': 20},
+        'email_address': {'max_length': 254},
+        'sales_representative': {'max_length': 200},
+        'description_of_problem': {'max_length': None, 'allow_newlines': True},
+        'product': {'max_length': 300},
+        'brand': {'max_length': 300},
+        'model_name': {'max_length': 300},
+        'device_equipment': {'max_length': 300},
+        'version_no': {'max_length': 100},
+        'serial_no': {'max_length': 200},
+        'sales_no': {'max_length': 200},
+        'others': {'max_length': None, 'allow_newlines': True},
+        'client_purchase_no': {'max_length': 200},
+        'maptech_dr': {'max_length': 200},
+        'maptech_sales_invoice': {'max_length': 200},
+        'maptech_sales_order_no': {'max_length': 200},
+        'supplier_purchase_no': {'max_length': 200},
+        'supplier_sales_invoice': {'max_length': 200},
+        'supplier_delivery_receipt': {'max_length': 200},
+        'type_of_service_others': {'max_length': 200},
+        'project_title': {'max_length': 300},
+    }
+
     class Meta:
         model = Ticket
         fields = [
@@ -342,6 +388,9 @@ class AdminCreateTicketSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             'email_address': {'required': False, 'allow_blank': True, 'default': ''},
         }
+
+    def to_internal_value(self, data):
+        return super().to_internal_value(sanitize_payload(data, self.text_field_rules))
 
     def validate_mobile_no(self, value):
         """Validate Philippine mobile number format."""
@@ -404,6 +453,23 @@ class EmployeeTicketActionSerializer(serializers.Serializer):
     observation = serializers.CharField(required=False, allow_blank=True, style={'base_template': 'textarea.html'})
     signature = serializers.CharField(required=False, allow_blank=True)
     signed_by_name = serializers.CharField(required=False, allow_blank=True, max_length=200)
+
+    text_field_rules = {
+        'product': {'max_length': 300},
+        'brand': {'max_length': 300},
+        'model_name': {'max_length': 300},
+        'device_equipment': {'max_length': 300},
+        'version_no': {'max_length': 100},
+        'serial_no': {'max_length': 200},
+        'action_taken': {'max_length': None, 'allow_newlines': True},
+        'remarks': {'max_length': None, 'allow_newlines': True},
+        'observation': {'max_length': None, 'allow_newlines': True},
+        'signature': {'max_length': None, 'allow_newlines': True, 'strip_tags': False},
+        'signed_by_name': {'max_length': 200},
+    }
+
+    def to_internal_value(self, data):
+        return super().to_internal_value(sanitize_payload(data, self.text_field_rules))
 
     def validate_date_purchased(self, value):
         """Ensure date_purchased is not in the future."""

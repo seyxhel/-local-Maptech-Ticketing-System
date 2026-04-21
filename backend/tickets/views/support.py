@@ -7,6 +7,8 @@ from rest_framework.exceptions import ValidationError
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 
+from tickets.input_security import clean_text
+
 from ..models import CallLog, FeedbackRating
 from ..serializers import CallLogSerializer, FeedbackRatingSerializer
 from ..permissions import IsAdminLevel
@@ -92,7 +94,7 @@ class CallLogViewSet(viewsets.ModelViewSet):
         call_log.call_end = timezone.now()
         notes = request.data.get('notes')
         if notes:
-            call_log.notes = notes
+            call_log.notes = clean_text(notes, allow_newlines=True)
         call_log.save()
         return Response(CallLogSerializer(call_log).data)
 

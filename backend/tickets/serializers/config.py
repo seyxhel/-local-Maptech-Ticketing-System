@@ -1,6 +1,7 @@
 from django.utils import timezone
 from rest_framework import serializers
 from ..models import RetentionPolicy, Announcement
+from tickets.input_security import sanitize_payload
 
 
 class RetentionPolicySerializer(serializers.ModelSerializer):
@@ -25,6 +26,11 @@ class AnnouncementSerializer(serializers.ModelSerializer):
     created_by_name = serializers.SerializerMethodField()
     is_currently_active = serializers.BooleanField(read_only=True)
 
+    text_field_rules = {
+        'title': {'max_length': 255},
+        'description': {'max_length': None, 'allow_newlines': True},
+    }
+
     class Meta:
         model = Announcement
         fields = [
@@ -34,6 +40,9 @@ class AnnouncementSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'created_by', 'created_by_name', 'is_currently_active', 'created_at', 'updated_at']
+
+    def to_internal_value(self, data):
+        return super().to_internal_value(sanitize_payload(data, self.text_field_rules))
 
     def get_created_by_name(self, obj):
         if obj.created_by:

@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from ..models import CallLog, FeedbackRating
+from tickets.input_security import sanitize_payload
 
 
 class CallLogSerializer(serializers.ModelSerializer):
@@ -15,6 +16,15 @@ class CallLogSerializer(serializers.ModelSerializer):
             'created_at',
         ]
         read_only_fields = ['admin', 'admin_name', 'stf_no', 'created_at']
+
+    text_field_rules = {
+        'client_name': {'max_length': 200},
+        'phone_number': {'max_length': 30},
+        'notes': {'max_length': None, 'allow_newlines': True},
+    }
+
+    def to_internal_value(self, data):
+        return super().to_internal_value(sanitize_payload(data, self.text_field_rules))
 
     def get_admin_name(self, obj):
         if obj.admin:
@@ -39,6 +49,13 @@ class FeedbackRatingSerializer(serializers.ModelSerializer):
             'admin', 'admin_name', 'rating', 'comments', 'created_at',
         ]
         read_only_fields = ['admin', 'admin_name', 'employee_name', 'stf_no', 'created_at']
+
+    text_field_rules = {
+        'comments': {'max_length': None, 'allow_newlines': True},
+    }
+
+    def to_internal_value(self, data):
+        return super().to_internal_value(sanitize_payload(data, self.text_field_rules))
 
     def get_admin_name(self, obj):
         if obj.admin:

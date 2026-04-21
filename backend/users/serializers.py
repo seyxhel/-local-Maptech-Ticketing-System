@@ -1,6 +1,8 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 
+from tickets.input_security import clean_text, sanitize_payload
+
 User = get_user_model()
 
 class UserSerializer(serializers.ModelSerializer):
@@ -35,8 +37,20 @@ class AdminUserCreateSerializer(serializers.Serializer):
     last_name = serializers.CharField(max_length=150)
     suffix = serializers.CharField(max_length=3, required=False, allow_blank=True)
     email = serializers.EmailField()
-    phone = serializers.CharField(max_length=13, required=False, allow_blank=True)
+    phone = serializers.CharField(max_length=30, required=False, allow_blank=True)
     role = serializers.ChoiceField(choices=[('employee', 'Technical Staff'), ('sales', 'Sales'), ('admin', 'Supervisor')])
+
+    text_field_rules = {
+        'first_name': {'max_length': 150},
+        'middle_name': {'max_length': 150},
+        'last_name': {'max_length': 150},
+        'suffix': {'max_length': 3},
+        'email': {'max_length': 254},
+        'phone': {'max_length': 30},
+    }
+
+    def to_internal_value(self, data):
+        return super().to_internal_value(sanitize_payload(data, self.text_field_rules))
 
     def validate_role(self, value):
         """Admin can only create employees; superadmin can create employees, sales, and admins."""
@@ -47,6 +61,7 @@ class AdminUserCreateSerializer(serializers.Serializer):
         return value
 
     def validate_email(self, value):
+        value = clean_text(value, max_length=254).lower()
         if User.objects.filter(email=value).exists():
             raise serializers.ValidationError('A user with that email already exists.')
         return value

@@ -7,6 +7,8 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from pathlib import Path
 
+from tickets.input_security import clean_text, clean_text_list
+
 from ..models import (
     Ticket, TicketTask, TicketAttachment, AssignmentSession,
     Message, EscalationLog, AuditLog, Product, Client,
@@ -27,6 +29,15 @@ BYTES_PER_GB = BYTES_PER_MB * 1024
 MAX_IMAGE_ATTACHMENT_SIZE = 500 * BYTES_PER_MB
 MAX_VIDEO_ATTACHMENT_SIZE = 2 * BYTES_PER_GB
 MAX_DOCUMENT_ATTACHMENT_SIZE = 500 * BYTES_PER_MB
+
+
+def _clean_ticket_text(value, *, max_length=None, allow_newlines=False, strip_tags=True):
+    return clean_text(
+        value,
+        max_length=max_length,
+        allow_newlines=allow_newlines,
+        strip_tags=strip_tags,
+    )
 
 
 def _get_attachment_type(file):
@@ -469,7 +480,7 @@ class TicketViewSet(viewsets.ModelViewSet):
         """Employee escalates ticket internally."""
         ticket = self.get_object()
         user = request.user
-        notes = request.data.get('notes', '')
+        notes = _clean_ticket_text(request.data.get('notes', ''), allow_newlines=True)
 
         # End current session
         if ticket.current_session:
@@ -521,7 +532,7 @@ class TicketViewSet(viewsets.ModelViewSet):
         ticket = self.get_object()
         user = request.user
         to_emp_id = request.data.get('employee_id')
-        notes = request.data.get('notes', '')
+        notes = _clean_ticket_text(request.data.get('notes', ''), allow_newlines=True)
         if not to_emp_id:
             return Response({'detail': 'employee_id required'}, status=status.HTTP_400_BAD_REQUEST)
         try:
@@ -617,10 +628,23 @@ class TicketViewSet(viewsets.ModelViewSet):
         }
 
         changes = {}
+        product_field_rules = {
+            'product': {'max_length': 300},
+            'brand': {'max_length': 300},
+            'model_name': {'max_length': 300},
+            'device_equipment': {'max_length': 300},
+            'version_no': {'max_length': 100},
+            'serial_no': {'max_length': 200},
+            'sales_no': {'max_length': 200},
+            'others': {'max_length': None, 'allow_newlines': True},
+        }
         for req_field, model_field in product_field_map.items():
             if req_field in request.data:
-                setattr(ticket, model_field, request.data[req_field])
-                changes[req_field] = request.data[req_field]
+                raw_value = request.data[req_field]
+                if req_field in product_field_rules:
+                    raw_value = _clean_ticket_text(raw_value, **product_field_rules[req_field])
+                setattr(ticket, model_field, raw_value)
+                changes[req_field] = raw_value
 
         if changes:
             ticket.save()
@@ -651,13 +675,36 @@ class TicketViewSet(viewsets.ModelViewSet):
             'cascade_type', 'observation', 'signature', 'signed_by_name',
         ]
 
+        product_field_rules = {
+            'product': {'max_length': 300},
+            'brand': {'max_length': 300},
+            'model_name': {'max_length': 300},
+            'device_equipment': {'max_length': 300},
+            'version_no': {'max_length': 100},
+            'serial_no': {'max_length': 200},
+            'others': {'max_length': None, 'allow_newlines': True},
+        }
+        ticket_field_rules = {
+            'action_taken': {'max_length': None, 'allow_newlines': True},
+            'remarks': {'max_length': None, 'allow_newlines': True},
+            'observation': {'max_length': None, 'allow_newlines': True},
+            'signature': {'max_length': None, 'allow_newlines': True, 'strip_tags': False},
+            'signed_by_name': {'max_length': 200},
+        }
+
         for req_field, model_field in product_field_map.items():
             if req_field in request.data:
-                setattr(ticket, model_field, request.data[req_field])
+                value = request.data[req_field]
+                if req_field in product_field_rules:
+                    value = _clean_ticket_text(value, **product_field_rules[req_field])
+                setattr(ticket, model_field, value)
 
         for field in ticket_allowed:
             if field in request.data:
-                setattr(ticket, field, request.data[field])
+                value = request.data[field]
+                if field in ticket_field_rules:
+                    value = _clean_ticket_text(value, **ticket_field_rules[field])
+                setattr(ticket, field, value)
 
         old_status = ticket.status
 
@@ -684,9 +731,19 @@ class TicketViewSet(viewsets.ModelViewSet):
             'action_taken', 'remarks', 'observation',
             'job_status', 'cascade_type', 'signature', 'signed_by_name',
         ]
+        field_rules = {
+            'action_taken': {'max_length': None, 'allow_newlines': True},
+            'remarks': {'max_length': None, 'allow_newlines': True},
+            'observation': {'max_length': None, 'allow_newlines': True},
+            'signature': {'max_length': None, 'allow_newlines': True, 'strip_tags': False},
+            'signed_by_name': {'max_length': 200},
+        }
         for field in allowed:
             if field in request.data:
-                setattr(ticket, field, request.data[field])
+                value = request.data[field]
+                if field in field_rules:
+                    value = _clean_ticket_text(value, **field_rules[field])
+                setattr(ticket, field, value)
 
         old_status = ticket.status
         ticket.status = Ticket.STATUS_FOR_OBSERVATION
@@ -694,7 +751,7 @@ class TicketViewSet(viewsets.ModelViewSet):
 
         sys_content = f"{user.get_full_name() or user.username} submitted this ticket for observation."
         if request.data.get('observation'):
-            sys_content += f" Observation: {request.data['observation'][:200]}"
+            sys_content += f" Observation: {_clean_ticket_text(request.data['observation'], max_length=200, allow_newlines=True)}"
         for ch in ['admin_employee']:
             Message.objects.create(
                 ticket=ticket,
@@ -755,8 +812,8 @@ class TicketViewSet(viewsets.ModelViewSet):
         user = request.user
         ticket = self.get_object()
 
-        escalated_to = request.data.get('escalated_to', '')
-        notes = request.data.get('notes', '')
+        escalated_to = _clean_ticket_text(request.data.get('escalated_to', ''), max_length=300)
+        notes = _clean_ticket_text(request.data.get('notes', ''), allow_newlines=True)
         if not escalated_to:
             return Response({'detail': 'escalated_to required (distributor/principal name)'}, status=status.HTTP_400_BAD_REQUEST)
 

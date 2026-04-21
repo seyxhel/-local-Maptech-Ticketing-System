@@ -5,6 +5,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.utils import timezone
 
+from tickets.input_security import clean_text, clean_text_list
+
 from ..models import TicketAttachment
 from ..serializers import KnowledgeHubAttachmentSerializer, PublishedArticleSerializer
 from ..permissions import IsAdminLevel
@@ -72,9 +74,9 @@ class KnowledgeHubViewSet(viewsets.ModelViewSet):
         title = request.data.get('published_title')
         desc = request.data.get('published_description')
         if title is not None:
-            instance.published_title = title
+            instance.published_title = clean_text(title, max_length=300)
         if desc is not None:
-            instance.published_description = desc
+            instance.published_description = clean_text(desc, allow_newlines=True)
         instance.save(update_fields=['published_title', 'published_description'])
         return Response(self.get_serializer(instance).data)
 
@@ -82,14 +84,14 @@ class KnowledgeHubViewSet(viewsets.ModelViewSet):
     def publish(self, request, pk=None):
         """Publish an attachment to the employee Knowledge Hub."""
         instance = self.get_object()
-        title = request.data.get('published_title', '').strip()
-        description = request.data.get('published_description', '').strip()
+        title = clean_text(request.data.get('published_title', ''), max_length=300)
+        description = clean_text(request.data.get('published_description', ''), allow_newlines=True)
         tags = request.data.get('published_tags', [])
         if not title:
             return Response({'detail': 'published_title is required.'}, status=status.HTTP_400_BAD_REQUEST)
         if not isinstance(tags, list):
             tags = []
-        tags = [str(t).strip() for t in tags[:3] if str(t).strip()]
+        tags = clean_text_list(tags[:3], max_length=50)
         instance.is_published = True
         instance.published_title = title
         instance.published_description = description

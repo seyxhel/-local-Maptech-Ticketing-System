@@ -16,6 +16,7 @@ from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
 from django.utils import timezone
+from tickets.input_security import clean_text
 from .serializers import UserSerializer
 
 logger = logging.getLogger(__name__)
@@ -166,7 +167,7 @@ class AuthViewSet(viewsets.GenericViewSet):
         allowed = ['first_name', 'middle_name', 'last_name', 'suffix', 'phone', 'username']
         for field in allowed:
             if field in request.data:
-                setattr(user, field, request.data[field])
+                setattr(user, field, clean_text(request.data[field], max_length=150 if field != 'phone' else 30))
         # Format phone server-side
         import re as _re
         raw_phone = _re.sub(r'\D', '', user.phone or '')
@@ -245,7 +246,7 @@ class AuthViewSet(viewsets.GenericViewSet):
     @action(detail=False, methods=['post'], permission_classes=[], url_path='password-reset')
     def password_reset(self, request):
         """Generate a password-reset token for the given email address."""
-        email = (request.data.get('email') or '').strip().lower()
+        email = clean_text(request.data.get('email'), max_length=254).lower()
         # Always return a generic success to prevent email enumeration
         generic = {'detail': 'If an account with that email exists, a reset link has been sent.'}
         if not email:
@@ -265,8 +266,8 @@ class AuthViewSet(viewsets.GenericViewSet):
     @action(detail=False, methods=['post'], permission_classes=[], url_path='password-reset-by-key')
     def password_reset_by_key(self, request):
         """Reset password using the user's unique recovery key and email."""
-        recovery_key = (request.data.get('recovery_key') or '').strip()
-        email = (request.data.get('email') or '').strip().lower()
+        recovery_key = clean_text(request.data.get('recovery_key'), max_length=255)
+        email = clean_text(request.data.get('email'), max_length=254).lower()
         new_password = request.data.get('new_password', '')
         if not recovery_key or not email or not new_password:
             return Response(
@@ -496,7 +497,11 @@ class UserViewSet(viewsets.GenericViewSet):
         allowed = ['first_name', 'middle_name', 'last_name', 'suffix', 'email', 'phone', 'role']
         for field in allowed:
             if field in request.data:
-                setattr(target, field, request.data[field])
+                max_length = 254 if field == 'email' else 30 if field == 'phone' else 150
+                value = clean_text(request.data[field], max_length=max_length)
+                if field == 'email':
+                    value = value.lower()
+                setattr(target, field, value)
         # Keep is_staff in sync with role
         if 'role' in request.data:
             target.is_staff = target.role in (User.ROLE_SALES, User.ROLE_ADMIN, User.ROLE_SUPERADMIN)
