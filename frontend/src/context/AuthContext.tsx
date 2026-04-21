@@ -7,6 +7,9 @@ import {
 } from '../services/authService';
 import {
   clearLegacyAuthStorage,
+  getStoredAccessToken,
+  replaceStoredAccessToken,
+  storeAccessToken,
 } from '../utils/authStorage';
 
 export type Role = 'superadmin' | 'admin' | 'employee' | 'sales' | null;
@@ -104,15 +107,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
 
     async function restore() {
-      clearLegacyAuthStorage();
-
       // Try current access cookie.
       try {
         const apiUser = await fetchCurrentUser();
         if (!cancelled) {
           const authUser = buildAuthUser(apiUser as unknown as Record<string, unknown>);
           if (authUser) {
-            setAccessToken(null);
+            setAccessToken(getStoredAccessToken());
             setUser(authUser);
           } else {
             clearLegacyAuthStorage();
@@ -121,12 +122,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch {
         // Access may be expired; try refresh cookie.
         try {
-          await refreshAccessToken();
+          const refreshed = await refreshAccessToken();
+          if (refreshed?.access) {
+            replaceStoredAccessToken(refreshed.access);
+          }
+
           const apiUser = await fetchCurrentUser();
           if (!cancelled) {
             const authUser = buildAuthUser(apiUser as unknown as Record<string, unknown>);
             if (authUser) {
-              setAccessToken(null);
+              setAccessToken(getStoredAccessToken());
               setUser(authUser);
             } else {
               clearLegacyAuthStorage();
@@ -151,6 +156,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const token = data.access;
       clearLegacyAuthStorage();
+      storeAccessToken(token, !!rememberMe);
 
       // Build user from response
       const authUser = buildAuthUser(data.user as unknown as Record<string, unknown>);
