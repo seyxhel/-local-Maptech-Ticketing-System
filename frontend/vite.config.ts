@@ -1,14 +1,13 @@
 import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
 
 // https://vitejs.dev/config/
-const contentSecurityPolicy = [
+const strictContentSecurityPolicy = [
   "default-src 'self'",
   "base-uri 'self'",
   "form-action 'self'",
   "frame-ancestors 'self'",
   "object-src 'none'",
-  "script-src 'self'",
+  "script-src 'self' 'sha256-Z2/iFzh9VMlVkEOar1f/oSHWwQk3ve1qk/C2WdsC4Xk='",
   "style-src 'self' 'nonce-maptech-csp-v1' https://fonts.googleapis.com",
   "style-src-attr 'unsafe-inline'",
   "font-src 'self' https://fonts.gstatic.com data:",
@@ -17,12 +16,11 @@ const contentSecurityPolicy = [
   "connect-src 'self' http://localhost:8000 ws://localhost:8000 http://127.0.0.1:8000 ws://127.0.0.1:8000 https://api.pwnedpasswords.com",
 ].join('; ')
 
-const securityHeaders = {
-  'Content-Security-Policy': contentSecurityPolicy,
+const strictSecurityHeaders = {
+  'Content-Security-Policy': strictContentSecurityPolicy,
 }
 
 export default defineConfig({
-  plugins: [react()],
   build: {
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
@@ -40,7 +38,6 @@ export default defineConfig({
   },
   server: {
     port: 3000,
-    headers: securityHeaders,
     proxy: {
       '/api': 'http://localhost:8000',
       '/media': 'http://localhost:8000',
@@ -51,6 +48,6 @@ export default defineConfig({
     },
   },
   preview: {
-    headers: securityHeaders,
+    headers: strictSecurityHeaders,
   },
 })
