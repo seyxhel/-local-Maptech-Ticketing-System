@@ -1521,22 +1521,33 @@ export default function AdminCreateTicket() {
             <div>
               <label className={labelCls}>Sales Representative <span className="text-gray-400 text-xs font-normal">(optional, multiple)</span></label>
               <div className="flex items-center gap-2">
-                {isSalesUser ? (
-                  <input
-                    type="text"
-                    value={currentSalesRepName}
-                    readOnly
-                    className={`${inputCls} bg-gray-100 dark:bg-gray-800`}
-                  />
-                ) : (
-                  <select
-                    value={selectedSalesRep}
-                    onChange={(e) => {
+                <input
+                  type="text"
+                  value={isSalesUser ? currentSalesRepName : selectedSalesRep}
+                  readOnly={isSalesUser}
+                  onChange={(e) => {
+                    if (!isSalesUser) {
                       setSelectedSalesRep(e.target.value);
                       setErrors((p) => ({ ...p, salesRepresentative: false }));
                       setErrorMsgs((p) => ({ ...p, salesRepresentative: '' }));
+                    }
+                  }}
+                  placeholder={isSalesUser ? '' : 'Type sales representative'}
+                  className={`${inputCls} flex-1 ${isSalesUser ? 'bg-gray-100 dark:bg-gray-800' : ''} ${errors['salesRepresentative'] ? errorRing : ''}`}
+                />
+                {!isSalesUser && (
+                  <select
+                    defaultValue=""
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (!value) return;
+                      setSelectedSalesRep(value);
+                      setErrors((p) => ({ ...p, salesRepresentative: false }));
+                      setErrorMsgs((p) => ({ ...p, salesRepresentative: '' }));
+                      e.currentTarget.value = '';
                     }}
-                    className={`${inputCls} ${errors['salesRepresentative'] ? errorRing : ''}`}
+                    className="h-[42px] min-w-[220px] px-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-gray-100"
+                    title="Choose from existing sales representatives"
                   >
                     <option value="">Select sales representative</option>
                     {salesUsers.map((salesUser) => (
@@ -1549,12 +1560,7 @@ export default function AdminCreateTicket() {
                 <button
                   type="button"
                   onClick={() => { setSalesRepPage(1); setSalesRepModalOpen(true); }}
-                  disabled={!selectedSalesRep.trim()}
-                  className={`h-[42px] w-[42px] inline-flex items-center justify-center rounded-lg border transition-colors ${
-                    selectedSalesRep.trim()
-                      ? 'border-[#0E8F79] bg-[#0E8F79] text-white hover:bg-[#0B7A68]'
-                      : 'border-gray-200 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
-                  }`}
+                  className="h-[42px] w-[42px] inline-flex items-center justify-center rounded-lg border border-[#0E8F79] bg-[#0E8F79] text-white hover:bg-[#0B7A68] transition-colors"
                   aria-label="Add additional sales representative"
                   title="Add additional sales representative"
                 >
