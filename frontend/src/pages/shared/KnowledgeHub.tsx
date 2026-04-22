@@ -81,6 +81,11 @@ function FileTypeIcon({ url }: { url: string }) {
 }
 
 export default function KnowledgeHub({ filter }: { filter?: 'uploaded' | 'published' | 'archived' }) {
+  type AttachmentGroup = {
+    stfNo: string;
+    items: KnowledgeHubAttachment[];
+  };
+
   const [attachments, setAttachments] = useState<KnowledgeHubAttachment[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
@@ -88,7 +93,7 @@ export default function KnowledgeHub({ filter }: { filter?: 'uploaded' | 'publis
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<KnowledgeHubAttachment | null>(null);
   const [deleting, setDeleting] = useState<number | null>(null);
-  const [publishTarget, setPublishTarget] = useState<KnowledgeHubAttachment | null>(null);
+  const [publishTarget, setPublishTarget] = useState<AttachmentGroup | null>(null);
   const [publishTitle, setPublishTitle] = useState('');
   const [publishSteps, setPublishSteps] = useState<string[]>(['']);
   const [publishTags, setPublishTags] = useState<string[]>([]);
@@ -236,8 +241,8 @@ export default function KnowledgeHub({ filter }: { filter?: 'uploaded' | 'publis
     }
   };
 
-  const openPublishModal = (att: KnowledgeHubAttachment) => {
-    setPublishTarget(att);
+  const openPublishModal = (group: AttachmentGroup) => {
+    setPublishTarget(group);
     setPublishTitle('');
     setPublishSteps(['']);
     setPublishTags([]);
@@ -257,17 +262,35 @@ export default function KnowledgeHub({ filter }: { filter?: 'uploaded' | 'publis
     }
     setPublishing(true);
     try {
-      await publishAttachment(publishTarget.id, {
+      const payload = {
         published_title: publishTitle.trim(),
         published_description: JSON.stringify(steps),
         published_tags: publishTags,
-      });
-      toast.success('Attachment published.');
-      setAttachments((prev) => prev.filter((a) => a.id !== publishTarget.id));
-      if (selected?.id === publishTarget.id) setSelected(null);
+      };
+      const targetItems = publishTarget.items;
+      const results = await Promise.allSettled(targetItems.map((att) => publishAttachment(att.id, payload)));
+      const successfulIds = results
+        .map((result, idx) => (result.status === 'fulfilled' ? targetItems[idx].id : null))
+        .filter((id): id is number => id !== null);
+
+      if (successfulIds.length === 0) {
+        toast.error('Failed to publish attachments for this STF number.');
+        return;
+      }
+
+      const successfulIdSet = new Set(successfulIds);
+      setAttachments((prev) => prev.filter((a) => !successfulIdSet.has(a.id)));
+      if (selected && successfulIdSet.has(selected.id)) setSelected(null);
+
+      if (successfulIds.length === targetItems.length) {
+        toast.success(`Published ${successfulIds.length} attachment${successfulIds.length > 1 ? 's' : ''} for ${publishTarget.stfNo}.`);
+      } else {
+        toast.error(`Published ${successfulIds.length} of ${targetItems.length} attachments for ${publishTarget.stfNo}.`);
+      }
+
       setPublishTarget(null);
     } catch {
-      toast.error('Failed to publish attachment.');
+      toast.error('Failed to publish attachments for this STF number.');
     } finally {
       setPublishing(false);
     }
@@ -287,9 +310,71 @@ export default function KnowledgeHub({ filter }: { filter?: 'uploaded' | 'publis
     return true;
   });
 
+  // Group attachments by STF number so files/videos for one ticket stay together.
+  const grouped = filtered.reduce<AttachmentGroup[]>((acc, att) => {
+    const stfNo = att.stf_no || `no-stf-${att.id}`;
+    const existing = acc.find((group) => group.stfNo === stfNo);
+    if (existing) {
+      existing.items.push(att);
+    } else {
+      acc.push({ stfNo, items: [att] });
+    }
+    return acc;
+  }, []);
+
   // Pagination
-  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
-  const paged = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(grouped.length / ITEMS_PER_PAGE);
+  const pagedGroups = grouped.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+
+  const renderRowActions = (att: KnowledgeHubAttachment) => (
+    <div className="flex items-center gap-0.5 flex-shrink-0">
+      <a
+        href={att.file}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-blue-500 transition-colors"
+        title="Open in new tab"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <ExternalLink className="w-3.5 h-3.5" />
+      </a>
+      {filter === 'published' && (
+        <button
+          onClick={(e) => { e.stopPropagation(); openEditModal(att); }}
+          className="p-1 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/20 text-gray-400 hover:text-amber-500 transition-colors"
+          title="Edit"
+        >
+          <Pencil className="w-3.5 h-3.5" />
+        </button>
+      )}
+      {filter !== 'archived' && (
+        <button
+          onClick={(e) => { e.stopPropagation(); handleArchive(att.id); }}
+          className="p-1 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-900/20 text-gray-400 hover:text-orange-500 transition-colors"
+          title="Archive"
+        >
+          <Archive className="w-3.5 h-3.5" />
+        </button>
+      )}
+      {filter === 'archived' && (
+        <button
+          onClick={(e) => { e.stopPropagation(); handleUnarchive(att.id); }}
+          className="p-1 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 text-gray-400 hover:text-green-500 transition-colors"
+          title="Unarchive"
+        >
+          <ArchiveRestore className="w-3.5 h-3.5" />
+        </button>
+      )}
+      <button
+        onClick={(e) => { e.stopPropagation(); handleDelete(att.id); }}
+        disabled={deleting === att.id}
+        className="p-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-400 hover:text-red-500 transition-colors disabled:opacity-50"
+        title="Delete"
+      >
+        <Trash2 className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -345,7 +430,7 @@ export default function KnowledgeHub({ filter }: { filter?: 'uploaded' | 'publis
         <div className="flex items-center justify-center py-20">
           <RefreshCw className="w-6 h-6 text-gray-400 animate-spin" />
         </div>
-      ) : paged.length === 0 ? (
+      ) : pagedGroups.length === 0 ? (
         <Card className="p-12">
           <div className="text-center text-gray-500 dark:text-gray-400">
             <Paperclip className="w-12 h-12 mx-auto mb-3 opacity-30" />
@@ -355,17 +440,19 @@ export default function KnowledgeHub({ filter }: { filter?: 'uploaded' | 'publis
         </Card>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {paged.map((att) => (
-            <Card key={att.id} className="p-0 overflow-hidden hover:shadow-lg transition-shadow">
+          {pagedGroups.map((group) => {
+            const lead = group.items[0];
+            return (
+            <Card key={group.stfNo} className="p-0 overflow-hidden hover:shadow-lg transition-shadow">
               {/* Preview Area */}
               <div
                 className="h-40 bg-gray-50 dark:bg-gray-900 flex items-center justify-center cursor-pointer relative group"
-                onClick={() => setSelected(att)}
+                onClick={() => setSelected(lead)}
               >
-                {isImageFile(att.file) ? (
+                {isImageFile(lead.file) ? (
                   <img
-                    src={att.file}
-                    alt={getFileName(att.file)}
+                    src={lead.file}
+                    alt={getFileName(lead.file)}
                     className="w-full h-full object-cover"
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
@@ -380,106 +467,69 @@ export default function KnowledgeHub({ filter }: { filter?: 'uploaded' | 'publis
                       }
                     }}
                   />
-                ) : isVideoFile(att.file) ? (
+                ) : isVideoFile(lead.file) ? (
                   <div className="flex flex-col items-center gap-2">
                     <Film className="w-10 h-10 text-purple-400" />
                     <span className="text-xs text-gray-400">Video</span>
                   </div>
                 ) : (
                   <div className="flex flex-col items-center gap-2">
-                    <FileTypeIcon url={att.file} />
-                    <span className="text-xs text-gray-400 uppercase">{getFileExtension(att.file)}</span>
+                    <FileTypeIcon url={lead.file} />
+                    <span className="text-xs text-gray-400 uppercase">{getFileExtension(lead.file)}</span>
                   </div>
                 )}
                 {/* Hover overlay */}
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
                   <Eye className="w-6 h-6 text-white" />
                 </div>
+                {group.items.length > 1 && (
+                  <span className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-black/60 text-white text-[11px] font-semibold">
+                    {group.items.length} files
+                  </span>
+                )}
               </div>
 
               {/* Info */}
               <div className="p-3 space-y-2">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
-                    {filter === 'published' && att.published_title ? (
+                    {filter === 'published' && lead.published_title ? (
                       <>
-                        <p className="text-sm font-semibold text-gray-900 dark:text-white truncate" title={att.published_title}>
-                          {att.published_title}
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white truncate" title={lead.published_title}>
+                          {lead.published_title}
                         </p>
-                        <p className="text-xs text-[#0E8F79] font-medium">{att.stf_no}</p>
+                        <p className="text-xs text-[#0E8F79] font-medium">{group.stfNo}</p>
                       </>
                     ) : (
                       <>
-                        <p className="text-sm font-semibold text-gray-900 dark:text-white truncate" title={getFileName(att.file)}>
-                          {getFileName(att.file)}
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white truncate" title={group.stfNo}>
+                          {group.stfNo}
                         </p>
-                        <p className="text-xs text-[#0E8F79] font-medium">{att.stf_no}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{group.items.length} attachment{group.items.length > 1 ? 's' : ''}</p>
                       </>
                     )}
                   </div>
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <a
-                      href={att.file}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-blue-500 transition-colors"
-                      title="Open in new tab"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </a>
-                    {filter === 'uploaded' && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); openPublishModal(att); }}
-                        className="p-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 text-gray-400 hover:text-blue-500 transition-colors"
-                        title="Publish"
-                      >
-                        <Send className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                    {filter === 'published' && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); openEditModal(att); }}
-                        className="p-1.5 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/20 text-gray-400 hover:text-amber-500 transition-colors"
-                        title="Edit"
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                    {filter !== 'archived' && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleArchive(att.id); }}
-                        className="p-1.5 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-900/20 text-gray-400 hover:text-orange-500 transition-colors"
-                        title="Archive"
-                      >
-                        <Archive className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                    {filter === 'archived' && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleUnarchive(att.id); }}
-                        className="p-1.5 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 text-gray-400 hover:text-green-500 transition-colors"
-                        title="Unarchive"
-                      >
-                        <ArchiveRestore className="w-3.5 h-3.5" />
-                      </button>
-                    )}
+                  <button
+                    onClick={() => setSelected(lead)}
+                    className="px-2 py-1 rounded-lg bg-gray-100 dark:bg-gray-700 text-[11px] font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                  >
+                    View
+                  </button>
+                  {filter === 'uploaded' && (
                     <button
-                      onClick={(e) => { e.stopPropagation(); handleDelete(att.id); }}
-                      disabled={deleting === att.id}
-                      className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-400 hover:text-red-500 transition-colors disabled:opacity-50"
-                      title="Delete"
+                      onClick={() => openPublishModal(group)}
+                      className="px-2 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      Publish All
                     </button>
-                  </div>
+                  )}
                 </div>
                 {filter === 'published' ? (
                   <div className="space-y-2">
                     {/* Tags */}
-                    {att.published_tags && att.published_tags.length > 0 && (
+                    {lead.published_tags && lead.published_tags.length > 0 && (
                       <div className="flex flex-wrap gap-1">
-                        {att.published_tags.map((tag, i) => (
+                        {lead.published_tags.map((tag, i) => (
                           <span key={i} className="px-2 py-0.5 rounded-full bg-[#0E8F79]/10 text-[#0E8F79] text-[10px] font-medium">
                             {tag}
                           </span>
@@ -487,8 +537,8 @@ export default function KnowledgeHub({ filter }: { filter?: 'uploaded' | 'publis
                       </div>
                     )}
                     {/* Steps preview */}
-                    {att.published_description && (() => {
-                      const steps = parseSteps(att.published_description);
+                    {lead.published_description && (() => {
+                      const steps = parseSteps(lead.published_description);
                       return steps.length > 0 ? (
                         <ol className="list-decimal list-inside text-xs text-gray-500 dark:text-gray-400 space-y-0.5">
                           {steps.slice(0, 3).map((step, i) => (
@@ -503,22 +553,38 @@ export default function KnowledgeHub({ filter }: { filter?: 'uploaded' | 'publis
                   </div>
                 ) : (
                   <div className="text-xs text-gray-500 dark:text-gray-400 space-y-0.5">
-                    {att.client && <p><span className="font-medium">Client:</span> {att.client}</p>}
-                    {att.assigned_to_name && <p><span className="font-medium">Assigned:</span> {att.assigned_to_name}</p>}
-                    {att.type_of_service_name && <p><span className="font-medium">Service:</span> {att.type_of_service_name}</p>}
+                    {lead.client && <p><span className="font-medium">Client:</span> {lead.client}</p>}
+                    {lead.assigned_to_name && <p><span className="font-medium">Assigned:</span> {lead.assigned_to_name}</p>}
+                    {lead.type_of_service_name && <p><span className="font-medium">Service:</span> {lead.type_of_service_name}</p>}
                   </div>
                 )}
+                <div className="space-y-1.5 pt-1 border-t border-gray-100 dark:border-gray-700">
+                  {group.items.map((att) => (
+                    <div
+                      key={att.id}
+                      className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/60 cursor-pointer"
+                      onClick={() => setSelected(att)}
+                    >
+                      <FileTypeIcon url={att.file} />
+                      <p className="min-w-0 flex-1 text-xs text-gray-700 dark:text-gray-300 truncate" title={getFileName(att.file)}>
+                        {getFileName(att.file)}
+                      </p>
+                      {renderRowActions(att)}
+                    </div>
+                  ))}
+                </div>
                 <div className="flex items-center justify-between pt-1 border-t border-gray-100 dark:border-gray-700">
                   <span className="text-[10px] text-gray-400">
-                    {att.uploaded_by ? `${att.uploaded_by.first_name} ${att.uploaded_by.last_name}` : 'Unknown'}
+                    {lead.uploaded_by ? `${lead.uploaded_by.first_name} ${lead.uploaded_by.last_name}` : 'Unknown'}
                   </span>
                   <span className="text-[10px] text-gray-400">
-                    {new Date(att.uploaded_at).toLocaleDateString()}
+                    {new Date(lead.uploaded_at).toLocaleDateString()}
                   </span>
                 </div>
               </div>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -526,7 +592,7 @@ export default function KnowledgeHub({ filter }: { filter?: 'uploaded' | 'publis
       {totalPages > 1 && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-1">
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Showing {(page - 1) * ITEMS_PER_PAGE + 1}–{Math.min(page * ITEMS_PER_PAGE, filtered.length)} of {filtered.length}
+            Showing {(page - 1) * ITEMS_PER_PAGE + 1}–{Math.min(page * ITEMS_PER_PAGE, grouped.length)} of {grouped.length} tickets
           </p>
           <div className="flex items-center gap-1">
             <button
@@ -674,10 +740,15 @@ export default function KnowledgeHub({ filter }: { filter?: 'uploaded' | 'publis
                 </button>
                 {filter === 'uploaded' && (
                   <button
-                    onClick={() => { setSelected(null); openPublishModal(selected); }}
+                    onClick={() => {
+                      const selectedGroup = grouped.find((group) => group.stfNo === selected.stf_no);
+                      if (!selectedGroup) return;
+                      setSelected(null);
+                      openPublishModal(selectedGroup);
+                    }}
                     className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-sm font-medium hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
                   >
-                    <Send className="w-4 h-4" /> Publish
+                    <Send className="w-4 h-4" /> Publish STF Group
                   </button>
                 )}
                 {filter === 'published' && (
@@ -730,8 +801,8 @@ export default function KnowledgeHub({ filter }: { filter?: 'uploaded' | 'publis
           >
             <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-gray-700">
               <div>
-                <h2 className="text-lg font-bold text-gray-900 dark:text-white">Publish Attachment</h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{getFileName(publishTarget.file)}</p>
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white">Publish STF Ticket</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{publishTarget.stfNo} • {publishTarget.items.length} attachment{publishTarget.items.length > 1 ? 's' : ''}</p>
               </div>
               <button
                 onClick={() => setPublishTarget(null)}

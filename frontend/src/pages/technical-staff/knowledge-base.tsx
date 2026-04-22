@@ -70,6 +70,11 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
 }
 
 export default function TechnicalStaffKnowledgeBase() {
+  type PublishedGroup = {
+    stfNo: string;
+    items: PublishedArticle[];
+  };
+
   const [search, setSearch] = useState('');
   const [selectedTag, setSelectedTag] = useState('All');
   const [selected, setSelected] = useState<PublishedArticle | null>(null);
@@ -108,8 +113,19 @@ export default function TechnicalStaffKnowledgeBase() {
     return matchSearch && matchTag;
   });
 
-  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
-  const paged = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+  const grouped = filtered.reduce<PublishedGroup[]>((acc, article) => {
+    const stfNo = article.stf_no || `no-stf-${article.id}`;
+    const existing = acc.find((group) => group.stfNo === stfNo);
+    if (existing) {
+      existing.items.push(article);
+    } else {
+      acc.push({ stfNo, items: [article] });
+    }
+    return acc;
+  }, []);
+
+  const totalPages = Math.ceil(grouped.length / ITEMS_PER_PAGE);
+  const pagedGroups = grouped.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
 
   return (
     <div className="space-y-6">
@@ -163,31 +179,32 @@ export default function TechnicalStaffKnowledgeBase() {
             <RefreshCw className="w-6 h-6 text-gray-400 animate-spin" />
           </div>
         )}
-        {!loading && filtered.length === 0 && (
+        {!loading && grouped.length === 0 && (
           <Card>
             <p className="text-center text-gray-500 dark:text-gray-400 py-8">No articles found matching your search.</p>
           </Card>
         )}
-        {paged.length > 0 && (
+        {pagedGroups.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {paged.map((article) => {
-              const steps = parseSteps(article.published_description);
+            {pagedGroups.map((group) => {
+              const lead = group.items[0];
+              const steps = parseSteps(lead.published_description);
               return (
                 <Card
-                  key={article.id}
+                  key={group.stfNo}
                   className="p-0 overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
-                  onClick={() => setSelected(article)}
+                  onClick={() => setSelected(lead)}
                 >
                   <div className="h-40 bg-gray-50 dark:bg-gray-900 flex items-center justify-center relative group">
-                    {isImageUrl(article.file_url) ? (
+                    {isImageUrl(lead.file_url) ? (
                       <img
-                        src={article.file_url}
-                        alt={article.published_title}
+                        src={lead.file_url}
+                        alt={lead.published_title}
                         className="w-full h-full object-cover"
                       />
-                    ) : isVideoUrl(article.file_url) ? (
+                    ) : isVideoUrl(lead.file_url) ? (
                       <video
-                        src={article.file_url}
+                        src={lead.file_url}
                         className="w-full h-full object-cover"
                         muted
                         playsInline
@@ -195,24 +212,29 @@ export default function TechnicalStaffKnowledgeBase() {
                       />
                     ) : (
                       <div className="flex flex-col items-center gap-2">
-                        <FileTypeIcon url={article.file_url} />
-                        <span className="text-xs text-gray-400 uppercase">{getFileExtension(article.file_url)}</span>
+                        <FileTypeIcon url={lead.file_url} />
+                        <span className="text-xs text-gray-400 uppercase">{getFileExtension(lead.file_url)}</span>
                       </div>
                     )}
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
                       <Eye className="w-6 h-6 text-white" />
                     </div>
+                    {group.items.length > 1 && (
+                      <span className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-black/60 text-white text-[11px] font-semibold">
+                        {group.items.length} files
+                      </span>
+                    )}
                   </div>
 
                   <div className="p-3 space-y-2">
-                    <p className="text-sm font-semibold text-gray-900 dark:text-white line-clamp-2" title={article.published_title}>
-                      {article.published_title}
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white line-clamp-2" title={lead.published_title}>
+                      {lead.published_title}
                     </p>
-                    <p className="text-xs text-[#0E8F79] font-medium">{article.stf_no}</p>
+                    <p className="text-xs text-[#0E8F79] font-medium">{group.stfNo}</p>
 
-                    {article.published_tags && article.published_tags.length > 0 && (
+                    {lead.published_tags && lead.published_tags.length > 0 && (
                       <div className="flex flex-wrap gap-1">
-                        {article.published_tags.slice(0, 3).map((tag, i) => (
+                        {lead.published_tags.slice(0, 3).map((tag, i) => (
                           <span key={i} className="px-2 py-0.5 rounded-full bg-[#0E8F79]/10 text-[#0E8F79] text-[10px] font-medium">
                             {tag}
                           </span>
@@ -228,9 +250,27 @@ export default function TechnicalStaffKnowledgeBase() {
                       </ol>
                     )}
 
+                    <div className="space-y-1.5 pt-1 border-t border-gray-100 dark:border-gray-700">
+                      {group.items.map((article) => (
+                        <div
+                          key={article.id}
+                          className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/60"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelected(article);
+                          }}
+                        >
+                          <FileTypeIcon url={article.file_url} />
+                          <p className="min-w-0 flex-1 text-xs text-gray-700 dark:text-gray-300 truncate" title={getFileName(article.file_url)}>
+                            {getFileName(article.file_url)}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+
                     <div className="flex items-center justify-between pt-1 border-t border-gray-100 dark:border-gray-700">
-                      <span className="text-[10px] text-gray-400">{article.published_by_name || 'Unknown'}</span>
-                      <span className="text-[10px] text-gray-400">{new Date(article.published_at).toLocaleDateString()}</span>
+                      <span className="text-[10px] text-gray-400">{lead.published_by_name || 'Unknown'}</span>
+                      <span className="text-[10px] text-gray-400">{new Date(lead.published_at).toLocaleDateString()}</span>
                     </div>
                   </div>
                 </Card>
@@ -242,7 +282,7 @@ export default function TechnicalStaffKnowledgeBase() {
         {totalPages > 1 && (
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-1">
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Showing {(page - 1) * ITEMS_PER_PAGE + 1}–{Math.min(page * ITEMS_PER_PAGE, filtered.length)} of {filtered.length}
+              Showing {(page - 1) * ITEMS_PER_PAGE + 1}–{Math.min(page * ITEMS_PER_PAGE, grouped.length)} of {grouped.length} tickets
             </p>
             <div className="flex items-center gap-1">
               <button
