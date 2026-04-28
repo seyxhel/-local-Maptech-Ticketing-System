@@ -11,9 +11,9 @@
 | **Last Updated** | April 28, 2026 |
 | **Prepared By** | Cuadra, Gerard R. — FullStack |
 | | Pelagio, Sealtiel Joseph B. — FullStack |
+| | Vebayo, Rivo M. — FullStack |
 | | Quieta, Kianshane B. — Quality Assurance |
 | | Sulaiman, Carmela M. — Quality Assurance |
-| | Vebayo, Rivo M. — FullStack |
 | **Reviewed By** | *[To be filled]* |
 | **Approved By** | *[To be filled]* |
 
@@ -37,7 +37,7 @@
 | Cuadra, Gerard R. | FullStack Developer | Electronic |
 | Pelagio, Sealtiel Joseph B. | FullStack Developer | Electronic |
 | Quieta, Kianshane B. | Quality Assurance | Electronic |
-| Sulaiman, Carmela M. | UI/UX Designer | Electronic |
+| Sulaiman, Carmela M. | Quality Assurance | Electronic |
 | Vebayo, Rivo M. | FullStack Developer | Electronic |
 | IT Operations | System Administrators | Electronic |
 | Project Manager | Project Oversight | Electronic |

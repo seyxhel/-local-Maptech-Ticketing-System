@@ -11,7 +11,7 @@
 | Cuadra, Gerard R. | FullStack Developer |
 | Pelagio, Sealtiel Joseph B. | FullStack Developer |
 | Quieta, Kianshane B. | Quality Assurance |
-| Sulaiman, Carmela M. | UI/UX Designer |
+| Sulaiman, Carmela M. | Quality Assurance |
 | Vebayo, Rivo M. | FullStack Developer |
 
 ---
