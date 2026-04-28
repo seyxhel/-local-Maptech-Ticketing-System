@@ -43,15 +43,11 @@
 
 | Recipient | Role | Copy Type |
 |-----------|------|-----------|
-| Cuadra, Gerard R. | FullStack Developer | Electronic |
-| Pelagio, Sealtiel Joseph B. | FullStack Developer | Electronic |
-| Quieta, Kianshane B. | Quality Assurance | Electronic |
-| Sulaiman, Carmela M. | Quality Assurance | Electronic |
-| Vebayo, Rivo M. | FullStack Developer | Electronic |
-| IT Operations | System Administrators | Electronic |
-| Project Manager | Project Oversight | Electronic |
-| Management | Executive Oversight | Electronic |
-
+| Cuadra, Gerard R. | FullStack Developer | Intern |
+| Pelagio, Sealtiel Joseph B. | FullStack Developer | Intern |
+| Quieta, Kianshane B. | Quality Assurance | Intern |
+| Sulaiman, Carmela M. | Quality Assurance | Intern |
+| Vebayo, Rivo M. | FullStack Developer | Intern |
 ---
 
 ## 1.4 Document Conventions
