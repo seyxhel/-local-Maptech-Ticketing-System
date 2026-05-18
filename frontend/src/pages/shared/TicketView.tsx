@@ -711,6 +711,13 @@ export function TicketView() {
   const [showInputEmoji, setShowInputEmoji] = useState(false);
   const [showChatSearch, setShowChatSearch] = useState(false);
   const [chatSearch, setChatSearch] = useState('');
+  const [chatExpanded, setChatExpanded] = useState(false);
+  const [showScrollDown, setShowScrollDown] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [previewUrls, setPreviewUrls] = useState<
+    { file: File; url: string; type: 'image' | 'video' | 'file' }[]
+  >([]);
   const [screenshotFiles, setScreenshotFiles] = useState<File[]>([]);
   const [recordingFiles, setRecordingFiles] = useState<File[]>([]);
   const [documentFiles, setDocumentFiles] = useState<File[]>([]);
@@ -1881,6 +1888,15 @@ export function TicketView() {
     remarks: '',
     status: '',
   });
+  const [serviceReportErrors, setServiceReportErrors] = useState<Record<string, string>>({});
+
+  const clearServiceReportError = (field: string) => {
+    setServiceReportErrors((prev) => {
+      const copy = { ...prev };
+      delete (copy as Record<string, string>)[field];
+      return copy;
+    });
+  };
 
   useEffect(() => {
     if (!showServiceReportModal || !btData) return;
@@ -2142,6 +2158,17 @@ ${PDF_CSS}
 
   const handleSubmitServiceReport = async () => {
     if (!btData) return;
+
+    // Client-side validation: require date and times
+    const errors: Record<string, string> = {};
+    if (!serviceReportDraft.reportDate) errors.reportDate = 'Please select a report date.';
+    if (!serviceReportDraft.timeResponded) errors.timeResponded = 'Please enter time responded.';
+    if (!serviceReportDraft.timeCompleted) errors.timeCompleted = 'Please enter time completed.';
+    if (Object.keys(errors).length > 0) {
+      setServiceReportErrors(errors);
+      toast.error('Please fill the required fields.');
+      return;
+    }
 
     try {
       const snapshot = resolveServiceReportProductSnapshot(btData);
@@ -5604,10 +5631,16 @@ ${PDF_CSS}
                   <input
                     type="date"
                     value={serviceReportDraft.reportDate}
-                    onChange={(e) => setServiceReportDraft((prev) => ({ ...prev, reportDate: e.target.value }))}
+                    onChange={(e) => {
+                      setServiceReportDraft((prev) => ({ ...prev, reportDate: e.target.value }));
+                      clearServiceReportError('reportDate');
+                    }}
                     min={formatDateInput(btData?.date || null)}
                     className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3 text-sm text-gray-900 dark:text-white"
                   />
+                  {serviceReportErrors.reportDate && (
+                    <div className="text-xs text-red-600 mt-1">{serviceReportErrors.reportDate}</div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">Company Address</label>
@@ -5616,11 +5649,17 @@ ${PDF_CSS}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">Time Responded</label>
-                    <input type="time" value={serviceReportDraft.timeResponded} onChange={(e) => setServiceReportDraft((prev) => ({ ...prev, timeResponded: e.target.value }))} className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3 text-sm text-gray-900 dark:text-white" />
+                    <input type="time" value={serviceReportDraft.timeResponded} onChange={(e) => { setServiceReportDraft((prev) => ({ ...prev, timeResponded: e.target.value })); clearServiceReportError('timeResponded'); }} className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3 text-sm text-gray-900 dark:text-white" />
+                    {serviceReportErrors.timeResponded && (
+                      <div className="text-xs text-red-600 mt-1">{serviceReportErrors.timeResponded}</div>
+                    )}
                   </div>
                   <div>
                     <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">Time Completed</label>
-                    <input type="time" value={serviceReportDraft.timeCompleted} onChange={(e) => setServiceReportDraft((prev) => ({ ...prev, timeCompleted: e.target.value }))} className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3 text-sm text-gray-900 dark:text-white" />
+                    <input type="time" value={serviceReportDraft.timeCompleted} onChange={(e) => { setServiceReportDraft((prev) => ({ ...prev, timeCompleted: e.target.value })); clearServiceReportError('timeCompleted'); }} className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3 text-sm text-gray-900 dark:text-white" />
+                    {serviceReportErrors.timeCompleted && (
+                      <div className="text-xs text-red-600 mt-1">{serviceReportErrors.timeCompleted}</div>
+                    )}
                   </div>
                 </div>
                 <div>
