@@ -618,6 +618,11 @@ export default function AdminCreateTicket() {
         if (emailErr) { newErrors['email'] = true; msgs['email'] = emailErr; }
       }
 
+      if (!combinedSalesReps.trim()) {
+        newErrors['salesRepresentative'] = true;
+        msgs['salesRepresentative'] = 'Sales Representative is required.';
+      }
+
       additionalContacts.forEach((contact, idx) => {
         const contactLabel = `Additional contact #${idx + 1}`;
         if (!contact.contact_person.trim()) {
@@ -1554,7 +1559,7 @@ export default function AdminCreateTicket() {
             </div>
 
             <div>
-              <label className={labelCls}>Sales Representative <span className="text-gray-400 text-xs font-normal">(required,it can be multiple)</span></label>
+              <label className={labelCls}>Sales Representative <span className="text-red-500 ml-1">*</span> <span className="text-gray-400 text-xs font-normal">(can be multiple)</span></label>
               <div className="flex items-center gap-2">
                 <input
                   type="text"
@@ -1602,6 +1607,7 @@ export default function AdminCreateTicket() {
                   <Plus className="w-4 h-4" />
                 </button>
               </div>
+              {errors['salesRepresentative'] && <p className="text-red-500 text-xs mt-1">{errorMsgs['salesRepresentative'] || 'Sales Representative is required.'}</p>}
               {isSalesUser && (
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Automatically set to the logged-in sales account.</p>
               )}
@@ -1684,7 +1690,7 @@ export default function AdminCreateTicket() {
         {currentStep === 0 && (
           <div className="flex justify-end gap-3">
             <GreenButton type="button" variant="outline" onClick={() => { setContactValues({ client: '', contactPerson: '', landline: '', mobile: '', designation: '', department: '' }); setAdditionalContacts([]); setEmail(''); setAddress(''); setSelectedSalesRep(isSalesUser ? currentSalesRepName : ''); setAdditionalSalesReps([]); setSelectedSupervisorId(null); }}>Clear</GreenButton>
-            <GreenButton type="button" onClick={goNext}>Next</GreenButton>
+            <GreenButton type="button" onClick={goNext} disabled={!combinedSalesReps.trim()}>Next</GreenButton>
           </div>
         )}
 
