@@ -1690,7 +1690,7 @@ export default function AdminCreateTicket() {
         {currentStep === 0 && (
           <div className="flex justify-end gap-3">
             <GreenButton type="button" variant="outline" onClick={() => { setContactValues({ client: '', contactPerson: '', landline: '', mobile: '', designation: '', department: '' }); setAdditionalContacts([]); setEmail(''); setAddress(''); setSelectedSalesRep(isSalesUser ? currentSalesRepName : ''); setAdditionalSalesReps([]); setSelectedSupervisorId(null); }}>Clear</GreenButton>
-            <GreenButton type="button" onClick={goNext} disabled={!combinedSalesReps.trim()}>Next</GreenButton>
+            <GreenButton type="button" onClick={goNext}>Next</GreenButton>
           </div>
         )}
 
