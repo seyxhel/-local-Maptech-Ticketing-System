@@ -4,7 +4,7 @@ import re
 from ..models import (
     Ticket, TicketTask, TicketAttachment, EscalationLog, AuditLog,
 )
-from tickets.input_security import sanitize_payload
+from tickets.input_security import sanitize_payload, LONG_TEXT_MAX_LENGTH, SIGNATURE_MAX_LENGTH
 from users.serializers import UserSerializer
 from .lookup import TypeOfServiceSerializer
 from .client import ClientSerializer
@@ -54,15 +54,15 @@ class TicketSerializer(serializers.ModelSerializer):
     type_of_service_others = serializers.SerializerMethodField()
 
     text_field_rules = {
-        'description_of_problem': {'max_length': None, 'allow_newlines': True},
-        'action_taken': {'max_length': None, 'allow_newlines': True},
-        'remarks': {'max_length': None, 'allow_newlines': True},
+        'description_of_problem': {'max_length': LONG_TEXT_MAX_LENGTH, 'allow_newlines': True},
+        'action_taken': {'max_length': LONG_TEXT_MAX_LENGTH, 'allow_newlines': True},
+        'remarks': {'max_length': LONG_TEXT_MAX_LENGTH, 'allow_newlines': True},
         'cascade_type': {'max_length': 20},
-        'observation': {'max_length': None, 'allow_newlines': True},
-        'signature': {'max_length': None, 'allow_newlines': True, 'strip_tags': False},
+        'observation': {'max_length': LONG_TEXT_MAX_LENGTH, 'allow_newlines': True},
+        'signature': {'max_length': SIGNATURE_MAX_LENGTH, 'allow_newlines': True, 'strip_tags': False},
         'signed_by_name': {'max_length': 200},
         'external_escalated_to': {'max_length': 300},
-        'external_escalation_notes': {'max_length': None, 'allow_newlines': True},
+        'external_escalation_notes': {'max_length': LONG_TEXT_MAX_LENGTH, 'allow_newlines': True},
     }
 
     # ── Client fields: read-only virtual fields from client_record FK ──
@@ -367,14 +367,14 @@ class AdminCreateTicketSerializer(serializers.ModelSerializer):
     text_field_rules = {
         'client': {'max_length': 500},
         'contact_person': {'max_length': 200},
-        'address': {'max_length': None, 'allow_newlines': True},
+        'address': {'max_length': LONG_TEXT_MAX_LENGTH, 'allow_newlines': True},
         'designation': {'max_length': 200},
         'landline': {'max_length': 30},
         'department_organization': {'max_length': 200},
         'mobile_no': {'max_length': 20},
         'email_address': {'max_length': 254},
         'sales_representative': {'max_length': 200},
-        'description_of_problem': {'max_length': None, 'allow_newlines': True},
+        'description_of_problem': {'max_length': LONG_TEXT_MAX_LENGTH, 'allow_newlines': True},
         'product': {'max_length': 300},
         'brand': {'max_length': 300},
         'model_name': {'max_length': 300},
@@ -385,10 +385,10 @@ class AdminCreateTicketSerializer(serializers.ModelSerializer):
         'software_version': {'max_length': 120},
         'software_vendor': {'max_length': 300},
         'software_license_key': {'max_length': 300},
-        'software_metadata': {'max_length': None, 'allow_newlines': True},
+        'software_metadata': {'max_length': LONG_TEXT_MAX_LENGTH, 'allow_newlines': True},
         'serial_no': {'max_length': 200},
         'sales_no': {'max_length': 200},
-        'others': {'max_length': None, 'allow_newlines': True},
+        'others': {'max_length': LONG_TEXT_MAX_LENGTH, 'allow_newlines': True},
         'client_purchase_no': {'max_length': 200},
         'maptech_dr': {'max_length': 200},
         'maptech_sales_invoice': {'max_length': 200},
@@ -500,10 +500,10 @@ class EmployeeTicketActionSerializer(serializers.Serializer):
         'device_equipment': {'max_length': 300},
         'version_no': {'max_length': 100},
         'serial_no': {'max_length': 200},
-        'action_taken': {'max_length': None, 'allow_newlines': True},
-        'remarks': {'max_length': None, 'allow_newlines': True},
-        'observation': {'max_length': None, 'allow_newlines': True},
-        'signature': {'max_length': None, 'allow_newlines': True, 'strip_tags': False},
+        'action_taken': {'max_length': LONG_TEXT_MAX_LENGTH, 'allow_newlines': True},
+        'remarks': {'max_length': LONG_TEXT_MAX_LENGTH, 'allow_newlines': True},
+        'observation': {'max_length': LONG_TEXT_MAX_LENGTH, 'allow_newlines': True},
+        'signature': {'max_length': SIGNATURE_MAX_LENGTH, 'allow_newlines': True, 'strip_tags': False},
         'signed_by_name': {'max_length': 200},
     }
 

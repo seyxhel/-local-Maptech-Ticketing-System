@@ -2,6 +2,7 @@
 import { createPortal } from 'react-dom';
 import { Card } from '../../components/ui/Card';
 import { GreenButton } from '../../components/ui/GreenButton';
+import { FieldLimitHint } from '../../components/ui/FieldLimitHint';
 import {
   Search,
   Plus,
@@ -21,6 +22,7 @@ import {
   deleteTypeOfService,
   type TypeOfService,
 } from '../../services/api';
+import { MAX_LONG_TEXT } from '../../utils/validation';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -396,9 +398,11 @@ export default function TypesOfService() {
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   rows={3}
+                  maxLength={MAX_LONG_TEXT}
                   className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B] resize-none"
                   placeholder="Optional description of this service type..."
                 />
+                <FieldLimitHint value={formData.description} maxLength={MAX_LONG_TEXT} />
               </div>
 
               {/* Estimated Resolution Days */}

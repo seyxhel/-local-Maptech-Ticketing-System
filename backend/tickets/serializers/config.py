@@ -1,7 +1,7 @@
 from django.utils import timezone
 from rest_framework import serializers
 from ..models import RetentionPolicy, Announcement
-from tickets.input_security import sanitize_payload
+from tickets.input_security import sanitize_payload, LONG_TEXT_MAX_LENGTH
 
 
 class RetentionPolicySerializer(serializers.ModelSerializer):
@@ -28,7 +28,7 @@ class AnnouncementSerializer(serializers.ModelSerializer):
 
     text_field_rules = {
         'title': {'max_length': 255},
-        'description': {'max_length': None, 'allow_newlines': True},
+        'description': {'max_length': LONG_TEXT_MAX_LENGTH, 'allow_newlines': True},
     }
 
     class Meta:

@@ -5,7 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.utils import timezone
 
-from tickets.input_security import clean_text, clean_text_list
+from tickets.input_security import clean_text, clean_text_list, LONG_TEXT_MAX_LENGTH
 
 from ..models import TicketAttachment
 from ..serializers import KnowledgeHubAttachmentSerializer, PublishedArticleSerializer
@@ -76,7 +76,7 @@ class KnowledgeHubViewSet(viewsets.ModelViewSet):
         if title is not None:
             instance.published_title = clean_text(title, max_length=300)
         if desc is not None:
-            instance.published_description = clean_text(desc, allow_newlines=True)
+            instance.published_description = clean_text(desc, max_length=LONG_TEXT_MAX_LENGTH, allow_newlines=True)
         instance.save(update_fields=['published_title', 'published_description'])
         return Response(self.get_serializer(instance).data)
 
@@ -85,7 +85,7 @@ class KnowledgeHubViewSet(viewsets.ModelViewSet):
         """Publish an attachment to the employee Knowledge Hub."""
         instance = self.get_object()
         title = clean_text(request.data.get('published_title', ''), max_length=300)
-        description = clean_text(request.data.get('published_description', ''), allow_newlines=True)
+        description = clean_text(request.data.get('published_description', ''), max_length=LONG_TEXT_MAX_LENGTH, allow_newlines=True)
         tags = request.data.get('published_tags', [])
         if not title:
             return Response({'detail': 'published_title is required.'}, status=status.HTTP_400_BAD_REQUEST)

@@ -7,7 +7,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from pathlib import Path
 
-from tickets.input_security import clean_text, clean_text_list
+from tickets.input_security import clean_text, clean_text_list, LONG_TEXT_MAX_LENGTH, SIGNATURE_MAX_LENGTH
 
 from ..models import (
     Ticket, TicketTask, TicketAttachment, AssignmentSession,
@@ -489,7 +489,7 @@ class TicketViewSet(viewsets.ModelViewSet):
         """Employee escalates ticket internally."""
         ticket = self.get_object()
         user = request.user
-        notes = _clean_ticket_text(request.data.get('notes', ''), allow_newlines=True)
+        notes = _clean_ticket_text(request.data.get('notes', ''), max_length=LONG_TEXT_MAX_LENGTH, allow_newlines=True)
 
         # End current session
         if ticket.current_session:
@@ -541,7 +541,7 @@ class TicketViewSet(viewsets.ModelViewSet):
         ticket = self.get_object()
         user = request.user
         to_emp_id = request.data.get('employee_id')
-        notes = _clean_ticket_text(request.data.get('notes', ''), allow_newlines=True)
+        notes = _clean_ticket_text(request.data.get('notes', ''), max_length=LONG_TEXT_MAX_LENGTH, allow_newlines=True)
         if not to_emp_id:
             return Response({'detail': 'employee_id required'}, status=status.HTTP_400_BAD_REQUEST)
         try:
@@ -645,7 +645,7 @@ class TicketViewSet(viewsets.ModelViewSet):
             'version_no': {'max_length': 100},
             'serial_no': {'max_length': 200},
             'sales_no': {'max_length': 200},
-            'others': {'max_length': None, 'allow_newlines': True},
+            'others': {'max_length': LONG_TEXT_MAX_LENGTH, 'allow_newlines': True},
         }
         # Collect any provided product fields and persist them to the linked Product when possible.
         provided_product_fields = {k: v for k, v in request.data.items() if k in (
@@ -736,13 +736,13 @@ class TicketViewSet(viewsets.ModelViewSet):
             'device_equipment': {'max_length': 300},
             'version_no': {'max_length': 100},
             'serial_no': {'max_length': 200},
-            'others': {'max_length': None, 'allow_newlines': True},
+            'others': {'max_length': LONG_TEXT_MAX_LENGTH, 'allow_newlines': True},
         }
         ticket_field_rules = {
-            'action_taken': {'max_length': None, 'allow_newlines': True},
-            'remarks': {'max_length': None, 'allow_newlines': True},
-            'observation': {'max_length': None, 'allow_newlines': True},
-            'signature': {'max_length': None, 'allow_newlines': True, 'strip_tags': False},
+            'action_taken': {'max_length': LONG_TEXT_MAX_LENGTH, 'allow_newlines': True},
+            'remarks': {'max_length': LONG_TEXT_MAX_LENGTH, 'allow_newlines': True},
+            'observation': {'max_length': LONG_TEXT_MAX_LENGTH, 'allow_newlines': True},
+            'signature': {'max_length': SIGNATURE_MAX_LENGTH, 'allow_newlines': True, 'strip_tags': False},
             'signed_by_name': {'max_length': 200},
         }
 
@@ -786,10 +786,10 @@ class TicketViewSet(viewsets.ModelViewSet):
             'job_status', 'cascade_type', 'signature', 'signed_by_name',
         ]
         field_rules = {
-            'action_taken': {'max_length': None, 'allow_newlines': True},
-            'remarks': {'max_length': None, 'allow_newlines': True},
-            'observation': {'max_length': None, 'allow_newlines': True},
-            'signature': {'max_length': None, 'allow_newlines': True, 'strip_tags': False},
+            'action_taken': {'max_length': LONG_TEXT_MAX_LENGTH, 'allow_newlines': True},
+            'remarks': {'max_length': LONG_TEXT_MAX_LENGTH, 'allow_newlines': True},
+            'observation': {'max_length': LONG_TEXT_MAX_LENGTH, 'allow_newlines': True},
+            'signature': {'max_length': SIGNATURE_MAX_LENGTH, 'allow_newlines': True, 'strip_tags': False},
             'signed_by_name': {'max_length': 200},
         }
         for field in allowed:
@@ -867,7 +867,7 @@ class TicketViewSet(viewsets.ModelViewSet):
         ticket = self.get_object()
 
         escalated_to = _clean_ticket_text(request.data.get('escalated_to', ''), max_length=300)
-        notes = _clean_ticket_text(request.data.get('notes', ''), allow_newlines=True)
+        notes = _clean_ticket_text(request.data.get('notes', ''), max_length=LONG_TEXT_MAX_LENGTH, allow_newlines=True)
         if not escalated_to:
             return Response({'detail': 'escalated_to required (distributor/principal name)'}, status=status.HTTP_400_BAD_REQUEST)
 

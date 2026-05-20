@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { GreenButton } from '../../components/ui/GreenButton';
+import { FieldLimitHint } from '../../components/ui/FieldLimitHint';
 import {
   Search,
   Plus,
@@ -32,6 +33,14 @@ import { StatusBadge } from '../../components/ui/StatusBadge';
 import { PriorityBadge } from '../../components/ui/PriorityBadge';
 import { mapStatus, mapPriority } from '../../services/ticketMapper';
 import { useAuth } from '../../context/AuthContext';
+import {
+  MAX_CLIENT_NAME,
+  MAX_CONTACT_FIELD,
+  MAX_LANDLINE,
+  MAX_PHONE,
+  MAX_EMAIL,
+  MAX_ADDRESS,
+} from '../../utils/validation';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -591,45 +600,46 @@ export default function Clients() {
             <form onSubmit={handleSave} className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Client Name <span className="text-red-500">*</span></label>
-                <input type="text" value={formData.client_name} onChange={(e) => setFormData({ ...formData, client_name: e.target.value })} className={`w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B] ${fieldErrors.client_name ? 'border-red-400' : 'border-gray-200 dark:border-gray-600'}`} placeholder="e.g. Maptech Inc." autoFocus />
+                <input type="text" value={formData.client_name} onChange={(e) => setFormData({ ...formData, client_name: e.target.value })} maxLength={MAX_CLIENT_NAME} className={`w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B] ${fieldErrors.client_name ? 'border-red-400' : 'border-gray-200 dark:border-gray-600'}`} placeholder="e.g. Maptech Inc." autoFocus />
                 {fieldErrors.client_name && <p className="mt-1 text-xs text-red-500">{fieldErrors.client_name}</p>}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Contact Person <span className="text-red-500">*</span></label>
-                  <input type="text" value={formData.contact_person} onChange={(e) => setFormData({ ...formData, contact_person: e.target.value })} className={`w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B] ${fieldErrors.contact_person ? 'border-red-400' : 'border-gray-200 dark:border-gray-600'}`} placeholder="e.g. Juan Dela Cruz" />
+                  <input type="text" value={formData.contact_person} onChange={(e) => setFormData({ ...formData, contact_person: e.target.value })} maxLength={MAX_CONTACT_FIELD} className={`w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B] ${fieldErrors.contact_person ? 'border-red-400' : 'border-gray-200 dark:border-gray-600'}`} placeholder="e.g. Juan Dela Cruz" />
                   {fieldErrors.contact_person && <p className="mt-1 text-xs text-red-500">{fieldErrors.contact_person}</p>}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Designation <span className="text-red-500">*</span></label>
-                  <input type="text" value={formData.designation} onChange={(e) => setFormData({ ...formData, designation: e.target.value })} className={`w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B] ${fieldErrors.designation ? 'border-red-400' : 'border-gray-200 dark:border-gray-600'}`} placeholder="e.g. IT Manager" />
+                  <input type="text" value={formData.designation} onChange={(e) => setFormData({ ...formData, designation: e.target.value })} maxLength={MAX_CONTACT_FIELD} className={`w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B] ${fieldErrors.designation ? 'border-red-400' : 'border-gray-200 dark:border-gray-600'}`} placeholder="e.g. IT Manager" />
                   {fieldErrors.designation && <p className="mt-1 text-xs text-red-500">{fieldErrors.designation}</p>}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Mobile No. <span className="text-red-500">*</span></label>
-                  <input type="text" value={formData.mobile_no} onChange={(e) => setFormData({ ...formData, mobile_no: e.target.value })} className={`w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B] ${fieldErrors.mobile_no ? 'border-red-400' : 'border-gray-200 dark:border-gray-600'}`} placeholder="e.g. 09171234567" />
+                  <input type="text" value={formData.mobile_no} onChange={(e) => setFormData({ ...formData, mobile_no: e.target.value })} maxLength={MAX_PHONE} className={`w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B] ${fieldErrors.mobile_no ? 'border-red-400' : 'border-gray-200 dark:border-gray-600'}`} placeholder="e.g. 09171234567" />
                   {fieldErrors.mobile_no && <p className="mt-1 text-xs text-red-500">{fieldErrors.mobile_no}</p>}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Landline No.</label>
-                  <input type="text" value={formData.landline} onChange={(e) => setFormData({ ...formData, landline: e.target.value })} className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B]" placeholder="e.g. (02) 1234-5678" />
+                  <input type="text" value={formData.landline} onChange={(e) => setFormData({ ...formData, landline: e.target.value })} maxLength={MAX_LANDLINE} className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B]" placeholder="e.g. (02) 1234-5678" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email Address <span className="text-red-500">*</span></label>
-                  <input type="email" value={formData.email_address} onChange={(e) => setFormData({ ...formData, email_address: e.target.value })} className={`w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B] ${fieldErrors.email_address ? 'border-red-400' : 'border-gray-200 dark:border-gray-600'}`} placeholder="e.g. client@email.com" />
+                  <input type="email" value={formData.email_address} onChange={(e) => setFormData({ ...formData, email_address: e.target.value })} maxLength={MAX_EMAIL} className={`w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B] ${fieldErrors.email_address ? 'border-red-400' : 'border-gray-200 dark:border-gray-600'}`} placeholder="e.g. client@email.com" />
                   {fieldErrors.email_address && <p className="mt-1 text-xs text-red-500">{fieldErrors.email_address}</p>}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Department / Organization <span className="text-red-500">*</span></label>
-                  <input type="text" value={formData.department_organization} onChange={(e) => setFormData({ ...formData, department_organization: e.target.value })} className={`w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B] ${fieldErrors.department_organization ? 'border-red-400' : 'border-gray-200 dark:border-gray-600'}`} placeholder="e.g. Information Technology" />
+                  <input type="text" value={formData.department_organization} onChange={(e) => setFormData({ ...formData, department_organization: e.target.value })} maxLength={MAX_CONTACT_FIELD} className={`w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B] ${fieldErrors.department_organization ? 'border-red-400' : 'border-gray-200 dark:border-gray-600'}`} placeholder="e.g. Information Technology" />
                   {fieldErrors.department_organization && <p className="mt-1 text-xs text-red-500">{fieldErrors.department_organization}</p>}
                 </div>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Full Address <span className="text-red-500">*</span></label>
-                <textarea value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} rows={2} className={`w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B] resize-none ${fieldErrors.address ? 'border-red-400' : 'border-gray-200 dark:border-gray-600'}`} placeholder="Full address..." />
+                <textarea value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} rows={2} maxLength={MAX_ADDRESS} className={`w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B] resize-none ${fieldErrors.address ? 'border-red-400' : 'border-gray-200 dark:border-gray-600'}`} placeholder="Full address..." />
+                <FieldLimitHint value={formData.address} maxLength={MAX_ADDRESS} />
                 {fieldErrors.address && <p className="mt-1 text-xs text-red-500">{fieldErrors.address}</p>}
               </div>
 
@@ -654,6 +664,7 @@ export default function Clients() {
                         onChange={(e) => {
                           const arr = [...(formData.additional_sales_reps || [])]; arr[idx] = e.target.value; setFormData({ ...formData, additional_sales_reps: arr });
                         }}
+                        maxLength={MAX_CONTACT_FIELD}
                         className="flex-1 px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none"
                         placeholder="Optional sales rep"
                       />

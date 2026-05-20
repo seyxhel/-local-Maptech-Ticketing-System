@@ -2,6 +2,7 @@
 import { createPortal } from 'react-dom';
 import { Card } from '../../components/ui/Card';
 import { GreenButton } from '../../components/ui/GreenButton';
+import { FieldLimitHint } from '../../components/ui/FieldLimitHint';
 import {
   Search,
   Plus,
@@ -26,6 +27,14 @@ import {
   type ClientRecord,
 } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import {
+  MAX_PROJECT_TITLE,
+  MAX_PRODUCT_FIELD,
+  MAX_PRODUCT_VERSION,
+  MAX_SERIAL_NO,
+  MAX_SALES_NO,
+  MAX_SOFTWARE_METADATA,
+} from '../../utils/validation';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -454,7 +463,7 @@ export default function Products() {
             <form onSubmit={handleSave} className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Project Title <span className="text-red-500">*</span></label>
-                <input type="text" value={formData.project_title} onChange={(e) => setFormData({ ...formData, project_title: e.target.value })} className={`w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B] ${fieldErrors.project_title ? 'border-red-400' : 'border-gray-200 dark:border-gray-600'}`} placeholder="e.g. CCTV Upgrade 2026" />
+                <input type="text" value={formData.project_title} onChange={(e) => setFormData({ ...formData, project_title: e.target.value })} maxLength={MAX_PROJECT_TITLE} className={`w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B] ${fieldErrors.project_title ? 'border-red-400' : 'border-gray-200 dark:border-gray-600'}`} placeholder="e.g. CCTV Upgrade 2026" />
                 {fieldErrors.project_title && <p className="mt-1 text-xs text-red-500">{fieldErrors.project_title}</p>}
               </div>
 
@@ -475,7 +484,7 @@ export default function Products() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Product Name <span className="text-red-500">*</span></label>
-                  <input type="text" value={formData.product_name} onChange={(e) => setFormData({ ...formData, product_name: e.target.value })} className={`w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B] ${fieldErrors.product_name ? 'border-red-400' : 'border-gray-200 dark:border-gray-600'}`} placeholder="e.g. Laptop" />
+                  <input type="text" value={formData.product_name} onChange={(e) => setFormData({ ...formData, product_name: e.target.value })} maxLength={MAX_PRODUCT_FIELD} className={`w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B] ${fieldErrors.product_name ? 'border-red-400' : 'border-gray-200 dark:border-gray-600'}`} placeholder="e.g. Laptop" />
                   {fieldErrors.product_name && <p className="mt-1 text-xs text-red-500">{fieldErrors.product_name}</p>}
                 </div>
                 <div>
@@ -506,17 +515,17 @@ export default function Products() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Brand <span className="text-red-500">*</span></label>
-                  <input type="text" value={formData.brand} onChange={(e) => setFormData({ ...formData, brand: e.target.value })} className={`w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B] ${fieldErrors.brand ? 'border-red-400' : 'border-gray-200 dark:border-gray-600'}`} placeholder="e.g. Dell" />
+                  <input type="text" value={formData.brand} onChange={(e) => setFormData({ ...formData, brand: e.target.value })} maxLength={MAX_PRODUCT_FIELD} className={`w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B] ${fieldErrors.brand ? 'border-red-400' : 'border-gray-200 dark:border-gray-600'}`} placeholder="e.g. Dell" />
                   {fieldErrors.brand && <p className="mt-1 text-xs text-red-500">{fieldErrors.brand}</p>}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Model <span className="text-red-500">*</span></label>
-                  <input type="text" value={formData.model_name} onChange={(e) => setFormData({ ...formData, model_name: e.target.value })} className={`w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B] ${fieldErrors.model_name ? 'border-red-400' : 'border-gray-200 dark:border-gray-600'}`} placeholder="e.g. Latitude 5520" />
+                  <input type="text" value={formData.model_name} onChange={(e) => setFormData({ ...formData, model_name: e.target.value })} maxLength={MAX_PRODUCT_FIELD} className={`w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B] ${fieldErrors.model_name ? 'border-red-400' : 'border-gray-200 dark:border-gray-600'}`} placeholder="e.g. Latitude 5520" />
                   {fieldErrors.model_name && <p className="mt-1 text-xs text-red-500">{fieldErrors.model_name}</p>}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Version No. <span className="text-red-500">*</span></label>
-                  <input type="text" value={formData.version_no} onChange={(e) => setFormData({ ...formData, version_no: e.target.value })} className={`w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B] ${fieldErrors.version_no ? 'border-red-400' : 'border-gray-200 dark:border-gray-600'}`} placeholder="e.g. v2.1" />
+                  <input type="text" value={formData.version_no} onChange={(e) => setFormData({ ...formData, version_no: e.target.value })} maxLength={MAX_PRODUCT_VERSION} className={`w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B] ${fieldErrors.version_no ? 'border-red-400' : 'border-gray-200 dark:border-gray-600'}`} placeholder="e.g. v2.1" />
                   {fieldErrors.version_no && <p className="mt-1 text-xs text-red-500">{fieldErrors.version_no}</p>}
                 </div>
                 <div>
@@ -526,37 +535,38 @@ export default function Products() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Serial No. <span className="text-red-500">*</span></label>
-                  <input type="text" value={formData.serial_no} onChange={(e) => setFormData({ ...formData, serial_no: e.target.value })} className={`w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B] ${fieldErrors.serial_no ? 'border-red-400' : 'border-gray-200 dark:border-gray-600'}`} placeholder="e.g. SN123456" />
+                  <input type="text" value={formData.serial_no} onChange={(e) => setFormData({ ...formData, serial_no: e.target.value })} maxLength={MAX_SERIAL_NO} className={`w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B] ${fieldErrors.serial_no ? 'border-red-400' : 'border-gray-200 dark:border-gray-600'}`} placeholder="e.g. SN123456" />
                   {fieldErrors.serial_no && <p className="mt-1 text-xs text-red-500">{fieldErrors.serial_no}</p>}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Sales / Invoice No. <span className="text-red-500">*</span></label>
-                  <input type="text" value={formData.sales_no} onChange={(e) => setFormData({ ...formData, sales_no: e.target.value })} className={`w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B] ${fieldErrors.sales_no ? 'border-red-400' : 'border-gray-200 dark:border-gray-600'}`} placeholder="e.g. INV-2026-001" />
+                  <input type="text" value={formData.sales_no} onChange={(e) => setFormData({ ...formData, sales_no: e.target.value })} maxLength={MAX_SALES_NO} className={`w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B] ${fieldErrors.sales_no ? 'border-red-400' : 'border-gray-200 dark:border-gray-600'}`} placeholder="e.g. INV-2026-001" />
                   {fieldErrors.sales_no && <p className="mt-1 text-xs text-red-500">{fieldErrors.sales_no}</p>}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Firmware Version</label>
-                  <input type="text" value={formData.firmware_version} onChange={(e) => setFormData({ ...formData, firmware_version: e.target.value })} className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B]" placeholder="e.g. 2.3.1" />
+                  <input type="text" value={formData.firmware_version} onChange={(e) => setFormData({ ...formData, firmware_version: e.target.value })} maxLength={MAX_PRODUCT_VERSION} className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B]" placeholder="e.g. 2.3.1" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Software Name</label>
-                  <input type="text" value={formData.software_name} onChange={(e) => setFormData({ ...formData, software_name: e.target.value })} className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B]" placeholder="e.g. Access Control Pro" />
+                  <input type="text" value={formData.software_name} onChange={(e) => setFormData({ ...formData, software_name: e.target.value })} maxLength={MAX_PRODUCT_FIELD} className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B]" placeholder="e.g. Access Control Pro" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Software Version</label>
-                  <input type="text" value={formData.software_version} onChange={(e) => setFormData({ ...formData, software_version: e.target.value })} className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B]" placeholder="e.g. 5.12" />
+                  <input type="text" value={formData.software_version} onChange={(e) => setFormData({ ...formData, software_version: e.target.value })} maxLength={MAX_PRODUCT_VERSION} className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B]" placeholder="e.g. 5.12" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Software Vendor</label>
-                  <input type="text" value={formData.software_vendor} onChange={(e) => setFormData({ ...formData, software_vendor: e.target.value })} className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B]" placeholder="e.g. Maptech" />
+                  <input type="text" value={formData.software_vendor} onChange={(e) => setFormData({ ...formData, software_vendor: e.target.value })} maxLength={MAX_PRODUCT_FIELD} className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B]" placeholder="e.g. Maptech" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Software License Key</label>
-                  <input type="text" value={formData.software_license_key} onChange={(e) => setFormData({ ...formData, software_license_key: e.target.value })} className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B]" placeholder="Optional" />
+                  <input type="text" value={formData.software_license_key} onChange={(e) => setFormData({ ...formData, software_license_key: e.target.value })} maxLength={MAX_PRODUCT_FIELD} className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B]" placeholder="Optional" />
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Software Metadata</label>
-                  <textarea value={formData.software_metadata} onChange={(e) => setFormData({ ...formData, software_metadata: e.target.value })} rows={3} className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B]" placeholder="Optional notes" />
+                  <textarea value={formData.software_metadata} onChange={(e) => setFormData({ ...formData, software_metadata: e.target.value })} rows={3} maxLength={MAX_SOFTWARE_METADATA} className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3BC25B]" placeholder="Optional notes" />
+                  <FieldLimitHint value={formData.software_metadata} maxLength={MAX_SOFTWARE_METADATA} />
                 </div>
               </div>
 

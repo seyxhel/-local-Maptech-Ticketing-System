@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from ..models import AssignmentSession, Message, MessageReaction, MessageReadReceipt
 from users.serializers import UserSerializer
+from tickets.input_security import sanitize_payload, LONG_TEXT_MAX_LENGTH
 
 
 class AssignmentSessionSerializer(serializers.ModelSerializer):
@@ -37,6 +38,10 @@ class MessageSerializer(serializers.ModelSerializer):
     read_by = MessageReadReceiptSerializer(source='read_receipts', many=True, read_only=True)
     reply_to_data = serializers.SerializerMethodField()
 
+    text_field_rules = {
+        'content': {'max_length': LONG_TEXT_MAX_LENGTH, 'allow_newlines': True},
+    }
+
     class Meta:
         model = Message
         fields = [
@@ -44,6 +49,9 @@ class MessageSerializer(serializers.ModelSerializer):
             'content', 'reply_to', 'reply_to_data', 'is_system_message',
             'reactions', 'read_by', 'created_at',
         ]
+
+    def to_internal_value(self, data):
+        return super().to_internal_value(sanitize_payload(data, self.text_field_rules))
 
     def get_reply_to_data(self, obj):
         if not obj.reply_to:

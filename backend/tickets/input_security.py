@@ -12,6 +12,10 @@ HTML_TAG_RE = re.compile(r'<[^>]*>')
 WHITESPACE_RE = re.compile(r'\s+')
 
 
+LONG_TEXT_MAX_LENGTH = 5000
+SIGNATURE_MAX_LENGTH = 1_000_000
+
+
 def clean_text(
     value,
     *,

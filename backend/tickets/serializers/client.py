@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from ..models import Client
-from tickets.input_security import sanitize_payload
+from tickets.input_security import sanitize_payload, LONG_TEXT_MAX_LENGTH
 
 
 class ClientSerializer(serializers.ModelSerializer):
@@ -15,7 +15,7 @@ class ClientSerializer(serializers.ModelSerializer):
         'designation': {'max_length': 200},
         'department_organization': {'max_length': 200},
         'email_address': {'max_length': 254},
-        'address': {'max_length': None, 'allow_newlines': True},
+        'address': {'max_length': LONG_TEXT_MAX_LENGTH, 'allow_newlines': True},
         'sales_representative': {'max_length': 200},
         'additional_sales_reps': {'max_length': 200},
     }

@@ -2,7 +2,7 @@ from rest_framework import serializers
 from ..models import Product
 from .lookup import CategorySerializer
 from .client import ClientSerializer
-from tickets.input_security import sanitize_payload
+from tickets.input_security import sanitize_payload, LONG_TEXT_MAX_LENGTH
 
 
 class ProductSerializer(serializers.ModelSerializer):
@@ -18,7 +18,7 @@ class ProductSerializer(serializers.ModelSerializer):
         'software_version': {'max_length': 120},
         'software_vendor': {'max_length': 300},
         'software_license_key': {'max_length': 300},
-        'software_metadata': {'max_length': None, 'allow_newlines': True},
+        'software_metadata': {'max_length': LONG_TEXT_MAX_LENGTH, 'allow_newlines': True},
         'serial_no': {'max_length': 200},
         'product_name': {'max_length': 300},
         'brand': {'max_length': 300},
@@ -31,7 +31,7 @@ class ProductSerializer(serializers.ModelSerializer):
         'supplier_purchase_no': {'max_length': 200},
         'supplier_sales_invoice': {'max_length': 200},
         'supplier_delivery_receipt': {'max_length': 200},
-        'others': {'max_length': None, 'allow_newlines': True},
+        'others': {'max_length': LONG_TEXT_MAX_LENGTH, 'allow_newlines': True},
     }
 
     class Meta:

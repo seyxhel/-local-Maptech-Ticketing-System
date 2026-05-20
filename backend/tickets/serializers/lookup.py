@@ -1,13 +1,13 @@
 from rest_framework import serializers
 from ..models import TypeOfService, Category
-from tickets.input_security import sanitize_payload
+from tickets.input_security import sanitize_payload, LONG_TEXT_MAX_LENGTH
 
 
 class TypeOfServiceSerializer(serializers.ModelSerializer):
     text_field_rules = {
         'name': {'max_length': 200},
         'type_of_service_others': {'max_length': 200},
-        'description': {'max_length': None, 'allow_newlines': True},
+        'description': {'max_length': LONG_TEXT_MAX_LENGTH, 'allow_newlines': True},
     }
 
     class Meta:
@@ -23,7 +23,7 @@ class CategorySerializer(serializers.ModelSerializer):
 
     text_field_rules = {
         'name': {'max_length': 200},
-        'description': {'max_length': None, 'allow_newlines': True},
+        'description': {'max_length': LONG_TEXT_MAX_LENGTH, 'allow_newlines': True},
     }
 
     class Meta:

@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from ..models import CallLog, FeedbackRating, ServiceReport, ServiceReportAttachment
-from tickets.input_security import sanitize_payload
+from tickets.input_security import sanitize_payload, LONG_TEXT_MAX_LENGTH
 
 
 class MultiFileField(serializers.ListField):
@@ -29,7 +29,7 @@ class CallLogSerializer(serializers.ModelSerializer):
     text_field_rules = {
         'client_name': {'max_length': 200},
         'phone_number': {'max_length': 30},
-        'notes': {'max_length': None, 'allow_newlines': True},
+        'notes': {'max_length': LONG_TEXT_MAX_LENGTH, 'allow_newlines': True},
     }
 
     def to_internal_value(self, data):
@@ -60,7 +60,7 @@ class FeedbackRatingSerializer(serializers.ModelSerializer):
         read_only_fields = ['admin', 'admin_name', 'employee_name', 'stf_no', 'created_at']
 
     text_field_rules = {
-        'comments': {'max_length': None, 'allow_newlines': True},
+        'comments': {'max_length': LONG_TEXT_MAX_LENGTH, 'allow_newlines': True},
     }
 
     def to_internal_value(self, data):
@@ -114,9 +114,9 @@ class ServiceReportSerializer(serializers.ModelSerializer):
         'contact_no': {'max_length': 60},
         'type_of_service': {'max_length': 200},
         'type_of_support': {'max_length': 120},
-        'description_of_trouble': {'max_length': None, 'allow_newlines': True},
-        'action_taken': {'max_length': None, 'allow_newlines': True},
-        'remarks': {'max_length': None, 'allow_newlines': True},
+        'description_of_trouble': {'max_length': LONG_TEXT_MAX_LENGTH, 'allow_newlines': True},
+        'action_taken': {'max_length': LONG_TEXT_MAX_LENGTH, 'allow_newlines': True},
+        'remarks': {'max_length': LONG_TEXT_MAX_LENGTH, 'allow_newlines': True},
     }
 
     def to_internal_value(self, data):

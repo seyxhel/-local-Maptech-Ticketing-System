@@ -22,15 +22,27 @@ export const USERNAME_REGEX = /^[A-Za-z0-9_.]{3,30}$/;
 // ── Max lengths ──
 
 export const MAX_NAME = 60;
-export const MAX_EMAIL = 100;
+export const MAX_EMAIL = 254;
 export const MAX_PHONE = 20;
+export const MAX_LANDLINE = 30;
 export const MAX_USERNAME = 30;
-export const MAX_ADDRESS = 300;
+export const MAX_ADDRESS = 5000;
 export const MAX_DESCRIPTION = 5000;
 export const MAX_REASON = 2000;
 export const MAX_PASSWORD = 128;
 export const MIN_PASSWORD = 8;
 export const MAX_FIELD = 150;
+export const MAX_CLIENT_NAME = 200;
+export const MAX_CONTACT_FIELD = 200;
+export const MAX_PROJECT_TITLE = 300;
+export const MAX_PRODUCT_FIELD = 300;
+export const MAX_PRODUCT_VERSION = 120;
+export const MAX_SERIAL_NO = 200;
+export const MAX_SALES_NO = 200;
+export const MAX_SOFTWARE_METADATA = 5000;
+export const MAX_SERVICE_DESCRIPTION = 5000;
+export const MAX_LONG_TEXT = 5000;
+export const MAX_TYPE_OF_SERVICE_DESCRIPTION = 5000;
 
 // ── Validators (return error string or empty string) ──
 

@@ -57,6 +57,7 @@ import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { GreenButton } from '../../components/ui/GreenButton';
+import { FieldLimitHint } from '../../components/ui/FieldLimitHint';
 import { toast } from 'sonner';
 import {
   validateEmail,
@@ -66,10 +67,17 @@ import {
   validateDescription,
   validateName,
   MAX_EMAIL,
-  MAX_PHONE,
+  MAX_LANDLINE,
   MAX_ADDRESS,
   MAX_DESCRIPTION,
   MAX_FIELD,
+  MAX_CLIENT_NAME,
+  MAX_CONTACT_FIELD,
+  MAX_PROJECT_TITLE,
+  MAX_PRODUCT_FIELD,
+  MAX_PRODUCT_VERSION,
+  MAX_SERIAL_NO,
+  MAX_SOFTWARE_METADATA,
 } from '../../utils/validation';
 import {
   Calendar,
@@ -1441,7 +1449,7 @@ export default function AdminCreateTicket() {
                 placeholder="e.g. Maptech Inc."
                 value={contactValues.client}
                 onChange={(e) => setContactField('client', e.target.value)}
-                maxLength={MAX_FIELD}
+                maxLength={MAX_CLIENT_NAME}
                 className={`${inputCls} ${errors['client'] ? errorRing : ''}`}
               />
               {errors['client'] && <p className="text-red-500 text-xs mt-1">{errorMsgs['client'] || 'Client is required.'}</p>}
@@ -1463,6 +1471,7 @@ export default function AdminCreateTicket() {
                 }}
                 className={`${inputCls} resize-none ${errors['address'] ? errorRing : ''}`}
               />
+              <FieldLimitHint value={address} maxLength={MAX_ADDRESS} />
               {errors['address'] && <p className="text-red-500 text-xs mt-1">{errorMsgs['address'] || 'Address is required.'}</p>}
             </div>
 
@@ -1477,7 +1486,7 @@ export default function AdminCreateTicket() {
                   if (val !== '' && !/^[\d()\-\s]*$/.test(val)) return;
                   setContactField('landline', val);
                 }}
-                maxLength={MAX_PHONE}
+                maxLength={MAX_LANDLINE}
                 className={`${inputCls} ${errors['landline'] ? errorRing : ''}`}
               />
               {errors['landline'] && <p className="text-red-500 text-xs mt-1">{errorMsgs['landline']}</p>}
@@ -1490,7 +1499,7 @@ export default function AdminCreateTicket() {
                 placeholder="e.g. Juan Dela Cruz"
                 value={contactValues.contactPerson}
                 onChange={(e) => setContactField('contactPerson', e.target.value)}
-                maxLength={MAX_FIELD}
+                maxLength={MAX_CONTACT_FIELD}
                 className={`${inputCls} ${errors['contactPerson'] ? errorRing : ''}`}
               />
               {errors['contactPerson'] && <p className="text-red-500 text-xs mt-1">{errorMsgs['contactPerson']}</p>}
@@ -1503,7 +1512,7 @@ export default function AdminCreateTicket() {
                 placeholder="e.g. IT Manager"
                 value={contactValues.designation}
                 onChange={(e) => setContactField('designation', e.target.value)}
-                maxLength={MAX_FIELD}
+                maxLength={MAX_CONTACT_FIELD}
                 className={`${inputCls} ${errors['designation'] ? errorRing : ''}`}
               />
               {errors['designation'] && <p className="text-red-500 text-xs mt-1">{errorMsgs['designation']}</p>}
@@ -1516,7 +1525,7 @@ export default function AdminCreateTicket() {
                 placeholder="e.g. Information Technology"
                 value={contactValues.department}
                 onChange={(e) => setContactField('department', e.target.value)}
-                maxLength={MAX_FIELD}
+                maxLength={MAX_CONTACT_FIELD}
                 className={`${inputCls} ${errors['department'] ? errorRing : ''}`}
               />
               {errors['department'] && <p className="text-red-500 text-xs mt-1">{errorMsgs['department']}</p>}
@@ -1533,7 +1542,7 @@ export default function AdminCreateTicket() {
                   if (val !== '' && !/^\d*$/.test(val)) return;
                   setContactField('mobile', val);
                 }}
-                maxLength={11}
+                maxLength={20}
                 className={`${inputCls} ${errors['mobile'] ? errorRing : ''}`}
               />
               {errors['mobile'] && <p className="text-red-500 text-xs mt-1">{errorMsgs['mobile']}</p>}
@@ -1672,12 +1681,12 @@ export default function AdminCreateTicket() {
                     </button>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <input value={contact.contact_person} onChange={(e) => setAdditionalContacts((prev) => prev.map((item, i) => i === idx ? { ...item, contact_person: e.target.value } : item))} placeholder="Contact Person" className={`${inputCls} ${errors[`additionalContact-${idx}-contact_person`] ? errorRing : ''}`} />
-                    <input value={contact.designation} onChange={(e) => setAdditionalContacts((prev) => prev.map((item, i) => i === idx ? { ...item, designation: e.target.value } : item))} placeholder="Designation" className={`${inputCls} ${errors[`additionalContact-${idx}-designation`] ? errorRing : ''}`} />
-                    <input value={contact.department} onChange={(e) => setAdditionalContacts((prev) => prev.map((item, i) => i === idx ? { ...item, department: e.target.value } : item))} placeholder="Department" className={`${inputCls} ${errors[`additionalContact-${idx}-department`] ? errorRing : ''}`} />
-                    <input value={contact.telephone} onChange={(e) => { const val = e.target.value; if (val !== '' && !/^[\d()\-\s]*$/.test(val)) return; setAdditionalContacts((prev) => prev.map((item, i) => i === idx ? { ...item, telephone: val } : item)); }} placeholder="Telephone" className={`${inputCls} ${errors[`additionalContact-${idx}-telephone`] ? errorRing : ''}`} />
+                    <input value={contact.contact_person} onChange={(e) => setAdditionalContacts((prev) => prev.map((item, i) => i === idx ? { ...item, contact_person: e.target.value } : item))} placeholder="Contact Person" maxLength={MAX_CONTACT_FIELD} className={`${inputCls} ${errors[`additionalContact-${idx}-contact_person`] ? errorRing : ''}`} />
+                    <input value={contact.designation} onChange={(e) => setAdditionalContacts((prev) => prev.map((item, i) => i === idx ? { ...item, designation: e.target.value } : item))} placeholder="Designation" maxLength={MAX_CONTACT_FIELD} className={`${inputCls} ${errors[`additionalContact-${idx}-designation`] ? errorRing : ''}`} />
+                    <input value={contact.department} onChange={(e) => setAdditionalContacts((prev) => prev.map((item, i) => i === idx ? { ...item, department: e.target.value } : item))} placeholder="Department" maxLength={MAX_CONTACT_FIELD} className={`${inputCls} ${errors[`additionalContact-${idx}-department`] ? errorRing : ''}`} />
+                    <input value={contact.telephone} onChange={(e) => { const val = e.target.value; if (val !== '' && !/^[\d()\-\s]*$/.test(val)) return; setAdditionalContacts((prev) => prev.map((item, i) => i === idx ? { ...item, telephone: val } : item)); }} placeholder="Telephone" maxLength={MAX_LANDLINE} className={`${inputCls} ${errors[`additionalContact-${idx}-telephone`] ? errorRing : ''}`} />
                     <input value={contact.mobile} onChange={(e) => { const val = e.target.value; if (val !== '' && !/^\d*$/.test(val)) return; setAdditionalContacts((prev) => prev.map((item, i) => i === idx ? { ...item, mobile: val } : item)); }} placeholder="Mobile" maxLength={11} className={`${inputCls} ${errors[`additionalContact-${idx}-mobile`] ? errorRing : ''}`} />
-                    <input value={contact.email} onChange={(e) => setAdditionalContacts((prev) => prev.map((item, i) => i === idx ? { ...item, email: e.target.value } : item))} placeholder="Email (optional)" className={`${inputCls} ${errors[`additionalContact-${idx}-email`] ? errorRing : ''}`} />
+                    <input value={contact.email} onChange={(e) => setAdditionalContacts((prev) => prev.map((item, i) => i === idx ? { ...item, email: e.target.value } : item))} placeholder="Email (optional)" maxLength={MAX_EMAIL} className={`${inputCls} ${errors[`additionalContact-${idx}-email`] ? errorRing : ''}`} />
                   </div>
                 </div>
               ))}
@@ -2044,8 +2053,9 @@ export default function AdminCreateTicket() {
                 </div>
                 {serviceType === 'Others' && (
                   <div onClick={(e) => e.stopPropagation()}>
-                    <input type="text" placeholder="Please specify the service..." value={serviceOthersText} onChange={(e) => { setServiceOthersText(e.target.value); if (e.target.value.trim()) setErrors((p) => ({ ...p, serviceOthersText: false })); }} className={`mt-1 w-full text-sm border-b ${errors['serviceOthersText'] ? 'border-red-400' : 'border-[#3BC25B]'} bg-transparent text-gray-900 dark:text-gray-100 focus:outline-none`} autoFocus />
+                    <input type="text" placeholder="Please specify the service..." value={serviceOthersText} onChange={(e) => { setServiceOthersText(e.target.value); if (e.target.value.trim()) setErrors((p) => ({ ...p, serviceOthersText: false })); }} maxLength={200} className={`mt-1 w-full text-sm border-b ${errors['serviceOthersText'] ? 'border-red-400' : 'border-[#3BC25B]'} bg-transparent text-gray-900 dark:text-gray-100 focus:outline-none`} autoFocus />
                     {errors['serviceOthersText'] && <p className="text-red-500 text-xs mt-1">Please specify the service</p>}
+                    <FieldLimitHint value={serviceOthersText} maxLength={200} />
                     <div className="mt-3">
                       <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Est. Resolution Days</label>
                       <input type="number" min={1} placeholder="e.g. 5" value={estimatedDaysOverride} onChange={(e) => setEstimatedDaysOverride(e.target.value ? parseInt(e.target.value) : '')} className="mt-1 w-full text-sm border-b border-[#3BC25B] bg-transparent text-gray-900 dark:text-gray-100 focus:outline-none" />
@@ -2189,7 +2199,7 @@ export default function AdminCreateTicket() {
 
             <div>
               <label className={labelCls}>Project Title <span className="text-red-500 ml-1">*</span></label>
-              <input
+                  <input
                 type="text"
                 placeholder="Project title or reference"
                 value={projectTitle}
@@ -2200,8 +2210,10 @@ export default function AdminCreateTicket() {
                     setErrorMsgs((p) => ({ ...p, projectTitle: '' }));
                   }
                 }}
+                    maxLength={MAX_PROJECT_TITLE}
                 className={`${inputCls} ${errors['projectTitle'] ? errorRing : ''}`}
               />
+                  <FieldLimitHint value={projectTitle} maxLength={MAX_PROJECT_TITLE} />
               {errors['projectTitle'] && <p className="text-red-500 text-xs mt-1">{errorMsgs['projectTitle'] || 'Project Title is required.'}</p>}
             </div>
 
@@ -2237,27 +2249,27 @@ export default function AdminCreateTicket() {
                 </div>
                 <div>
                   <label className={labelCls}>Product</label>
-                  <input type="text" placeholder="e.g. ZK-K40" value={newProductInfo.product_name} onChange={(e) => { setNewProductInfo((p) => ({ ...p, product_name: e.target.value })); if (e.target.value.trim()) setErrors((p) => ({ ...p, product_name: false })); }} maxLength={MAX_FIELD} className={`${inputCls} ${errors['product_name'] ? errorRing : ''}`} />
+                  <input type="text" placeholder="e.g. ZK-K40" value={newProductInfo.product_name} onChange={(e) => { setNewProductInfo((p) => ({ ...p, product_name: e.target.value })); if (e.target.value.trim()) setErrors((p) => ({ ...p, product_name: false })); }} maxLength={MAX_PRODUCT_FIELD} className={`${inputCls} ${errors['product_name'] ? errorRing : ''}`} />
                   {errors['product_name'] && <p className="text-red-500 text-xs mt-1">{errorMsgs['product_name'] || 'Product name is required.'}</p>}
                 </div>
                 <div>
                   <label className={labelCls}>Brand <span className="text-red-500 ml-1">*</span></label>
-                  <input type="text" placeholder="e.g. ZKTeco" value={newProductInfo.brand} onChange={(e) => { setNewProductInfo((p) => ({ ...p, brand: e.target.value })); if (e.target.value.trim()) setErrors((p) => ({ ...p, brand: false })); }} maxLength={MAX_FIELD} className={`${inputCls} ${errors['brand'] ? errorRing : ''}`} />
+                  <input type="text" placeholder="e.g. ZKTeco" value={newProductInfo.brand} onChange={(e) => { setNewProductInfo((p) => ({ ...p, brand: e.target.value })); if (e.target.value.trim()) setErrors((p) => ({ ...p, brand: false })); }} maxLength={MAX_PRODUCT_FIELD} className={`${inputCls} ${errors['brand'] ? errorRing : ''}`} />
                   {errors['brand'] && <p className="text-red-500 text-xs mt-1">{errorMsgs['brand'] || 'Brand is required.'}</p>}
                 </div>
                 <div>
                   <label className={labelCls}>Model <span className="text-red-500 ml-1">*</span></label>
-                  <input type="text" placeholder="e.g. K40" value={newProductInfo.model_name} onChange={(e) => { setNewProductInfo((p) => ({ ...p, model_name: e.target.value })); if (e.target.value.trim()) setErrors((p) => ({ ...p, model_name: false })); }} maxLength={MAX_FIELD} className={`${inputCls} ${errors['model_name'] ? errorRing : ''}`} />
+                  <input type="text" placeholder="e.g. K40" value={newProductInfo.model_name} onChange={(e) => { setNewProductInfo((p) => ({ ...p, model_name: e.target.value })); if (e.target.value.trim()) setErrors((p) => ({ ...p, model_name: false })); }} maxLength={MAX_PRODUCT_FIELD} className={`${inputCls} ${errors['model_name'] ? errorRing : ''}`} />
                   {errors['model_name'] && <p className="text-red-500 text-xs mt-1">{errorMsgs['model_name'] || 'Model is required.'}</p>}
                 </div>
                 <div>
                   <label className={labelCls}>Serial No. <span className="text-red-500 ml-1">*</span></label>
-                  <input type="text" placeholder="e.g. SN123456" value={newProductInfo.serial_no} onChange={(e) => { setNewProductInfo((p) => ({ ...p, serial_no: e.target.value })); if (e.target.value.trim()) setErrors((p) => ({ ...p, serial_no: false })); }} maxLength={MAX_FIELD} className={`${inputCls} ${errors['serial_no'] ? errorRing : ''}`} />
+                  <input type="text" placeholder="e.g. SN123456" value={newProductInfo.serial_no} onChange={(e) => { setNewProductInfo((p) => ({ ...p, serial_no: e.target.value })); if (e.target.value.trim()) setErrors((p) => ({ ...p, serial_no: false })); }} maxLength={MAX_SERIAL_NO} className={`${inputCls} ${errors['serial_no'] ? errorRing : ''}`} />
                   {errors['serial_no'] && <p className="text-red-500 text-xs mt-1">{errorMsgs['serial_no'] || 'Serial No. is required.'}</p>}
                 </div>
                 <div>
                   <label className={labelCls}>Version No. <span className="text-red-500 ml-1">*</span></label>
-                  <input type="text" placeholder="e.g. FW 6.60" value={newProductInfo.version_no} onChange={(e) => { setNewProductInfo((p) => ({ ...p, version_no: e.target.value })); if (e.target.value.trim()) setErrors((p) => ({ ...p, version_no: false })); }} maxLength={MAX_FIELD} className={`${inputCls} ${errors['version_no'] ? errorRing : ''}`} />
+                  <input type="text" placeholder="e.g. FW 6.60" value={newProductInfo.version_no} onChange={(e) => { setNewProductInfo((p) => ({ ...p, version_no: e.target.value })); if (e.target.value.trim()) setErrors((p) => ({ ...p, version_no: false })); }} maxLength={100} className={`${inputCls} ${errors['version_no'] ? errorRing : ''}`} />
                   {errors['version_no'] && <p className="text-red-500 text-xs mt-1">{errorMsgs['version_no'] || 'Version No. is required.'}</p>}
                 </div>
                 <div>
@@ -2342,27 +2354,28 @@ export default function AdminCreateTicket() {
 
             <div>
               <label className={labelCls}>Firmware Version</label>
-              <input type="text" placeholder="e.g. 2.3.1" value={newProductInfo.firmware_version} onChange={(e) => setNewProductInfo((p) => ({ ...p, firmware_version: e.target.value }))} maxLength={MAX_FIELD} className={inputCls} />
+              <input type="text" placeholder="e.g. 2.3.1" value={newProductInfo.firmware_version} onChange={(e) => setNewProductInfo((p) => ({ ...p, firmware_version: e.target.value }))} maxLength={MAX_PRODUCT_VERSION} className={inputCls} />
             </div>
             <div>
               <label className={labelCls}>Software Name</label>
-              <input type="text" placeholder="e.g. Access Control Pro" value={newProductInfo.software_name} onChange={(e) => setNewProductInfo((p) => ({ ...p, software_name: e.target.value }))} maxLength={MAX_FIELD} className={inputCls} />
+              <input type="text" placeholder="e.g. Access Control Pro" value={newProductInfo.software_name} onChange={(e) => setNewProductInfo((p) => ({ ...p, software_name: e.target.value }))} maxLength={MAX_PRODUCT_FIELD} className={inputCls} />
             </div>
             <div>
               <label className={labelCls}>Software Version</label>
-              <input type="text" placeholder="e.g. 5.12" value={newProductInfo.software_version} onChange={(e) => setNewProductInfo((p) => ({ ...p, software_version: e.target.value }))} maxLength={MAX_FIELD} className={inputCls} />
+              <input type="text" placeholder="e.g. 5.12" value={newProductInfo.software_version} onChange={(e) => setNewProductInfo((p) => ({ ...p, software_version: e.target.value }))} maxLength={MAX_PRODUCT_VERSION} className={inputCls} />
             </div>
             <div>
               <label className={labelCls}>Software Vendor</label>
-              <input type="text" placeholder="e.g. Maptech" value={newProductInfo.software_vendor} onChange={(e) => setNewProductInfo((p) => ({ ...p, software_vendor: e.target.value }))} maxLength={MAX_FIELD} className={inputCls} />
+              <input type="text" placeholder="e.g. Maptech" value={newProductInfo.software_vendor} onChange={(e) => setNewProductInfo((p) => ({ ...p, software_vendor: e.target.value }))} maxLength={MAX_PRODUCT_FIELD} className={inputCls} />
             </div>
             <div>
               <label className={labelCls}>Software License Key</label>
-              <input type="text" placeholder="Optional" value={newProductInfo.software_license_key} onChange={(e) => setNewProductInfo((p) => ({ ...p, software_license_key: e.target.value }))} maxLength={MAX_FIELD} className={inputCls} />
+              <input type="text" placeholder="Optional" value={newProductInfo.software_license_key} onChange={(e) => setNewProductInfo((p) => ({ ...p, software_license_key: e.target.value }))} maxLength={MAX_PRODUCT_FIELD} className={inputCls} />
             </div>
             <div className="md:col-span-2">
               <label className={labelCls}>Software Metadata</label>
-              <textarea rows={3} value={newProductInfo.software_metadata} onChange={(e) => setNewProductInfo((p) => ({ ...p, software_metadata: e.target.value }))} className={`${inputCls} resize-none`} placeholder="Optional notes such as modules, environment, or deployment details" />
+              <textarea rows={3} value={newProductInfo.software_metadata} maxLength={MAX_SOFTWARE_METADATA} onChange={(e) => setNewProductInfo((p) => ({ ...p, software_metadata: e.target.value }))} className={`${inputCls} resize-none`} placeholder="Optional notes such as modules, environment, or deployment details" />
+              <FieldLimitHint value={newProductInfo.software_metadata} maxLength={MAX_SOFTWARE_METADATA} />
             </div>
           </div>
 
@@ -2372,7 +2385,7 @@ export default function AdminCreateTicket() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className={labelCls}>Client Purchase No.</label>
-                <input value={additionalProductDetails.client_purchase_no} onChange={(e) => setAdditionalProductDetails((prev) => ({ ...prev, client_purchase_no: e.target.value }))} className={inputCls} />
+                <input value={additionalProductDetails.client_purchase_no} onChange={(e) => setAdditionalProductDetails((prev) => ({ ...prev, client_purchase_no: e.target.value }))} maxLength={200} className={inputCls} />
               </div>
             </div>
           </div>
@@ -2398,16 +2411,16 @@ export default function AdminCreateTicket() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className={labelCls}>Delivery Receipt</label>
-                    <input value={additionalProductDetails.maptech_dr} onChange={(e) => setAdditionalProductDetails((prev) => ({ ...prev, maptech_dr: e.target.value }))} className={inputCls} />
+                    <input value={additionalProductDetails.maptech_dr} onChange={(e) => setAdditionalProductDetails((prev) => ({ ...prev, maptech_dr: e.target.value }))} maxLength={200} className={inputCls} />
                   </div>
                   <div>
                     <label className={labelCls}>Sales Invoice <span className="text-red-500 ml-1">*</span></label>
-                    <input value={additionalProductDetails.maptech_sales_invoice} onChange={(e) => { setAdditionalProductDetails((prev) => ({ ...prev, maptech_sales_invoice: e.target.value })); if (e.target.value.trim()) setErrors((p) => ({ ...p, maptech_sales_invoice: false })); }} className={`${inputCls} ${errors['maptech_sales_invoice'] ? errorRing : ''}`} />
+                    <input value={additionalProductDetails.maptech_sales_invoice} onChange={(e) => { setAdditionalProductDetails((prev) => ({ ...prev, maptech_sales_invoice: e.target.value })); if (e.target.value.trim()) setErrors((p) => ({ ...p, maptech_sales_invoice: false })); }} maxLength={200} className={`${inputCls} ${errors['maptech_sales_invoice'] ? errorRing : ''}`} />
                     {errors['maptech_sales_invoice'] && <p className="text-red-500 text-xs mt-1">{errorMsgs['maptech_sales_invoice'] || 'Maptech Sales Invoice is required.'}</p>}
                   </div>
                   <div>
                     <label className={labelCls}>Sales Order No.</label>
-                    <input value={additionalProductDetails.maptech_sales_order_no} onChange={(e) => setAdditionalProductDetails((prev) => ({ ...prev, maptech_sales_order_no: e.target.value }))} className={inputCls} />
+                    <input value={additionalProductDetails.maptech_sales_order_no} onChange={(e) => setAdditionalProductDetails((prev) => ({ ...prev, maptech_sales_order_no: e.target.value }))} maxLength={200} className={inputCls} />
                   </div>
                 </div>
               </div>
@@ -2417,15 +2430,15 @@ export default function AdminCreateTicket() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className={labelCls}>Supplier Purchase No.</label>
-                    <input value={additionalProductDetails.supplier_purchase_no} onChange={(e) => setAdditionalProductDetails((prev) => ({ ...prev, supplier_purchase_no: e.target.value }))} className={inputCls} />
+                    <input value={additionalProductDetails.supplier_purchase_no} onChange={(e) => setAdditionalProductDetails((prev) => ({ ...prev, supplier_purchase_no: e.target.value }))} maxLength={200} className={inputCls} />
                   </div>
                   <div>
                     <label className={labelCls}>Sales Invoice</label>
-                    <input value={additionalProductDetails.supplier_sales_invoice} onChange={(e) => setAdditionalProductDetails((prev) => ({ ...prev, supplier_sales_invoice: e.target.value }))} className={inputCls} />
+                    <input value={additionalProductDetails.supplier_sales_invoice} onChange={(e) => setAdditionalProductDetails((prev) => ({ ...prev, supplier_sales_invoice: e.target.value }))} maxLength={200} className={inputCls} />
                   </div>
                   <div>
                     <label className={labelCls}>Delivery Receipt</label>
-                    <input value={additionalProductDetails.supplier_delivery_receipt} onChange={(e) => setAdditionalProductDetails((prev) => ({ ...prev, supplier_delivery_receipt: e.target.value }))} className={inputCls} />
+                    <input value={additionalProductDetails.supplier_delivery_receipt} onChange={(e) => setAdditionalProductDetails((prev) => ({ ...prev, supplier_delivery_receipt: e.target.value }))} maxLength={200} className={inputCls} />
                   </div>
                 </div>
               </div>
