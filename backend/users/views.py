@@ -13,6 +13,7 @@ from rest_framework_simplejwt.exceptions import TokenError, InvalidToken
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.contrib.auth.tokens import default_token_generator
+from django.db.models import Q
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
 from django.utils import timezone
@@ -20,6 +21,8 @@ from tickets.input_security import clean_text
 from .serializers import UserSerializer
 
 logger = logging.getLogger(__name__)
+
+LOCKED_ACCOUNT_MESSAGE = 'This account has been blocked after 20 failed login attempts. Please contact an administrator.'
 
 
 def _is_password_pwned(password: str) -> bool:
@@ -331,12 +334,27 @@ class CustomTokenObtainPairView(TokenObtainPairView):
     def post(self, request, *args, **kwargs):
         incoming = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
         remember = bool(incoming.pop('remember_me', False))
+        provided = request.data.get('username') or request.data.get('email')
+
+        matched_user = None
+        if provided:
+            matched_user = User.objects.filter(Q(username=provided) | Q(email__iexact=provided)).first()
+
+        if matched_user and matched_user.is_login_blocked:
+            return Response({'detail': LOCKED_ACCOUNT_MESSAGE}, status=status.HTTP_403_FORBIDDEN)
+
         # First, try the normal username-based token obtain
         try:
             serializer = self.get_serializer(data=incoming)
             serializer.is_valid(raise_exception=True)
             resp = Response(serializer.validated_data, status=status.HTTP_200_OK)
         except Exception:
+            # If the serializer failed (wrong credentials or other auth error),
+            # record a failed login for a matched user (by username/email) when available.
+            if matched_user:
+                blocked_now = matched_user.register_failed_login()
+                if blocked_now:
+                    return Response({'detail': LOCKED_ACCOUNT_MESSAGE}, status=status.HTTP_403_FORBIDDEN)
             resp = None
 
         # If auth succeeded, attach the user data
@@ -345,8 +363,9 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             try:
                 user = User.objects.get(username=username)
             except User.DoesNotExist:
-                user = None
+                user = matched_user
             if user:
+                user.clear_failed_logins()
                 user.last_login = timezone.now()
                 user.save(update_fields=['last_login'])
                 # Audit log for login
@@ -372,14 +391,16 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             return response
 
         # If auth failed, allow login by email: check whether the provided "username" looks like an email
-        provided = request.data.get('username') or request.data.get('email')
         password = request.data.get('password')
         if provided and '@' in str(provided) and password:
             try:
                 user = User.objects.get(email=provided)
+                if user.is_login_blocked:
+                    return Response({'detail': LOCKED_ACCOUNT_MESSAGE}, status=status.HTTP_403_FORBIDDEN)
                 if not user.is_active:
                     return Response({'detail': 'Your account has been deactivated. Please contact an administrator.'}, status=status.HTTP_401_UNAUTHORIZED)
                 if user.check_password(password):
+                    user.clear_failed_logins()
                     user.last_login = timezone.now()
                     user.save(update_fields=['last_login'])
                     refresh = RefreshToken.for_user(user)
@@ -406,8 +427,16 @@ class CustomTokenObtainPairView(TokenObtainPairView):
                     response = Response(data)
                     _set_auth_cookies(response, access=data.get('access'), refresh=data.get('refresh'), remember=remember)
                     return response
+                else:
+                    # Wrong password for an existing user — count it.
+                    if user.register_failed_login():
+                        return Response({'detail': LOCKED_ACCOUNT_MESSAGE}, status=status.HTTP_403_FORBIDDEN)
             except User.DoesNotExist:
                 pass
+
+        if matched_user and not matched_user.is_login_blocked:
+            if matched_user.register_failed_login():
+                return Response({'detail': LOCKED_ACCOUNT_MESSAGE}, status=status.HTTP_403_FORBIDDEN)
 
         # otherwise return 401
         return Response({'detail': 'Invalid credentials.'}, status=status.HTTP_401_UNAUTHORIZED)
@@ -524,6 +553,12 @@ class UserViewSet(viewsets.GenericViewSet):
             return Response({'detail': 'Cannot deactivate a superadmin.'}, status=status.HTTP_403_FORBIDDEN)
         target.is_active = not target.is_active
         target.save(update_fields=['is_active'])
+        # If reactivating, clear any failed-login counters and unblock the account
+        if target.is_active:
+            try:
+                target.clear_failed_logins()
+            except Exception:
+                pass
 
         # Audit log
         try:
@@ -536,6 +571,46 @@ class UserViewSet(viewsets.GenericViewSet):
                 entity_id=target.id,
                 action=AuditLog.ACTION_UPDATE,
                 activity=f"{request.user.email} {action_text} user {target.email}",
+                actor=request.user,
+                ip_address=ip,
+            )
+        except Exception:
+            pass
+
+        return Response(UserSerializer(target).data)
+
+    @action(detail=True, methods=['post'], url_path='unblock_account')
+    def unblock_account(self, request, pk=None):
+        """Superadmin clears a login-blocked user account and restores access."""
+        if request.user.role != 'superadmin':
+            return Response({'detail': 'Only superadmins can manage users.'}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            target = User.objects.get(pk=pk)
+        except User.DoesNotExist:
+            return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+        if target.id == request.user.id:
+            return Response({'detail': 'Cannot modify your own account.'}, status=status.HTTP_400_BAD_REQUEST)
+        if target.role == User.ROLE_SUPERADMIN and request.user.role != User.ROLE_SUPERADMIN:
+            return Response({'detail': 'Cannot manage a superadmin.'}, status=status.HTTP_403_FORBIDDEN)
+
+        if target.is_login_blocked or not target.is_active:
+            try:
+                target.clear_failed_logins()
+            except Exception:
+                pass
+            if not target.is_active:
+                target.is_active = True
+                target.save(update_fields=['is_active'])
+
+        try:
+            from tickets.models import AuditLog
+            x_forwarded = request.META.get('HTTP_X_FORWARDED_FOR')
+            ip = x_forwarded.split(',')[0].strip() if x_forwarded else request.META.get('REMOTE_ADDR')
+            AuditLog.log(
+                entity=AuditLog.ENTITY_USER,
+                entity_id=target.id,
+                action=AuditLog.ACTION_UPDATE,
+                activity=f"{request.user.email} unblocked user {target.email}",
                 actor=request.user,
                 ip_address=ip,
             )

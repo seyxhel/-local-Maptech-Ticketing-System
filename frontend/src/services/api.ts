@@ -99,6 +99,8 @@ export interface BackendUser {
   suffix?: string;
   phone?: string;
   is_active: boolean;
+  is_login_blocked?: boolean;
+  failed_login_attempts?: number;
   recovery_key?: string;
   [key: string]: unknown;
 }
@@ -792,6 +794,15 @@ export async function updateUser(userId: number, data: Partial<BackendUser>): Pr
 /** Toggle user active status. */
 export async function toggleUserActive(userId: number): Promise<BackendUser> {
   const res = await apiFetch(`${API_BASE}/users/${userId}/toggle_active/`, {
+    method: 'POST',
+    headers: authHeaders(),
+  });
+  return handleResponse<BackendUser>(res);
+}
+
+/** Unblock a user that was locked by failed login attempts. */
+export async function unblockUser(userId: number): Promise<BackendUser> {
+  const res = await apiFetch(`${API_BASE}/users/${userId}/unblock_account/`, {
     method: 'POST',
     headers: authHeaders(),
   });

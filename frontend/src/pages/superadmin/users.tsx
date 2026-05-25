@@ -7,7 +7,6 @@ import {
   Plus,
   Edit2,
   Lock,
-  Unlock,
   X,
   Users,
   Loader2,
@@ -32,6 +31,7 @@ import {
   createUser,
   updateUser,
   toggleUserActive,
+  unblockUser,
   adminResetPassword,
   type BackendUser,
   type CreateUserPayload,
@@ -49,6 +49,12 @@ interface UserAccount {
   phone: string;
   role: 'Supervisor' | 'Technical' | 'Sales' | 'Superadmin';
   status: 'Active' | 'Blocked';
+  isLoginBlocked: boolean;
+}
+
+interface StatusActionModalState {
+  user: UserAccount;
+  action: 'block' | 'unblock';
 }
 
 /** Map a BackendUser to the local UserAccount shape. */
@@ -73,7 +79,8 @@ function toUserAccount(u: BackendUser): UserAccount {
     email: u.email,
     phone: u.phone || '',
     role: roleMap[u.role] || 'Technical',
-    status: u.is_active ? 'Active' : 'Blocked',
+    status: u.is_login_blocked || !u.is_active ? 'Blocked' : 'Active',
+    isLoginBlocked: Boolean(u.is_login_blocked),
   };
 }
 
@@ -128,6 +135,7 @@ export default function UserManagement() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [statusActionModal, setStatusActionModal] = useState<StatusActionModalState | null>(null);
 
   // ── Fetch users from backend ──
   const loadUsers = useCallback(async () => {
@@ -294,6 +302,37 @@ export default function UserManagement() {
       toast.error(msg);
     }
   };
+  const unblockStatus = async (id: number) => {
+    try {
+      await unblockUser(id);
+      await loadUsers(); // Refresh
+      const user = users.find((u) => u.id === id);
+      if (user) {
+        toast.info(`${user.name} has been unblocked.`);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unblock failed.';
+      toast.error(msg);
+    }
+  };
+  const openStatusActionModal = (user: UserAccount) => {
+    setStatusActionModal({
+      user,
+      action: user.isLoginBlocked || user.status === 'Blocked' ? 'unblock' : 'block',
+    });
+  };
+
+  const confirmStatusAction = async () => {
+    if (!statusActionModal) {
+      return;
+    }
+    if (statusActionModal.action === 'unblock') {
+      await unblockStatus(statusActionModal.user.id);
+    } else {
+      await toggleStatus(statusActionModal.user.id);
+    }
+    setStatusActionModal(null);
+  };
   const roleBadge = (role: string) => {
     const r = role.toLowerCase();
     if (r === 'supervisor')
@@ -439,6 +478,7 @@ export default function UserManagement() {
               ) : (
                 filteredUsers.map((user) => {
                   const name = displayName(user);
+                  const isBlocked = user.isLoginBlocked || user.status === 'Blocked';
                   return (
                     <tr
                       key={user.id}
@@ -467,20 +507,21 @@ export default function UserManagement() {
                       <td className="px-6 py-4">
                         <span
                           className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border ${
-                            user.status === 'Active'
-                              ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-700'
-                              : 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-200 dark:border-red-700'
+                            user.isLoginBlocked || user.status === 'Blocked'
+                              ? 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-200 dark:border-red-700'
+                              : 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-700'
                           }`}
                         >
                           <span
-                            className={`w-1.5 h-1.5 rounded-full ${user.status === 'Active' ? 'bg-green-500' : 'bg-red-500'}`}
+                            className={`w-1.5 h-1.5 rounded-full ${user.isLoginBlocked || user.status === 'Blocked' ? 'bg-red-500' : 'bg-green-500'}`}
                           />
-                          {user.status === 'Active' ? 'Active' : 'Blocked'}
+                          {user.isLoginBlocked || user.status === 'Blocked' ? 'Blocked' : 'Active'}
                         </span>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-end gap-1">
                           <button
+                            type="button"
                             onClick={() => openEditModal(user)}
                             title="Edit account"
                             className="p-2 text-gray-400 hover:text-[#0E8F79] dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
@@ -488,19 +529,16 @@ export default function UserManagement() {
                             <Edit2 className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => toggleStatus(user.id)}
-                            title={user.status === 'Active' ? 'Block account' : 'Activate account'}
+                            type="button"
+                            onClick={() => openStatusActionModal(user)}
+                            title={isBlocked ? 'Unblock account' : 'Block account'}
                             className={`p-2 rounded-lg transition-colors ${
-                              user.status === 'Active'
-                                ? 'text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20'
-                                : 'text-red-400 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20'
+                              isBlocked
+                                ? 'text-red-400 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20'
+                                : 'text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20'
                             }`}
                           >
-                            {user.status === 'Active' ? (
-                              <Lock className="w-4 h-4" />
-                            ) : (
-                              <Unlock className="w-4 h-4" />
-                            )}
+                            <Lock className="w-4 h-4" />
                           </button>
                         </div>
                       </td>
@@ -719,6 +757,43 @@ export default function UserManagement() {
                 </GreenButton>
               </div>
             </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Status Change Confirmation Modal */}
+      {statusActionModal && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-sm p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              {statusActionModal.action === 'block' ? 'Block Account' : 'Unblock Account'}
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-6">
+              {statusActionModal.action === 'block'
+                ? <>Are you sure you want to block <strong>"{statusActionModal.user.name}"</strong>? They will not be able to sign in until you unblock the account.</>
+                : <>Are you sure you want to unblock <strong>"{statusActionModal.user.name}"</strong>? This will restore sign-in access.</>
+              }
+            </p>
+            <div className="flex justify-end gap-3">
+              <GreenButton variant="outline" onClick={() => setStatusActionModal(null)} disabled={submitting}>
+                Cancel
+              </GreenButton>
+              <button
+                onClick={() => void confirmStatusAction()}
+                disabled={submitting}
+                className={`inline-flex items-center justify-center rounded-lg font-medium px-4 py-2.5 text-sm text-white transition-colors disabled:opacity-50 ${
+                  statusActionModal.action === 'block'
+                    ? 'bg-red-600 hover:bg-red-700'
+                    : 'bg-[#0E8F79] hover:bg-[#0b7362]'
+                }`}
+              >
+                {submitting ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : null}
+                {statusActionModal.action === 'block' ? 'Block' : 'Unblock'}
+              </button>
+            </div>
           </div>
         </div>,
         document.body

@@ -2,7 +2,6 @@ import uuid
 import secrets
 
 from django.db import models
-from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.hashers import make_password, check_password
 
@@ -14,6 +13,8 @@ def _generate_recovery_key():
 
 
 class User(AbstractUser):
+    MAX_LOGIN_ATTEMPTS = 20
+
     ROLE_EMPLOYEE = 'employee'
     ROLE_SALES = 'sales'
     ROLE_ADMIN = 'admin'
@@ -42,6 +43,8 @@ class User(AbstractUser):
         blank=True,
         help_text='Hashed recovery key for password reset verification.',
     )
+    failed_login_attempts = models.PositiveSmallIntegerField(default=0)
+    is_login_blocked = models.BooleanField(default=False)
 
     @staticmethod
     def generate_recovery_key() -> str:
@@ -76,6 +79,24 @@ class User(AbstractUser):
             # Legacy plaintext key support during transition.
             self.set_recovery_key(self.recovery_key)
         super().save(*args, **kwargs)
+
+    def register_failed_login(self) -> bool:
+        """Increment failed attempts and return True when account becomes blocked."""
+        if self.is_login_blocked:
+            return True
+        self.failed_login_attempts += 1
+        if self.failed_login_attempts >= self.MAX_LOGIN_ATTEMPTS:
+            self.is_login_blocked = True
+            # Deactivate the account so it clearly appears blocked in admin/UX
+            self.is_active = False
+        self.save(update_fields=['failed_login_attempts', 'is_login_blocked'])
+        return self.is_login_blocked
+
+    def clear_failed_logins(self) -> None:
+        if self.failed_login_attempts or self.is_login_blocked:
+            self.failed_login_attempts = 0
+            self.is_login_blocked = False
+            self.save(update_fields=['failed_login_attempts', 'is_login_blocked'])
 
     @property
     def is_admin_level(self):

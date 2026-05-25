@@ -12,7 +12,7 @@ HTML_TAG_RE = re.compile(r'<[^>]*>')
 WHITESPACE_RE = re.compile(r'\s+')
 
 
-LONG_TEXT_MAX_LENGTH = 5000
+LONG_TEXT_MAX_LENGTH = 1000
 SIGNATURE_MAX_LENGTH = 1_000_000
 
 
