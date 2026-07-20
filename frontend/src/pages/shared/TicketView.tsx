@@ -412,6 +412,12 @@ function resolveTicketProductSnapshot(btData: BackendTicket): {
   };
 }
 
+function formatPdfValue(value: unknown, fallback = 'N/A'): string {
+  if (value === null || value === undefined) return fallback;
+  const text = String(value).trim();
+  return text || fallback;
+}
+
 export function TicketView() {
   const { user } = useAuth();
   const isEmployee = user?.role === 'employee';
@@ -936,6 +942,10 @@ export function TicketView() {
   const [feedbackRatingValue, setFeedbackRatingValue] = useState(0);
   const [feedbackComments, setFeedbackComments] = useState('');
   const [submittingFeedbackRating, setSubmittingFeedbackRating] = useState(false);
+  // Client copy acknowledged-by modal state
+  const [showClientCopyAck, setShowClientCopyAck] = useState(false);
+  const [ackSelectedKey, setAckSelectedKey] = useState('');
+  const [ackText, setAckText] = useState('');
 
   // ── Admin reassign (for escalated tickets) ──
   const [employees, setEmployees] = useState<{ id: number; first_name: string; last_name: string; username: string; active_ticket_count: number }[]>([]);
@@ -1780,6 +1790,135 @@ export function TicketView() {
       });
   };
 
+  const handleExportClientCopyPDF = (acknowledgedBy?: string) => {
+    setShowExportMenu(false);
+    if (!btData) return;
+
+    const dateTag = new Date().toISOString().slice(0, 10);
+    const product = ticket.productDetails;
+    const jobStatus = String(ticket.jobStatus || '').trim().toLowerCase();
+    const productWarranty = String(product?.warranty || '').trim().toLowerCase();
+    const companyName = formatPdfValue(ticket.client || btData.client_record_detail?.client_name);
+    const companyAddress = formatPdfValue(ticket.fullAddress || btData.client_record_detail?.address);
+    const contactNo = formatPdfValue([ticket.mobile, ticket.landline].filter((value) => value && value !== 'N/A').join(' / '));
+    const currentDate = formatPdfValue(btData.date || ticket.created);
+    const timeResponded = formatPdfValue(ticket.timeIn);
+    const timeCompleted = formatPdfValue(ticket.timeOut);
+    const contactPerson = formatPdfValue(ticket.contact);
+    const typeOfService = formatPdfValue(ticket.typeOfService);
+    const typeOfSupport = formatPdfValue(ticket.preferredSupport);
+    const descriptionOfTrouble = formatPdfValue(ticket.description);
+    const actionTaken = formatPdfValue(ticket.actionTaken);
+    const remarks = formatPdfValue(ticket.remarks);
+    const productName = formatPdfValue(product?.product || btData.product_record_detail?.product_name);
+    const productTitle = formatPdfValue(ticket.projectTitle || btData.product_record_detail?.project_title);
+    const deviceEquipment = formatPdfValue(product?.deviceEquipment);
+    const serialNo = formatPdfValue(product?.serialNo);
+    const productRemarks = formatPdfValue(product?.others);
+    const imageExtensions = /\.(png|jpe?g|gif|webp|bmp|svg)$/i;
+    const actionPictures = uploadedAttachments
+      .filter((att) => Boolean(att.url) && (att.type === 'screenshot' || imageExtensions.test(att.url || att.name)))
+      .slice(0, 12);
+
+    const statusRows = [
+      { label: 'Pending', active: jobStatus === 'pending' },
+      { label: 'Done', active: ['done', 'completed', 'closed', 'resolved'].includes(jobStatus) },
+      { label: 'Under Warranty', active: productWarranty === 'with warranty' || jobStatus === 'under warranty' },
+      { label: 'Under Quotation', active: jobStatus === 'for quotation' || jobStatus === 'under quotation' },
+      { label: 'Chargeable', active: jobStatus === 'chargeable' },
+      { label: 'Under Contract', active: jobStatus === 'under contract' },
+    ];
+    const statusPairs = [
+      [statusRows[0], statusRows[3]],
+      [statusRows[1], statusRows[4]],
+      [statusRows[2], statusRows[5]],
+    ] as const;
+
+    const body = `
+      <div class="report-section-title">Official Document</div>
+      <div class="report-info-grid">
+        <div class="report-info-col">
+          <div class="info-row"><span class="info-label">Company Name:</span><span class="info-value">${companyName}</span></div>
+          <div class="info-row"><span class="info-label">Company Address:</span><span class="info-value">${companyAddress}</span></div>
+          <div class="info-row"><span class="info-label">Contact Person:</span><span class="info-value">${contactPerson}</span></div>
+          <div class="info-row"><span class="info-label">Contact No.:</span><span class="info-value">${contactNo}</span></div>
+          <div class="info-row"><span class="info-label">Type of Service:</span><span class="info-value">${typeOfService}</span></div>
+          <div class="info-row"><span class="info-label">Type of Support:</span><span class="info-value">${typeOfSupport}</span></div>
+        </div>
+        <div class="report-info-col">
+          <div class="info-row"><span class="info-label">Date:</span><span class="info-value">${currentDate}</span></div>
+          <div class="info-row"><span class="info-label">Time Responded:</span><span class="info-value">${timeResponded}</span></div>
+          <div class="info-row"><span class="info-label">Time Completed:</span><span class="info-value">${timeCompleted}</span></div>
+        </div>
+      </div>
+
+      <div class="report-section-title">Description of Trouble</div>
+      <div class="report-remarks">${descriptionOfTrouble}</div>
+
+      <div class="report-section-title">Action Taken</div>
+      <div class="report-remarks">${actionTaken}</div>
+      ${actionPictures.length > 0 ? `
+        <div class="report-photo-section">
+          <div class="report-photo-title">Picture Attached</div>
+          <div class="report-photo-list">
+            ${actionPictures.map((att) => `<div class="report-photo-item"><img class="report-attachment-image" src="${att.url}" alt="Attached picture" /></div>`).join('')}
+          </div>
+        </div>
+      ` : ''}
+
+      <div class="report-status-grid">
+        ${statusPairs.map(([left, right]) => `
+          <div class="report-status-row">
+            <div class="status-item"><span class="status-box ${left.active ? 'is-checked' : ''}"></span><span>${left.label}</span></div>
+            <div class="status-item"><span class="status-box ${right.active ? 'is-checked' : ''}"></span><span>${right.label}</span></div>
+          </div>
+        `).join('')}
+      </div>
+
+      <div class="report-remarks"><span class="report-remarks-label">Remarks:</span>${remarks}</div>
+
+      <table class="report-product-table">
+        <thead><tr><th>Product Name</th><th>Product Title</th><th>Device/Equipment</th><th>Serial No.</th><th>Remarks</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>${productName}</td>
+            <td>${productTitle}</td>
+            <td>${deviceEquipment}</td>
+            <td>${serialNo}</td>
+            <td>${productRemarks}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="report-note">We confirm that the services requested has been satisfactorily performed as per our above report.</div>
+
+      <div class="report-signature-row">
+        <div class="report-signature-cell">
+          <div class="info-label">Acknowledged by:</div>
+          <div class="ack-signature-space"></div>
+          <div class="info-value">${formatPdfValue(acknowledgedBy || '')}</div>
+        </div>
+        <div class="report-signature-cell">
+          <div class="info-label">Assigned Technical:</div>
+          ${ticket.signature ? `<div class="signature-box"><img src="${ticket.signature}" alt="Signature" /></div><div class="info-value">${formatPdfValue(ticket.assignedTo || '')}</div>` : `<div class="info-value">${formatPdfValue(ticket.assignedTo || '')}</div>`}
+        </div>
+      </div>`;
+
+    const html = buildPdfDocument(
+      `Service Report ${ticket.id}`,
+      'Service Report',
+      body,
+      `Service Report ${ticket.id}`,
+    );
+
+    void openPrintWindow(html, `service_report_${ticket.id}_client_copy_${dateTag}.pdf`)
+      .then(() => toast.success('Client copy PDF downloaded.'))
+      .catch((err) => {
+        console.error('Client copy PDF export failed:', err);
+        toast.error('Client copy PDF export failed.');
+      });
+  };
+
   const handleExportTicket = () => {
     if (!btData) return;
     try {
@@ -2034,6 +2173,45 @@ export function TicketView() {
 
   return (
     <div className="space-y-6">
+      {showClientCopyAck && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/40" onClick={() => setShowClientCopyAck(false)} />
+          <div className="relative bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-md z-50 p-4 mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Acknowledged by</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">Select a contact or type a name to include in the client copy.</p>
+            <select
+              value={ackSelectedKey}
+              onChange={(e) => setAckSelectedKey(e.target.value)}
+              className="w-full mb-2 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-gray-100 outline-none"
+            >
+              {callContactOptions.map((c) => (
+                <option key={c.key} value={c.key}>{c.name}{c.phoneNumber ? ` — ${c.phoneNumber}` : ''}</option>
+              ))}
+              <option value="__other__">Other (type below)</option>
+            </select>
+            <input
+              value={ackText}
+              onChange={(e) => setAckText(e.target.value)}
+              placeholder="Type name to acknowledge"
+              className="w-full mb-3 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-gray-100 outline-none"
+            />
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowClientCopyAck(false)} className="px-3 py-2 rounded bg-gray-100 dark:bg-gray-700 text-sm">Cancel</button>
+              <button
+                onClick={() => {
+                  const selectedContact = callContactOptions.find(c => c.key === ackSelectedKey);
+                  const value = (ackText || (selectedContact ? selectedContact.name : '')).trim();
+                  setShowClientCopyAck(false);
+                  void handleExportClientCopyPDF(value);
+                }}
+                className="px-3 py-2 rounded bg-[#0E8F79] text-white text-sm"
+              >
+                Download
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {btLoading ? (
         <div className="flex items-center justify-center py-32">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#0E8F79]" />
@@ -2094,6 +2272,15 @@ export function TicketView() {
               </>
             )}
           </div>
+          <button
+            onClick={() => { setAckSelectedKey(callContactOptions[0]?.key || ''); setAckText(''); setShowClientCopyAck(true); setShowExportMenu(false); }}
+            title="Download for Clients Copy"
+            aria-label="Download for Clients Copy"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-sm text-gray-700 dark:text-gray-300"
+          >
+            <FileDown className="w-4 h-4 text-red-500" />
+            Client Copy PDF
+          </button>
           <button
             onClick={() => setShowChat(true)}
             title="Messages"

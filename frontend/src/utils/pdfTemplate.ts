@@ -103,6 +103,216 @@ export const PDF_CSS = `
   .info-row { display: flex; gap: 6px; padding: 4px 0; font-size: 11px; align-items: flex-start; }
   .info-label { font-weight: 600; color: #154734; min-width: 120px; flex-shrink: 0; font-size: 10px; }
   .info-value { color: #1f2937; font-size: 11px; word-break: break-word; }
+  .report-section-title {
+    margin: 14px 0 0;
+    background: #355f27;
+    color: #ffffff;
+    text-align: center;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 5px 10px;
+    border-radius: 0;
+    border-left: none;
+  }
+  .report-info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 36px;
+    margin: 0;
+    padding: 12px 12px 10px;
+    background: #ffffff;
+    border: 1px solid #dbead8;
+    border-top: none;
+  }
+  .report-info-col {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .report-info-grid .info-label {
+    min-width: 110px;
+    font-size: 9px;
+    color: #3f4a3f;
+  }
+  .report-info-grid .info-value {
+    font-size: 9px;
+    line-height: 1.3;
+  }
+  .report-status-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px;
+    border: 1px solid #dbead8;
+    border-top: none;
+    background: #ffffff;
+    margin-bottom: 0;
+  }
+  .report-status-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 28px;
+    align-items: center;
+  }
+  .status-item {
+    display: grid;
+    grid-template-columns: 12px minmax(0, 1fr);
+    gap: 6px;
+    align-items: center;
+    font-size: 10px;
+    color: #2f3a2f;
+    min-height: 16px;
+    line-height: 1;
+  }
+  .status-box {
+    width: 10px;
+    height: 10px;
+    border: 1px solid #6b7280;
+    display: inline-block;
+    position: relative;
+    flex: 0 0 auto;
+    line-height: 1;
+    color: #355f27;
+    background: #ffffff;
+  }
+  .status-item span:last-child {
+    display: block;
+    line-height: 1.2;
+  }
+  .status-box.is-checked {
+    background: #d7ead1;
+  }
+  .status-box.is-checked::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 4px;
+    height: 7px;
+    border-right: 1.5px solid #355f27;
+    border-bottom: 1.5px solid #355f27;
+    transform: translate(-50%, -60%) rotate(45deg);
+    transform-origin: center;
+  }
+  .report-remarks {
+    border: 1px solid #dbead8;
+    border-top: none;
+    padding: 10px 12px 8px;
+    font-size: 10px;
+    background: #ffffff;
+  }
+  .report-remarks-label {
+    font-weight: 700;
+    color: #355f27;
+    margin-right: 6px;
+  }
+  .report-product-table {
+    margin-bottom: 10px;
+  }
+  .report-product-table thead tr {
+    background: #4d6f32;
+  }
+  .report-product-table th {
+    text-transform: uppercase;
+    font-size: 7px;
+    letter-spacing: 0.4px;
+    text-align: center;
+    padding: 6px 5px;
+    white-space: nowrap;
+  }
+  .report-product-table td {
+    font-size: 9px;
+    text-align: center;
+    vertical-align: middle;
+    padding: 6px 5px;
+  }
+  .report-note {
+    padding: 2px 0 8px;
+    font-size: 10px;
+    color: #2f3a2f;
+  }
+  .report-photo-section {
+    border: none;
+    padding: 8px 0 0;
+    background: transparent;
+    page-break-inside: avoid;
+  }
+  .report-photo-title {
+    font-size: 10px;
+    font-weight: 700;
+    color: #355f27;
+    margin-bottom: 8px;
+  }
+  .report-photo-list {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .report-photo-item {
+    width: auto;
+    max-width: 220px;
+    flex: 0 0 auto;
+  }
+  .report-attachment-image {
+    width: auto;
+    max-width: 220px;
+    height: auto;
+    max-height: 170px;
+    object-fit: contain;
+    display: block;
+    margin: 0;
+    page-break-inside: avoid;
+  }
+  .report-signature-row {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    border-top: 1px solid #cfd8cf;
+    border-bottom: 1px solid #cfd8cf;
+    margin-top: 8px;
+  }
+  .report-signature-cell {
+    min-height: 44px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    color: #1f2937;
+    border-right: 1px solid #cfd8cf;
+    padding: 8px;
+    text-align: center;
+  }
+  .report-signature-cell .info-value {
+    margin-top: 0;
+  }
+  .report-signature-cell .ack-signature-space {
+    width: 78%;
+    height: 34px;
+  }
+  .report-signature-cell .signature-box {
+    width: auto;
+    min-height: 0;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+  }
+  .report-signature-cell .signature-box img {
+    max-height: 64px;
+    max-width: 190px;
+    object-fit: contain;
+    display: block;
+    margin: 0 auto;
+    filter: contrast(1.2) brightness(0.8);
+    mix-blend-mode: multiply;
+  }
+  .report-signature-cell:last-child {
+    border-right: none;
+  }
   .desc {
     padding: 12px 14px; background: #f8fdf9; border: 1px solid #e8faf0;
     border-radius: 6px; font-size: 11px; line-height: 1.6; margin-bottom: 12px;
@@ -170,6 +380,7 @@ export const PDF_CSS = `
   tr { page-break-inside: avoid; }
   .desc { page-break-inside: avoid; }
   .signature-section { page-break-inside: avoid; }
+  .report-info-grid, .report-status-grid, .report-product-table, .report-signature-row { page-break-inside: avoid; }
   /* ── Badge ── */
   .badge {
     display: inline-block; padding: 2px 8px; border-radius: 12px;
