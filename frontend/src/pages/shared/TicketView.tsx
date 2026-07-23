@@ -1811,7 +1811,7 @@ export function TicketView() {
     const actionTaken = formatPdfValue(ticket.actionTaken);
     const remarks = formatPdfValue(ticket.remarks);
     const productName = formatPdfValue(product?.product || btData.product_record_detail?.product_name);
-    const productTitle = formatPdfValue(ticket.projectTitle || btData.product_record_detail?.project_title);
+
     const deviceEquipment = formatPdfValue(product?.deviceEquipment);
     const serialNo = formatPdfValue(product?.serialNo);
     const productRemarks = formatPdfValue(product?.others);
@@ -1878,14 +1878,13 @@ export function TicketView() {
       <div class="report-remarks"><span class="report-remarks-label">Remarks:</span>${remarks}</div>
 
       <table class="report-product-table">
-        <thead><tr><th>Product Name</th><th>Product Title</th><th>Device/Equipment</th><th>Serial No.</th><th>Remarks</th></tr></thead>
+        <thead><tr><th>Product Name</th><th>Device/Equipment</th><th>Serial No.</th><th>Remarks</th></tr></thead>
         <tbody>
           <tr>
             <td>${productName}</td>
-            <td>${productTitle}</td>
             <td>${deviceEquipment}</td>
             <td>${serialNo}</td>
-            <td>${productRemarks}</td>
+            <td>${remarks}</td>
           </tr>
         </tbody>
       </table>

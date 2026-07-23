@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Eraser, Check, Save } from 'lucide-react';
+import { Eraser, Check, Save, Upload } from 'lucide-react';
 
 interface SignaturePadProps {
   onSave: (dataUrl: string) => void;
@@ -12,6 +12,7 @@ interface SignaturePadProps {
 export function SignaturePad({ onSave, initialValue, height = 200, disabled = false }: SignaturePadProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasContent, setHasContent] = useState(!!initialValue);
   const [isSaved, setIsSaved] = useState(!!initialValue);
@@ -43,6 +44,33 @@ export function SignaturePad({ onSave, initialValue, height = 200, disabled = fa
     return () => observer.disconnect();
   }, []);
 
+  const drawImageOnCanvas = useCallback((imageSrc: string) => {
+    const ctx = getCtx();
+    const canvas = canvasRef.current;
+    if (!ctx || !canvas) return;
+  
+    const img = new Image();
+    img.onload = () => {
+      // Clear canvas before drawing
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvasWidth, height);
+      
+      // Preserve aspect ratio
+      const hRatio = canvasWidth / img.width;
+      const vRatio = height / img.height;
+      const ratio = Math.min(hRatio, vRatio);
+      const centerShiftX = (canvasWidth - img.width * ratio) / 2;
+      const centerShiftY = (height - img.height * ratio) / 2;
+  
+      ctx.drawImage(img, 0, 0, img.width, img.height,
+                    centerShiftX, centerShiftY, img.width * ratio, img.height * ratio);
+      
+      setHasContent(true);
+      if (isSaved) setIsSaved(false);
+    };
+    img.src = imageSrc;
+  }, [getCtx, canvasWidth, height, isSaved]);
+
   // Setup / resize canvas whenever measured width or height changes
   useEffect(() => {
     if (canvasWidth === 0) return;
@@ -70,13 +98,9 @@ export function SignaturePad({ onSave, initialValue, height = 200, disabled = fa
 
     // Load initial value
     if (initialValue) {
-      const img = new Image();
-      img.onload = () => {
-        ctx.drawImage(img, 0, 0, canvasWidth, height);
-      };
-      img.src = initialValue;
+      drawImageOnCanvas(initialValue);
     }
-  }, [canvasWidth, height, initialValue, getCtx]);
+  }, [canvasWidth, height, initialValue, getCtx, drawImageOnCanvas]);
 
   const getPosition = (e: React.MouseEvent | React.TouchEvent) => {
     const canvas = canvasRef.current;
@@ -144,6 +168,25 @@ export function SignaturePad({ onSave, initialValue, height = 200, disabled = fa
     onSave('');
   };
 
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      if (dataUrl) {
+        drawImageOnCanvas(dataUrl);
+      }
+    };
+    reader.readAsDataURL(file);
+    event.target.value = ''; // Reset for same-file upload
+  };
+
   return (
     <div className="space-y-2">
       <div
@@ -164,19 +207,35 @@ export function SignaturePad({ onSave, initialValue, height = 200, disabled = fa
         />
         {!hasContent && !disabled && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <span className="text-gray-300 dark:text-gray-500 text-sm">Sign here</span>
+            <span className="text-gray-300 dark:text-gray-500 text-sm">Sign or upload</span>
           </div>
         )}
       </div>
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        accept="image/png, image/jpeg, image/webp"
+        className="hidden"
+      />
       {!disabled && (
         <div className="flex items-center justify-between">
-          <button
-            type="button"
-            onClick={clear}
-            className="flex items-center gap-1 px-3 py-1 text-xs text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-          >
-            <Eraser className="w-3 h-3" /> Clear
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={clear}
+              className="flex items-center gap-1 px-3 py-1 text-xs text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+            >
+              <Eraser className="w-3 h-3" /> Clear
+            </button>
+            <button
+              type="button"
+              onClick={handleUploadClick}
+              className="flex items-center gap-1 px-3 py-1 text-xs text-gray-500 hover:text-[#0E8F79] hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+            >
+              <Upload className="w-3 h-3" /> Upload
+            </button>
+          </div>
           <div className="flex items-center gap-2">
             {hasContent && !isSaved && (
               <button
