@@ -252,14 +252,14 @@ export const PDF_CSS = `
   }
   .report-photo-item {
     width: auto;
-    max-width: 220px;
+    max-width: 480px;
     flex: 0 0 auto;
   }
   .report-attachment-image {
     width: auto;
-    max-width: 220px;
+    max-width: 480px;
     height: auto;
-    max-height: 170px;
+    max-height: 360px;
     object-fit: contain;
     display: block;
     margin: 0;
@@ -295,7 +295,7 @@ export const PDF_CSS = `
   }
   .report-signature-cell .signature-box {
     width: auto;
-    min-height: 0;
+    min-height: 64px;
     padding: 0;
     background: transparent;
     border: none;

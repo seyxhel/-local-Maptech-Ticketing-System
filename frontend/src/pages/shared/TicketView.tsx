@@ -1852,7 +1852,7 @@ export function TicketView() {
         </div>
       </div>
 
-      <div class="report-section-title">Description of Trouble</div>
+      <div class="report-section-title">Description</div>
       <div class="report-remarks">${descriptionOfTrouble}</div>
 
       <div class="report-section-title">Action Taken</div>
@@ -1895,12 +1895,13 @@ export function TicketView() {
       <div class="report-signature-row">
         <div class="report-signature-cell">
           <div class="info-label">Acknowledged by:</div>
-          <div class="ack-signature-space"></div>
+          <div class="signature-box">&nbsp;</div>
           <div class="info-value">${formatPdfValue(acknowledgedBy || '')}</div>
         </div>
         <div class="report-signature-cell">
-          <div class="info-label">Assigned Technical:</div>
-          ${ticket.signature ? `<div class="signature-box"><img src="${ticket.signature}" alt="Signature" /></div><div class="info-value">${formatPdfValue(ticket.assignedTo || '')}</div>` : `<div class="info-value">${formatPdfValue(ticket.assignedTo || '')}</div>`}
+          <div class="info-label">Technical:</div>
+          ${ticket.signature ? `<div class="signature-box"><img src="${ticket.signature}" alt="Signature" /></div>` : `<div class="signature-box">&nbsp;</div>`}
+          <div class="info-value">${formatPdfValue(ticket.assignedTo || '')}</div>
         </div>
       </div>`;
 
