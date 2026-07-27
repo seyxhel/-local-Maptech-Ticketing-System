@@ -1,71 +1,53 @@
-from rest_framework import viewsets
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from django.db.models import Q
-from django.utils import timezone
-
-from ..models import RetentionPolicy, Announcement
-from ..serializers import RetentionPolicySerializer, AnnouncementSerializer
+from rest_framework import viewsets, views, response, status
+from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from ..models.config import RetentionPolicy, Announcement, ReportSettings
+from ..serializers.config import RetentionPolicySerializer, AnnouncementSerializer, ReportSettingsSerializer
 from ..permissions import IsSuperAdmin
 
 
 class RetentionPolicyViewSet(viewsets.ViewSet):
-    """Singleton retention policy — superadmin can view and update."""
     permission_classes = [IsAuthenticated, IsSuperAdmin]
-    swagger_tags = ['Retention Policy']
 
     def list(self, request):
-        """Return the current retention policy."""
         policy = RetentionPolicy.get_policy()
-        return Response(RetentionPolicySerializer(policy).data)
+        serializer = RetentionPolicySerializer(policy)
+        return response.Response(serializer.data)
 
-    def create(self, request):
-        """Update the singleton retention policy (uses POST for simplicity)."""
+    def update(self, request, pk=None):
         policy = RetentionPolicy.get_policy()
         serializer = RetentionPolicySerializer(policy, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        serializer.save(updated_by=request.user)
-        return Response(serializer.data)
+        if serializer.is_valid():
+            serializer.save(updated_by=request.user)
+            return response.Response(serializer.data)
+        return response.Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class AnnouncementViewSet(viewsets.ModelViewSet):
-    """
-    Superadmin: full CRUD.
-    Admin / Employee: list only (filtered by visibility & active date range).
-    """
+    queryset = Announcement.objects.all()
     serializer_class = AnnouncementSerializer
-    permission_classes = [IsAuthenticated]
-    swagger_tags = ['Announcements']
+    permission_classes = [IsAuthenticated, IsAdminUser]
 
-    def get_queryset(self):
-        if getattr(self, 'swagger_fake_view', False):
-            return Announcement.objects.none()
-
-        user = self.request.user
-        qs = Announcement.objects.all()
-
-        if user.role == 'superadmin':
-            return qs
-
-        # Non-superadmin users only see active announcements within date range
-        now = timezone.now()
-        qs = qs.filter(is_active=True, start_date__lte=now).filter(
-            Q(end_date__isnull=True) | Q(end_date__gte=now)
-        )
-
-        if user.role == 'admin':
-            return qs.filter(visibility__in=['all', 'admin'])
-        elif user.role == 'sales':
-            return qs.filter(visibility__in=['all', 'sales'])
-        elif user.role == 'employee':
-            return qs.filter(visibility__in=['all', 'employee'])
-
-        return qs.none()
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [IsAuthenticated(), IsSuperAdmin()]
+        return [IsAuthenticated(), IsAdminUser()]
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
 
-    def check_permissions(self, request):
-        super().check_permissions(request)
-        if self.action not in ('list', 'retrieve') and request.user.role != 'superadmin':
-            self.permission_denied(request, message='Only superadmin can manage announcements.')
+
+class ReportSettingsView(views.APIView):
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def get(self, request):
+        settings = ReportSettings.get_settings()
+        serializer = ReportSettingsSerializer(settings)
+        return response.Response(serializer.data)
+
+    def put(self, request):
+        settings = ReportSettings.get_settings()
+        serializer = ReportSettingsSerializer(settings, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save(updated_by=request.user)
+            return response.Response(serializer.data)
+        return response.Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

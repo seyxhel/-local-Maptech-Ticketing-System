@@ -7,6 +7,7 @@ import { changePassword, updateProfile } from '../../services/authService';
 import { fetchRetentionPolicy, updateRetentionPolicy, type RetentionPolicyData } from '../../services/api';
 import { toast } from 'sonner';
 import { ProfilePhotoSection } from '../../components/profile/ProfilePhotoSection';
+import { ReportSettingsForm } from '../../components/admin/ReportSettingsForm';
 import { getRoleMeta } from './settingsRoleMeta';
 import {
   validatePassword,
@@ -611,6 +612,18 @@ export default function SharedSettings() {
               </button>
             </div>
           )}
+        </Card>
+      )}
+
+      {role === 'admin' && (
+        <Card accent>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Report Customization</h2>
+          </div>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+            Customize the header and footer of generated PDF reports.
+          </p>
+          <ReportSettingsForm />
         </Card>
       )}
     </div>

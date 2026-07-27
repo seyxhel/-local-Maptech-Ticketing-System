@@ -1,6 +1,7 @@
 import { MAPTECH_LOGO_BASE64 } from './pdfLogo';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
+import { ReportSettingsData } from '../services/api';
 
 /**
  * Shared PDF template system for professional Maptech-branded exports.
@@ -425,13 +426,14 @@ export function pdfHeader(
   reportTitle: string,
   dateStr: string,
   timeStr: string,
+  settings: ReportSettingsData,
 ): string {
   return `
     <div class="header-banner">
       <img src="${MAPTECH_LOGO_BASE64}" alt="Maptech" class="header-logo" />
       <div class="header-text">
-        <div class="header-title">${reportTitle}</div>
-        <div class="header-company">Maptech Information Solutions Inc.</div>
+        <div class="header-title">${settings.header_title}</div>
+        <div class="header-company">${settings.header_company}</div>
       </div>
     </div>
     <div class="sub-header">
@@ -442,15 +444,15 @@ export function pdfHeader(
 }
 
 /** Generate the branded footer HTML */
-export function pdfFooter(recordCount: string, dateIso: string, timeStr: string): string {
+export function pdfFooter(recordCount: string, dateIso: string, timeStr: string, settings: ReportSettingsData): string {
   return `
     <div class="footer-wrap">
       <div class="footer-divider"></div>
       <div class="footer-bar">
-        <div class="footer-left">Maptech Information Solutions Inc.</div>
+        <div class="footer-left">${settings.footer_left}</div>
         <div class="footer-right">
           ${recordCount} &bull; ${dateIso} ${timeStr}<br/>
-          Confidential &mdash; For Authorized Use Only
+          ${settings.footer_right}
         </div>
       </div>
     </div>
@@ -463,8 +465,9 @@ export function buildPdfDocument(
   reportTitle: string,
   bodyContent: string,
   recordSummary: string,
-  signatureData?: string,
-  signedBy?: string,
+  signatureData: string | undefined,
+  signedBy: string | undefined,
+  settings?: ReportSettingsData,
 ): string {
   const now = new Date();
   const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
@@ -473,16 +476,26 @@ export function buildPdfDocument(
   const signatureMeta = signatureData ? 'present' : 'none';
   const signedByMeta = signedBy || 'n/a';
 
+  const reportSettings = settings || {
+    id: 1,
+    header_title: 'Service Report',
+    header_company: 'Maptech Information Solutions Inc.',
+    footer_left: 'Maptech Information Solutions Inc.',
+    footer_right: 'Confidential &mdash; For Authorized Use Only',
+    updated_at: new Date().toISOString(),
+    updated_by: null,
+  };
+
   return `<!DOCTYPE html><html><head>
     <title>${title}</title>
     <style>${PDF_CSS}</style>
   </head><body>
     <!-- signature:${signatureMeta}; signedBy:${signedByMeta} -->
-    ${pdfHeader(reportTitle, dateStr, timeStr)}
+    ${pdfHeader(reportTitle, dateStr, timeStr, reportSettings)}
     <div class="page-wrapper">
       ${bodyContent}
     </div>
-    ${pdfFooter(recordSummary, dateIso, timeStr)}
+    ${pdfFooter(recordSummary, dateIso, timeStr, reportSettings)}
   </body></html>`;
 }
 

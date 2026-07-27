@@ -15,17 +15,3 @@ from .knowledge import KnowledgeHubAttachmentSerializer, PublishedArticleSeriali
 from .notification import NotificationSerializer
 from .config import RetentionPolicySerializer, AnnouncementSerializer
 
-__all__ = [
-    'TypeOfServiceSerializer', 'CategorySerializer',
-    'ClientSerializer',
-    'ProductSerializer',
-    'CallLogSerializer', 'FeedbackRatingSerializer',
-    'AssignmentSessionSerializer', 'MessageSerializer',
-    'MessageReactionSerializer', 'MessageReadReceiptSerializer',
-    'EscalationLogSerializer', 'AuditLogSerializer',
-    'TicketSerializer', 'TicketTaskSerializer', 'TicketAttachmentSerializer',
-    'AdminCreateTicketSerializer', 'EmployeeTicketActionSerializer',
-    'KnowledgeHubAttachmentSerializer', 'PublishedArticleSerializer',
-    'NotificationSerializer',
-    'RetentionPolicySerializer', 'AnnouncementSerializer',
-]

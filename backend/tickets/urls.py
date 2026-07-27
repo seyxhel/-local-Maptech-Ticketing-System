@@ -22,6 +22,7 @@ from .views import (
     list_employees,
     list_sales_users,
     list_supervisors,
+    ReportSettingsView,
 )
 from users.views import AuthViewSet, CustomTokenObtainPairView, CustomTokenRefreshView, UserViewSet
 
@@ -54,11 +55,12 @@ for prefix, viewset, basename in [
     (r'notifications', NotificationViewSet, 'notification'),
     (r'retention-policy', RetentionPolicyViewSet, 'retentionpolicy'),
     (r'announcements', AnnouncementViewSet, 'announcement'),
-]:
+    ]:
     router.register(prefix, viewset, basename=basename)
 
-urlpatterns = [
+    urlpatterns = [
     path('', include(router.urls)),
+    path('report-settings/', ReportSettingsView.as_view(), name='report_settings'),
     path('auth/login/', decorated_login_view, name='token_obtain_pair'),
     path('auth/token/refresh/', decorated_refresh_view, name='token_refresh'),
     path('employees/', list_employees, name='list_employees'),

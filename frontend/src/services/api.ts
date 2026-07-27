@@ -88,6 +88,16 @@ async function handleResponse<T>(res: Response): Promise<T> {
 
 // ── Types ──
 
+export interface ReportSettingsData {
+  id: number;
+  header_title: string;
+  header_company: string;
+  footer_left: string;
+  footer_right: string;
+  updated_at: string;
+  updated_by: number | null;
+}
+
 export interface BackendUser {
   id: number;
   username: string;
@@ -1325,5 +1335,28 @@ export async function deleteAnnouncement(id: number): Promise<void> {
     const data = await res.json().catch(() => ({}));
     throw new Error((data as Record<string, string>).detail || `Delete failed (${res.status})`);
   }
+}
+
+// ── Report Settings endpoints ──
+
+/** Fetch the current report settings (admin only). */
+export async function fetchReportSettings(): Promise<ReportSettingsData> {
+  const res = await apiFetch(`${API_BASE}/report-settings/`, { headers: authHeaders() });
+  return handleResponse<ReportSettingsData>(res);
+}
+
+/** Update the report settings (admin only). */
+export async function updateReportSettings(data: Partial<{
+  header_title: string;
+  header_company: string;
+  footer_left: string;
+  footer_right: string;
+}>): Promise<ReportSettingsData> {
+  const res = await apiFetch(`${API_BASE}/report-settings/`, {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify(data),
+  });
+  return handleResponse<ReportSettingsData>(res);
 }
 

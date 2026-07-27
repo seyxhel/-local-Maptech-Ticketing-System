@@ -88,3 +88,51 @@ class Announcement(models.Model):
         if self.end_date and now > self.end_date:
             return False
         return True
+
+
+class ReportSettings(models.Model):
+    """Customizable settings for PDF report headers and footers.
+    Only one row should exist (singleton). Use ReportSettings.get_settings() to access.
+    """
+    header_title = models.CharField(
+        max_length=255,
+        default='Service Report',
+        help_text='Main title displayed in the PDF report header.',
+    )
+    header_company = models.CharField(
+        max_length=255,
+        default='Maptech Information Solutions Inc.',
+        help_text='Company name displayed in the PDF report header.',
+    )
+    footer_left = models.CharField(
+        max_length=255,
+        default='Maptech Information Solutions Inc.',
+        help_text='Content for the left side of the PDF report footer.',
+    )
+    footer_right = models.TextField(
+        default='Confidential &mdash; For Authorized Use Only',
+        help_text='Content for the right side of the PDF report footer. Can include HTML.',
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='+',
+    )
+
+    class Meta:
+        verbose_name = 'Report Settings'
+        verbose_name_plural = 'Report Settings'
+
+    def __str__(self):
+        return 'PDF Report Settings'
+
+    def save(self, *args, **kwargs):
+        # Enforce singleton: always use pk=1
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get_settings(cls):
+        """Return the singleton settings, creating it with defaults if it doesn't exist."""
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj

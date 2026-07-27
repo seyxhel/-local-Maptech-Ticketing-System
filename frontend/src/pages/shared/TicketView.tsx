@@ -15,8 +15,8 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { TicketChatSocket } from '../../services/chatService';
 import type { ChatMessage, ChatEvent, ChatAttachment } from '../../services/chatService';
-import { fetchTicketByStf, fetchTicketById, uploadResolutionProof, deleteAttachment, closeTicket, updateEmployeeFields, saveProductDetails, escalateTicket, escalateExternal, startWork, createFeedbackRating, updateTicket, fetchProducts, submitForObservation, assignTicket, fetchEmployees, fetchTickets, createCallLog, endCallLog, reviewTicket, confirmTicket, fetchCallLogs } from '../../services/api';
-import type { Product, CallLog, UploadedAttachment } from '../../services/api';
+import { fetchTicketByStf, fetchTicketById, uploadResolutionProof, deleteAttachment, closeTicket, updateEmployeeFields, saveProductDetails, escalateTicket, escalateExternal, startWork, createFeedbackRating, updateTicket, fetchProducts, submitForObservation, assignTicket, fetchEmployees, fetchTickets, createCallLog, endCallLog, reviewTicket, confirmTicket, fetchCallLogs, fetchReportSettings } from '../../services/api';
+import type { Product, CallLog, UploadedAttachment, ReportSettingsData } from '../../services/api';
 import { toast } from 'sonner';
 import type { BackendTicket } from '../../services/api';
 import { mapStatus, mapPriority, getAssigneeName, reverseMapStatus, reverseMapPriority, getUserDisplayName } from '../../services/ticketMapper';
@@ -431,6 +431,39 @@ export function TicketView() {
   // Backend ticket state
   const [btLoading, setBtLoading] = useState(true);
   const [btData, setBtData] = useState<BackendTicket | null>(null);
+
+  // Report settings state
+  const [reportSettings, setReportSettings] = useState<ReportSettingsData | null>(null);
+
+  // Fetch report settings on component mount
+  useEffect(() => {
+    let cancelled = false;
+    if (isAdmin) { // Only fetch if the user is an admin
+      fetchReportSettings()
+        .then((settings) => {
+          if (!cancelled) {
+            setReportSettings(settings);
+          }
+        })
+        .catch((err) => {
+          if (!cancelled) {
+            console.error('Failed to fetch report settings:', err);
+            // Optionally set default settings if fetch fails
+            setReportSettings({
+              id: 1,
+              header_title: 'Service Report',
+              header_company: 'Maptech Information Solutions Inc.',
+              footer_left: 'Maptech Information Solutions Inc.',
+              footer_right: 'Confidential &mdash; For Authorized Use Only',
+              updated_at: new Date().toISOString(),
+              updated_by: null,
+            });
+          }
+        });
+    }
+
+    return () => { cancelled = true; };
+  }, [isAdmin]);
 
   // Compute SLA from backend data
   function computeSla(bt: BackendTicket) {
@@ -1909,6 +1942,17 @@ export function TicketView() {
       'Service Report',
       body,
       `Service Report ${ticket.id}`,
+      undefined, // signatureData
+      undefined, // signedBy
+      reportSettings || {
+        id: 1,
+        header_title: 'Service Report',
+        header_company: 'Maptech Information Solutions Inc.',
+        footer_left: 'Maptech Information Solutions Inc.',
+        footer_right: 'Confidential &mdash; For Authorized Use Only',
+        updated_at: new Date().toISOString(),
+        updated_by: null,
+      },
     );
 
     void openPrintWindow(html, `service_report_${ticket.id}_client_copy_${dateTag}.pdf`)
